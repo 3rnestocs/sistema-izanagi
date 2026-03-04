@@ -1,14 +1,265 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// ==========================================
+// 🧬 SISTEMA IZANAGI V2 - NÚCLEO RELACIONAL
+// ==========================================
 
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider     = "postgresql"
+  relationMode = "prisma"
+}
+
+// ==========================================
+// 👤 1. ENTIDADES PRINCIPALES
+// ==========================================
+
+model Character {
+  id            String    @id @default(uuid())
+  discordId     String    @unique
+  name          String    @unique // El "Keko"
+  fullName      String?   // Asegúrate de que este campo EXISTA aquí
+  age           Int?
+  moral         String?
+  level         String    @default("D1")    // D1, D2, C1...
+  rank          String    @default("Genin") // Genin, Chuunin, Jounin...
+  isSpecialRank Boolean   @default(false)   // True si es ANBU, Sannin, etc.
+  canCreateNPC Boolean @default(false)      // Candado para creación de NPCs (Solo para altos cargos)
+  title         String?                     // Kage, Líder de Clan, Sannin (Coexisten con el Rank)
+
+  // 💰 SISTEMA DE SUELDOS
+  lastSalaryClaim DateTime @default(now()) // Para evitar que cobren el Lunes 5 veces
+
+  ryou          Int       @default(0)
+  exp           Int       @default(0)
+  pr            Int       @default(0)
+  sp            Int       @default(0)
+  cupos         Int       @default(0)
+  rc            Int       @default(0)
+  bts             Int       @default(0) // Bonos de Técnica Superior
+  bes             Int       @default(0) // Bonos de Experimentación Superior
+  specialWishUsed Boolean   @default(false) // Candado del Deseo Especial Único
+
+  fuerza        Int       @default(0)
+  resistencia   Int       @default(0)
+  velocidad     Int       @default(0)
+  percepcion    Int       @default(0)
+  chakra        Int       @default(0)
+  armas         Int       @default(0)
+  inteligencia  Int       @default(0)
+
+  traits        CharacterTrait[]
+  plazas CharacterPlaza[]
+  logs   AuditLog[]
+  inventory   InventoryItem[]
+  activities ActivityRecord[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// 🧬 2. CATÁLOGOS SSOT (RASGOS Y PLAZAS)
+// ==========================================
+
+model Trait {
+  id       String @id @default(uuid())
+  name     String @unique // Case sensitive SSOT
+  category String // Ej: Origen, Nacimiento, etc.
+  costRC   Int    @default(0) // Puede ser negativo (gasto) o positivo (ingreso)
+
+  // 💸 ECONOMÍA Y MODIFICADORES ESTÁTICOS
+  bonusRyou          Int     @default(0) // Sueldos planos (Noble, Rico)
+  multiplierGasto    Float   @default(1.0) // Multiplicador de compra (Derrochador)
+  multiplierGanancia Float   @default(1.0) // Multiplicador de venta/sueldo (Ambicioso)
+  minBalanceRule     Int     @default(0) // Regla Tacaño: Saldo intocable
+  blocksTransfer     Boolean @default(false) // Regla Tacaño: Prohíbe ceder dinero
+
+  // 🛑 MECÁNICAS FLEXIBLES (JSON)
+  // Ideal para bloqueos de stat como: { "blockedStats": ["Armas", "Velocidad"] } 
+  // Esto evita crear columnas booleanas innecesarias para cada stat en la DB.
+  mechanics Json?
+
+  // 🔗 RELACIONES
+  characters CharacterTrait[]
+
+  // Mapeo de Incompatibilidades (A y B)
+  incompatibilitiesA TraitConflict[] @relation("TraitAToConflict")
+  incompatibilitiesB TraitConflict[] @relation("TraitBToConflict")
+
+  // Herencia desde Plazas
+  inheritedByPlazas PlazaTraitInheritance[]
+}
+
+model Plaza {
+  id        String @id @default(uuid())
+  name      String @unique
+  category  String
+  costCupos Int    @default(0)
+
+  // 📈 BONOS DIRECTOS A STATS
+  bonusStatName  String? // Ej: "Ninjutsu" o "Fuerza"
+  bonusStatValue Int     @default(0)
+
+  // 🔗 RELACIONES
+  characters CharacterPlaza[]
+
+  // 🎁 HERENCIA RECURSIVA (SSOT)
+  inheritedTraits PlazaTraitInheritance[]
+  inheritedPlazas PlazaPlazaInheritance[] @relation("ParentPlaza")
+  parentPlazas    PlazaPlazaInheritance[] @relation("ChildPlaza")
+}
+
+// ==========================================
+// 🤝 3. TABLAS INTERMEDIAS (RELACIONES M:N Y LÓGICA)
+// ==========================================
+
+// Tabla de conflictos para Rasgos (Incompatibilidades)
+model TraitConflict {
+  traitAId String
+  traitBId String
+  traitA   Trait  @relation("TraitAToConflict", fields: [traitAId], references: [id], onDelete: Cascade)
+  traitB   Trait  @relation("TraitBToConflict", fields: [traitBId], references: [id], onDelete: Cascade)
+
+  @@id([traitAId, traitBId])
+  @@index([traitBId]) // Optimiza la búsqueda inversa de conflictos
+}
+
+// Ficha <-> Rasgo
+model CharacterTrait {
+  characterId String
+  traitId     String
+  assignedAt  DateTime @default(now())
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  trait     Trait     @relation(fields: [traitId], references: [id], onDelete: Cascade)
+
+  @@id([characterId, traitId])
+  @@index([traitId]) // El ID del personaje ya está indexado por ser el primer campo del @@id
+}
+
+// Ficha <-> Plaza (Habilidad)
+model CharacterPlaza {
+  characterId String
+  plazaId     String
+  assignedAt  DateTime @default(now())
+
+  currentRank String   @default("C") // Ej: "C", "B", "A", "S"
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  plaza     Plaza     @relation(fields: [plazaId], references: [id], onDelete: Cascade)
+
+  @@id([characterId, plazaId])
+  @@index([plazaId]) // Optimiza consultas de "Quiénes tienen X habilidad"
+}
+
+// Herencia: Plaza -> Rasgo
+model PlazaTraitInheritance {
+  plazaId String
+  traitId String
+  plaza   Plaza  @relation(fields: [plazaId], references: [id], onDelete: Cascade)
+  trait   Trait  @relation(fields: [traitId], references: [id], onDelete: Cascade)
+
+  @@id([plazaId, traitId])
+  @@index([traitId]) // Optimiza la búsqueda de qué Plazas otorgan X Rasgo
+}
+
+// Herencia Recursiva: Plaza -> Plaza (Nietos)
+model PlazaPlazaInheritance {
+  parentId String
+  childId  String
+  parent   Plaza  @relation("ParentPlaza", fields: [parentId], references: [id], onDelete: Cascade)
+  child    Plaza  @relation("ChildPlaza", fields: [childId], references: [id], onDelete: Cascade)
+
+  @@id([parentId, childId])
+  @@index([childId]) // Optimiza la navegación ascendente en la herencia
+}
+
+// ==========================================
+// 🖋️ 4. TRAZABILIDAD (AUDIT LOGS)
+// ==========================================
+model AuditLog {
+  id          String  @id @default(uuid())
+  characterId String?
+  category    String // Ej: "Generador de Ficha", "Gestor Habilidades"
+  detail      String
+  evidence    String // Soporta hipervínculos o texto
+
+  // Deltas de recursos (El impacto real de la transacción)
+  deltaRyou  Int @default(0)
+  deltaExp   Int @default(0)
+  deltaPr    Int @default(0)
+  deltaSp    Int @default(0)
+  deltaCupos Int @default(0)
+  deltaRc    Int @default(0)
+  deltaBts   Int @default(0)
+  deltaBes   Int @default(0)
+
+  // Integridad Temporal
+  createdAt DateTime @default(now())
+
+  character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
+
+  // 🚀 SOLUCIÓN: Índice manual para optimizar consultas por personaje
+  @@index([characterId])
+}
+
+// ==========================================
+// 🎒 5. SISTEMA DE INVENTARIO Y MERCADO
+// ==========================================
+
+// Catálogo Global SSOT (Lo que antes era la hoja "Mercado")
+model Item {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  type        String   @default("Objeto") // Ej: Arma, Consumible, Marioneta
+  price       Int      @default(0)
+  currency    String   @default("RYOU")   // RYOU, EXP, PR
+  
+  // Relación inversa
+  inventories InventoryItem[]
+}
+
+// Inventario del Personaje (Cantidades apilables)
+model InventoryItem {
+  id          String    @id @default(uuid())
+  characterId String
+  itemId      String
+  quantity    Int       @default(1)
+
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  item        Item      @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  // Un personaje solo tiene una fila por tipo de ítem (la cantidad se apila)
+  @@unique([characterId, itemId])
+  @@index([itemId])
+}
+
+// ==========================================
+// 📜 6. REGISTRO DE ACTIVIDADES ON-ROL
+// ==========================================
+model ActivityRecord {
+  id          String   @id @default(uuid())
+  characterId String
+  
+  // Categorización estricta para facilitar los conteos (Misión, Combate, Crónica, Curación)
+  type        String   
+  
+  // Rango de la actividad (D, C, B, A, S). Puede ser nulo para Crónicas/Curaciones.
+  rank        String?  
+  
+  // Resultado (Victoria, Derrota, Completada, Destacada)
+  result      String?  
+  
+  // El link al foro o al mensaje de Discord para que el Staff pueda auditar si alguien hace trampa
+  evidenceUrl String   
+
+  status String @default("PENDIENTE") // PENDIENTE, APROBADO, RECHAZADO
+
+  createdAt   DateTime @default(now())
+
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  
+  @@index([characterId, type]) // Índice para búsquedas rápidas al subir de rango
 }
