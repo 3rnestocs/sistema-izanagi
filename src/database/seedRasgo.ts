@@ -108,6 +108,7 @@ async function main() {
     if (!process.env.DATABASE_URL) throw new Error("Falta DATABASE_URL en .env");
 
     const filas = datosExcel.trim().split('\n');
+    const pendingConflicts: Array<{ traitName: string; conflictName: string }> = [];
     let inyectados = 0;
 
     for (const fila of filas) {
@@ -128,22 +129,80 @@ async function main() {
         const saldoMinimo = parseInt(columnas[14] || "0") || 0;
         const bloqueaDinero = columnas[15]?.trim().toUpperCase() === 'SI';
 
+        const afecta = columnas[3]?.trim() || '';
+        const operacion = columnas[4]?.trim() || '';
+        const valorRaw = columnas[5]?.trim().replace(',', '.') || '0';
+        const valor = parseFloat(valorRaw) || 0;
+
+        let multiplierGasto = 1;
+        let multiplierGanancia = multiplicadorLunes;
+
+        if (afecta.toLowerCase().includes('gasto') && operacion === '*' && valor > 0) {
+            multiplierGasto = valor;
+        }
+        if (afecta.toLowerCase().includes('ganancia') && operacion === '*' && valor > 0) {
+            multiplierGanancia = valor;
+        }
+
+        const mechanics = descripcion.length > 0 || sueldoEXP !== 0
+            ? { description: descripcion, bonusExp: sueldoEXP }
+            : null;
+
+        const baseTraitData = {
+            category: categoria,
+            costRC,
+            bonusRyou: sueldoRyou,
+            multiplierGasto,
+            multiplierGanancia,
+            minBalanceRule: saldoMinimo,
+            blocksTransfer: bloqueaDinero
+        };
+
         await prisma.trait.upsert({
             where: { name: nombre },
             update: {
-                category: categoria, costRC, incompatibleWith: incompatibilidad, description: descripcion,
-                salaryRyou: sueldoRyou, salaryEXP: sueldoEXP, multiplierLunes: multiplicadorLunes, 
-                minBalance: saldoMinimo, blocksTransfer: bloqueaDinero
+                ...baseTraitData,
+                ...(mechanics ? { mechanics } : {})
             },
             create: {
-                name: nombre, category: categoria, costRC, incompatibleWith: incompatibilidad, description: descripcion,
-                salaryRyou: sueldoRyou, salaryEXP: sueldoEXP, multiplierLunes: multiplicadorLunes, 
-                minBalance: saldoMinimo, blocksTransfer: bloqueaDinero
+                name: nombre,
+                ...baseTraitData,
+                ...(mechanics ? { mechanics } : {})
             }
         });
+
+        if (incompatibilidad) {
+            const incompatibles = incompatibilidad
+                .split(',')
+                .map((item) => item.trim())
+                .filter((item) => item.length > 0 && item !== '-');
+
+            for (const conflictName of incompatibles) {
+                pendingConflicts.push({ traitName: nombre, conflictName });
+            }
+        }
         
         console.log(`✅ ${nombre} sincronizado.`);
         inyectados++;
+    }
+
+    for (const pair of pendingConflicts) {
+        const traitA = await prisma.trait.findUnique({ where: { name: pair.traitName }, select: { id: true } });
+        const traitB = await prisma.trait.findUnique({ where: { name: pair.conflictName }, select: { id: true } });
+
+        if (!traitA || !traitB || traitA.id === traitB.id) {
+            continue;
+        }
+
+        const [traitAId, traitBId] = traitA.id < traitB.id
+            ? [traitA.id, traitB.id]
+            : [traitB.id, traitA.id];
+
+        await prisma.traitConflict.upsert({
+            where: { traitAId_traitBId: { traitAId, traitBId } },
+            update: {},
+            create: { traitAId, traitBId }
+        });
     }
 
     console.log(`\n🎉 SEED COMPLETADO: ${inyectados} rasgos en Supabase.`);

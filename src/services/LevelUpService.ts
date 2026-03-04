@@ -10,11 +10,22 @@ interface RequirementCheck {
     pr: number;
     level: string;
     rank: string;
-    missionBOrHigherAnyResult: number;
+    missionD: number;
+    missionC: number;
+    missionB: number;
+    missionA: number;
+    missionS: number;
     missionASuccess: number;
     missionSSuccess: number;
     missionSAnyResult: number;
+    narrations: number;
+    highlightedNarrations: number;
+    combats: number;
+    combatsVsCOrHigher: number;
+    combatsVsBOrHigher: number;
+    combatsVsAOrHigher: number;
     combatWinsVsAOrHigher: number;
+    achievements: number;
   };
 }
 
@@ -36,6 +47,9 @@ export class LevelUpService {
   };
 
   private readonly APPROVED_STATUSES = new Set<string>(['APROBADO', 'APROBADA']);
+  private readonly NARRATION_TYPES = new Set<string>(['Evento', 'Crónica', 'Escena']);
+  private readonly ACHIEVEMENT_TYPES = new Set<string>(['Logro General', 'Logro de Saga']);
+
   private readonly SANNIN_DISCOUNT_TARGETS = new Set<string>([
     'JOUNIN',
     'JOUNIN_HANCHOU',
@@ -43,13 +57,34 @@ export class LevelUpService {
     'LIDER_DE_CLAN'
   ]);
 
-  private normalizeTargetRank(targetRank: string): string {
-    return targetRank
+  private readonly LEVEL_EXP_REQUIREMENTS: Readonly<Record<string, number>> = {
+    D1: 0,
+    D2: 40,
+    D3: 80,
+    C1: 100,
+    C2: 150,
+    C3: 200,
+    B1: 250,
+    B2: 350,
+    B3: 450,
+    A1: 500,
+    A2: 700,
+    A3: 900,
+    S1: 1000,
+    S2: 1300
+  };
+
+  private normalizeTarget(target: string): string {
+    return target
       .trim()
       .toUpperCase()
       .normalize('NFD')
       .replace(/\p{Diacritic}/gu, '')
       .replace(/\s+/g, '_');
+  }
+
+  private isInternalLevel(target: string): boolean {
+    return /^[DCBAS][123]$/.test(target) || target === 'S2';
   }
 
   private isMissionType(type: string): boolean {
@@ -69,7 +104,15 @@ export class LevelUpService {
     return normalized === 'EXITOSA' || normalized === 'VICTORIA';
   }
 
-  private isLevelAtLeast(level: string, minRankLetter: 'A' | 'B' | 'S'): boolean {
+  private isHighlighted(result: string | null): boolean {
+    if (!result) {
+      return false;
+    }
+
+    return result.trim().toUpperCase() === 'DESTACADO';
+  }
+
+  private isLevelAtLeast(level: string, minRankLetter: 'A' | 'B' | 'C' | 'S'): boolean {
     const levelRankLetter = level.charAt(0).toUpperCase();
     const order: Record<string, number> = { D: 1, C: 2, B: 3, A: 4, S: 5 };
     const currentLevelValue = order[levelRankLetter] ?? 0;
@@ -93,8 +136,121 @@ export class LevelUpService {
     return Math.ceil(baseValue * 0.5);
   }
 
-  async checkRankRequirements(characterId: string, targetRank: string): Promise<RequirementCheck> {
-    const normalizedTargetRank = this.normalizeTargetRank(targetRank);
+  private countMissionEquivalentForB(missionB: number, missionA: number): number {
+    return missionB + (missionA * 2);
+  }
+
+  private buildFailure(
+    snapshot: RequirementCheck['snapshot'],
+    missingRequirements: string[],
+    manualRequirements: string[]
+  ): RequirementCheck {
+    const firstMissing = missingRequirements[0];
+    if (firstMissing) {
+      return {
+        passed: false,
+        reason: firstMissing,
+        missingRequirements,
+        manualRequirements,
+        snapshot
+      };
+    }
+
+    return {
+      passed: false,
+      reason: 'Cumple validaciones automáticas, pero faltan requisitos manuales.',
+      manualRequirements,
+      snapshot
+    };
+  }
+
+  private buildMetrics(
+    activities: Array<{ type: string; rank: string | null; result: string | null; status: string }>
+  ) {
+    const approved = activities.filter((activity) => this.APPROVED_STATUSES.has(activity.status.toUpperCase()));
+
+    const missionD = approved.filter((activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'D').length;
+    const missionC = approved.filter((activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'C').length;
+    const missionB = approved.filter((activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'B').length;
+    const missionA = approved.filter((activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'A').length;
+    const missionS = approved.filter((activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'S').length;
+
+    const missionASuccess = approved.filter(
+      (activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'A' && this.isVictory(activity.result)
+    ).length;
+
+    const missionSSuccess = approved.filter(
+      (activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'S' && this.isVictory(activity.result)
+    ).length;
+
+    const missionSAnyResult = missionS;
+
+    const narrations = approved.filter((activity) => this.NARRATION_TYPES.has(activity.type)).length;
+    const highlightedNarrations = approved.filter(
+      (activity) => this.NARRATION_TYPES.has(activity.type) && this.isHighlighted(activity.result)
+    ).length;
+
+    const combats = approved.filter((activity) => this.isCombatType(activity.type)).length;
+
+    const combatsVsCOrHigher = approved.filter((activity) => {
+      if (!this.isCombatType(activity.type)) {
+        return false;
+      }
+      const rank = activity.rank?.toUpperCase();
+      return rank === 'C' || rank === 'B' || rank === 'A' || rank === 'S';
+    }).length;
+
+    const combatsVsBOrHigher = approved.filter((activity) => {
+      if (!this.isCombatType(activity.type)) {
+        return false;
+      }
+      const rank = activity.rank?.toUpperCase();
+      return rank === 'B' || rank === 'A' || rank === 'S';
+    }).length;
+
+    const combatsVsAOrHigher = approved.filter((activity) => {
+      if (!this.isCombatType(activity.type)) {
+        return false;
+      }
+      const rank = activity.rank?.toUpperCase();
+      return rank === 'A' || rank === 'S';
+    }).length;
+
+    const combatWinsVsAOrHigher = approved.filter((activity) => {
+      if (!this.isCombatType(activity.type) || !this.isVictory(activity.result)) {
+        return false;
+      }
+      const rank = activity.rank?.toUpperCase();
+      return rank === 'A' || rank === 'S';
+    }).length;
+
+    const achievements = approved.filter((activity) => this.ACHIEVEMENT_TYPES.has(activity.type)).length;
+
+    return {
+      missionD,
+      missionC,
+      missionB,
+      missionA,
+      missionS,
+      missionASuccess,
+      missionSSuccess,
+      missionSAnyResult,
+      narrations,
+      highlightedNarrations,
+      combats,
+      combatsVsCOrHigher,
+      combatsVsBOrHigher,
+      combatsVsAOrHigher,
+      combatWinsVsAOrHigher,
+      achievements
+    };
+  }
+
+  async checkRankRequirements(characterId: string, targetRankOrLevel: string): Promise<RequirementCheck> {
+    const normalizedTarget = this.normalizeTarget(targetRankOrLevel);
+    if (this.isInternalLevel(normalizedTarget)) {
+      return this.checkLevelRequirements(characterId, normalizedTarget);
+    }
 
     const character = await this.prisma.character.findUnique({
       where: { id: characterId },
@@ -106,74 +262,25 @@ export class LevelUpService {
     }
 
     const activities = await this.prisma.activityRecord.findMany({
-      where: {
-        characterId
-      },
+      where: { characterId },
       select: { type: true, rank: true, result: true, status: true }
     });
 
-    const approvedActivities = activities.filter((activity) => this.APPROVED_STATUSES.has(activity.status.toUpperCase()));
-
-    const missionBOrHigherAnyResult = approvedActivities.filter((activity) => {
-      if (!this.isMissionType(activity.type)) {
-        return false;
-      }
-
-      const activityRank = activity.rank?.toUpperCase();
-      return activityRank === 'B' || activityRank === 'A' || activityRank === 'S';
-    }).length;
-
-    const missionASuccess = approvedActivities.filter((activity) => {
-      if (!this.isMissionType(activity.type) || !this.isVictory(activity.result)) {
-        return false;
-      }
-
-      const activityRank = activity.rank?.toUpperCase();
-      return activityRank === 'A' || activityRank === 'S';
-    }).length;
-
-    const missionSSuccess = approvedActivities.filter((activity) => {
-      if (!this.isMissionType(activity.type) || !this.isVictory(activity.result)) {
-        return false;
-      }
-
-      return activity.rank?.toUpperCase() === 'S';
-    }).length;
-
-    const missionSAnyResult = approvedActivities.filter((activity) => {
-      if (!this.isMissionType(activity.type)) {
-        return false;
-      }
-
-      return activity.rank?.toUpperCase() === 'S';
-    }).length;
-
-    const combatWinsVsAOrHigher = approvedActivities.filter((activity) => {
-      if (!this.isCombatType(activity.type) || !this.isVictory(activity.result)) {
-        return false;
-      }
-
-      const activityRank = activity.rank?.toUpperCase();
-      return activityRank === 'A' || activityRank === 'S';
-    }).length;
-
-    const missingRequirements: string[] = [];
-    const manualRequirements: string[] = [];
+    const metrics = this.buildMetrics(activities);
     const hasSannin = this.hasSanninTitle(character.title);
 
-    const snapshot = {
+    const snapshot: RequirementCheck['snapshot'] = {
       exp: character.exp,
       pr: character.pr,
       level: character.level,
       rank: character.rank,
-      missionBOrHigherAnyResult,
-      missionASuccess,
-      missionSSuccess,
-      missionSAnyResult,
-      combatWinsVsAOrHigher
+      ...metrics
     };
 
-    switch (normalizedTargetRank) {
+    const missingRequirements: string[] = [];
+    const manualRequirements: string[] = [];
+
+    switch (normalizedTarget) {
       case 'CHUUNIN': {
         const requiredExp = 120;
         const requiredPr = 400;
@@ -184,7 +291,7 @@ export class LevelUpService {
         if (character.pr < requiredPr) {
           missingRequirements.push(`PR insuficiente (${character.pr}/${requiredPr}).`);
         }
-        if (missionBOrHigherAnyResult < 1) {
+        if ((metrics.missionB + metrics.missionA + metrics.missionS) < 1) {
           missingRequirements.push('Falta al menos 1 misión Rango B (fallida o exitosa).');
         }
         break;
@@ -199,7 +306,7 @@ export class LevelUpService {
         if (character.pr < requiredPr) {
           missingRequirements.push(`PR insuficiente (${character.pr}/${requiredPr}).`);
         }
-        if (missionASuccess < 1) {
+        if ((metrics.missionASuccess + metrics.missionSSuccess) < 1) {
           missingRequirements.push('Falta cumplir exitosamente al menos 1 misión Rango A.');
         }
         break;
@@ -214,8 +321,8 @@ export class LevelUpService {
         if (character.pr < requiredPr) {
           missingRequirements.push(`PR insuficiente (${character.pr}/${requiredPr}).`);
         }
-        if (missionASuccess < 2) {
-          missingRequirements.push(`Faltan misiones A exitosas (${missionASuccess}/2).`);
+        if ((metrics.missionASuccess + metrics.missionSSuccess) < 2) {
+          missingRequirements.push(`Faltan misiones A exitosas (${metrics.missionASuccess + metrics.missionSSuccess}/2).`);
         }
 
         manualRequirements.push('Requiere consentimiento de otro Jounin (o duelo de mérito válido).');
@@ -249,7 +356,7 @@ export class LevelUpService {
         if (character.rank !== 'ANBU') {
           missingRequirements.push(`Se requiere ser ANBU actualmente (actual: ${character.rank}).`);
         }
-        if (missionSSuccess < 1) {
+        if (metrics.missionSSuccess < 1) {
           missingRequirements.push('Falta cumplir exitosamente al menos 1 misión Rango S.');
         }
         break;
@@ -267,7 +374,7 @@ export class LevelUpService {
         if (character.rank !== 'Jounin') {
           missingRequirements.push(`Se requiere ser Jounin actualmente (actual: ${character.rank}).`);
         }
-        if (missionSSuccess < 1) {
+        if (metrics.missionSSuccess < 1) {
           missingRequirements.push('Falta cumplir exitosamente al menos 1 misión Rango S.');
         }
         break;
@@ -282,7 +389,7 @@ export class LevelUpService {
         if (character.pr < requiredPr) {
           missingRequirements.push(`PR insuficiente (${character.pr}/${requiredPr}).`);
         }
-        if (missionSAnyResult < 1 && combatWinsVsAOrHigher < 1) {
+        if (metrics.missionSAnyResult < 1 && metrics.combatWinsVsAOrHigher < 1) {
           missingRequirements.push('Falta al menos 1 requisito trazable de Rango S (misión S o combate ganado vs A/S).');
         }
 
@@ -325,27 +432,227 @@ export class LevelUpService {
         break;
       }
       default:
-        throw new Error(`⛔ El rango objetivo '${targetRank}' no está configurado en el motor.`);
+        throw new Error(`⛔ El rango/cargo objetivo '${targetRankOrLevel}' no está configurado en el motor.`);
     }
 
-    if (missingRequirements.length > 0) {
-      const firstMissingRequirement = missingRequirements[0] ?? 'Requisitos insuficientes.';
-      return {
-        passed: false,
-        reason: firstMissingRequirement,
-        missingRequirements,
-        manualRequirements,
-        snapshot
-      };
+    if (missingRequirements.length > 0 || manualRequirements.length > 0) {
+      return this.buildFailure(snapshot, missingRequirements, manualRequirements);
     }
 
-    if (manualRequirements.length > 0) {
-      return {
-        passed: false,
-        reason: 'Cumple validaciones automáticas, pero faltan requisitos manuales.',
-        manualRequirements,
-        snapshot
-      };
+    return { passed: true, snapshot };
+  }
+
+  async checkLevelRequirements(characterId: string, targetLevel: string): Promise<RequirementCheck> {
+    const normalizedTargetLevel = this.normalizeTarget(targetLevel);
+    if (!this.isInternalLevel(normalizedTargetLevel)) {
+      throw new Error(`⛔ El nivel '${targetLevel}' no es una gradación válida.`);
+    }
+
+    const requiredExp = this.LEVEL_EXP_REQUIREMENTS[normalizedTargetLevel];
+    if (requiredExp === undefined) {
+      throw new Error(`⛔ No hay configuración de EXP para el nivel '${targetLevel}'.`);
+    }
+
+    const character = await this.prisma.character.findUnique({
+      where: { id: characterId },
+      select: { id: true, exp: true, pr: true, level: true, rank: true, title: true }
+    });
+
+    if (!character) {
+      throw new Error('Personaje no encontrado.');
+    }
+
+    const activities = await this.prisma.activityRecord.findMany({
+      where: { characterId },
+      select: { type: true, rank: true, result: true, status: true }
+    });
+
+    const metrics = this.buildMetrics(activities);
+    const snapshot: RequirementCheck['snapshot'] = {
+      exp: character.exp,
+      pr: character.pr,
+      level: character.level,
+      rank: character.rank,
+      ...metrics
+    };
+
+    const missingRequirements: string[] = [];
+    const manualRequirements: string[] = [];
+
+    if (character.exp < requiredExp) {
+      missingRequirements.push(`EXP insuficiente (${character.exp}/${requiredExp}).`);
+    }
+
+    switch (normalizedTargetLevel) {
+      case 'D2':
+      case 'D3':
+        break;
+
+      case 'C1': {
+        manualRequirements.push('Obligatorio: 5 días como Rango D (verificación manual por gradación).');
+
+        const optionalMet = [
+          metrics.narrations >= 1,
+          metrics.combats >= 1,
+          metrics.missionD >= 2,
+          metrics.achievements >= 2
+        ].filter(Boolean).length;
+
+        if (optionalMet < 1) {
+          missingRequirements.push('Falta al menos 1 requisito adicional para C1 (narración, combate, 2 misiones D o 2 logros).');
+        }
+        break;
+      }
+
+      case 'C2':
+      case 'C3': {
+        manualRequirements.push('Obligatorio: 2 días por nivel en la gradación previa (verificación manual por fecha).');
+        manualRequirements.push('Manual parcial: curar a 2 usuarios diferentes no es trazable con el schema actual.');
+
+        const optionalMet = [
+          metrics.narrations >= 1,
+          metrics.highlightedNarrations >= 1,
+          metrics.achievements >= 1,
+          metrics.combats >= 1,
+          metrics.missionC >= 1
+        ].filter(Boolean).length;
+
+        if (optionalMet < 1) {
+          missingRequirements.push('Falta al menos 1 requisito adicional para C2/C3 (narración, destacado, logro, combate o misión C).');
+        }
+        break;
+      }
+
+      case 'B1': {
+        manualRequirements.push('Obligatorio: 8 días como Rango C (verificación manual por gradación).');
+        manualRequirements.push('Manual parcial: curar a 5 usuarios diferentes no es trazable con el schema actual.');
+
+        if (character.pr < 500) {
+          missingRequirements.push(`PR insuficiente para B1 (${character.pr}/500).`);
+        }
+
+        const missionEquivalent = metrics.missionC + (metrics.missionB * 2) + (metrics.missionA * 2) + (metrics.missionS * 2);
+        const optionalMet = [
+          metrics.narrations >= 3,
+          metrics.highlightedNarrations >= 2,
+          missionEquivalent >= 4,
+          metrics.combatsVsCOrHigher >= 2
+        ].filter(Boolean).length;
+
+        if (optionalMet < 1) {
+          missingRequirements.push('Falta al menos 1 requisito adicional para B1 (narraciones, destacados, misiones equivalentes C o combates vs C+).');
+        }
+        break;
+      }
+
+      case 'B2':
+      case 'B3': {
+        manualRequirements.push('Obligatorio: 3 días por nivel en la gradación previa (verificación manual por fecha).');
+        manualRequirements.push('Manual parcial: curar a 2 usuarios diferentes no es trazable con el schema actual.');
+
+        const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        const optionalMet = [
+          metrics.narrations >= 1,
+          metrics.highlightedNarrations >= 1,
+          metrics.achievements >= 1,
+          metrics.combatsVsBOrHigher >= 2,
+          missionEquivalent >= 1
+        ].filter(Boolean).length;
+
+        if (optionalMet < 1) {
+          missingRequirements.push('Falta al menos 1 requisito adicional para B2/B3 (narración, destacado, logro, 2 combates B+ o misión B/A).');
+        }
+        break;
+      }
+
+      case 'A1': {
+        manualRequirements.push('Obligatorio: 14 días como Rango B (verificación manual por gradación).');
+        manualRequirements.push('Manual parcial: curar a 10 usuarios diferentes no es trazable con el schema actual.');
+
+        if (character.pr < 1000) {
+          missingRequirements.push(`PR insuficiente para A1 (${character.pr}/1000).`);
+        }
+
+        const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        const optionalMet = [
+          metrics.narrations >= 6,
+          metrics.highlightedNarrations >= 3,
+          missionEquivalent >= 5,
+          metrics.combatWinsVsAOrHigher >= 3,
+          metrics.achievements >= 8
+        ].filter(Boolean).length;
+
+        if (optionalMet < 1) {
+          missingRequirements.push('Falta al menos 1 requisito adicional para A1 (narraciones, destacados, misiones B/A, victorias A+ o logros).');
+        }
+        break;
+      }
+
+      case 'A2':
+      case 'A3': {
+        manualRequirements.push('Obligatorio: 6 días por nivel en la gradación previa (verificación manual por fecha).');
+        manualRequirements.push('Manual parcial: curar a 2 usuarios diferentes no es trazable con el schema actual.');
+        manualRequirements.push('Manual parcial: “obtener 300 PR durante la gradación anterior” no es trazable sin ledger temporal.');
+
+        const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        const optionalMet = [
+          metrics.narrations >= 1,
+          metrics.highlightedNarrations >= 1,
+          metrics.achievements >= 2,
+          metrics.combatsVsAOrHigher >= 1,
+          missionEquivalent >= 2
+        ].filter(Boolean).length;
+
+        if (optionalMet < 1) {
+          missingRequirements.push('Falta al menos 1 requisito adicional para A2/A3 (narración, destacado, 2 logros, combate A+ o misiones B/A).');
+        }
+        break;
+      }
+
+      case 'S1': {
+        manualRequirements.push('Obligatorio: 20 días como Rango A (verificación manual por gradación).');
+
+        if (character.pr < 3500) {
+          missingRequirements.push(`PR insuficiente para S1 (${character.pr}/3500).`);
+        }
+        if (metrics.combatWinsVsAOrHigher < 7) {
+          missingRequirements.push(`Faltan victorias vs A/S para S1 (${metrics.combatWinsVsAOrHigher}/7).`);
+        }
+        if ((metrics.missionASuccess >= 5) === false && (metrics.missionSAnyResult >= 3) === false) {
+          missingRequirements.push('Para S1 se requiere 5 misiones A exitosas o participar en 3 misiones S.');
+        }
+        if (metrics.narrations < 10) {
+          missingRequirements.push(`Narraciones insuficientes para S1 (${metrics.narrations}/10).`);
+        }
+        if (metrics.highlightedNarrations < 5) {
+          missingRequirements.push(`Destacados insuficientes para S1 (${metrics.highlightedNarrations}/5).`);
+        }
+        break;
+      }
+
+      case 'S2': {
+        manualRequirements.push('Manual parcial: 10 días como Rango S no es trazable sin historial de gradaciones.');
+        manualRequirements.push('Manual parcial: curar a 5 usuarios diferentes no es trazable con el schema actual.');
+
+        const optionalMet = [
+          metrics.narrations >= 2,
+          metrics.highlightedNarrations >= 1,
+          metrics.missionSAnyResult >= 1,
+          character.pr >= 500
+        ].filter(Boolean).length;
+
+        if (optionalMet < 1) {
+          missingRequirements.push('Falta al menos 1 requisito adicional para S2 (2 narraciones, 1 destacado, 1 misión S o 500 PR).');
+        }
+        break;
+      }
+
+      default:
+        throw new Error(`⛔ El nivel '${targetLevel}' no está configurado en el motor.`);
+    }
+
+    if (missingRequirements.length > 0 || manualRequirements.length > 0) {
+      return this.buildFailure(snapshot, missingRequirements, manualRequirements);
     }
 
     return { passed: true, snapshot };

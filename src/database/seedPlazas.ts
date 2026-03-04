@@ -348,15 +348,15 @@ async function main() {
         if (!nombre || nombre.includes("Nombre de Guía")) continue;
 
         const categoria = columnas[1]?.trim() || "Otros";
-        const costoBase = parseInt(columnas[2] || "0") || 0;
+        const costoCupos = parseInt(columnas[2] || "0") || 0;
 
         await prisma.plaza.upsert({
             where: { name: nombre },
-            update: { category: categoria, baseCost: costoBase },
-            create: { name: nombre, category: categoria, baseCost: costoBase }
+            update: { category: categoria, costCupos: costoCupos },
+            create: { name: nombre, category: categoria, costCupos: costoCupos }
         });
         
-        console.log(`✅ Guía sincronizada: ${nombre} (${categoria}) - Costo: ${costoBase}`);
+        console.log(`✅ Guía sincronizada: ${nombre} (${categoria}) - Costo Cupos: ${costoCupos}`);
         inyectadas++;
     }
 
