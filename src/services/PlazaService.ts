@@ -1,21 +1,31 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 
+export type PlazaGrantType = 'INICIAL' | 'DESARROLLO' | 'DESEO_NORMAL' | 'DESEO_ESPECIAL';
+
 export interface AssignPlazaDTO {
   characterId: string;
   plazaName: string;
-  isInitialBuild?: boolean;  // True si viene del comando /registro
-  isSpecialWish?: boolean;   // True si el Staff usa su "Deseo Especial"
+  grantType?: PlazaGrantType;
   costoBts?: number;         // Si es una Mejora de Técnica (BTS)
   costoBes?: number;         // Si es una Mejora de Técnica (BES)
   isFreeInheritance?: boolean; // (Uso interno) True para recursividad gratis
+  evidence?: string;
 }
 
 export class PlazaService {
   constructor(private prisma: PrismaClient) {}
 
-  // 🗂️ Categorías SSOT
-  private readonly INITIAL_CATEGORIES = ["Elemento", "Clan", "Especial", "Bijuu"];
-  private readonly DEVELOPABLE_CATEGORIES = ["Complementario", "Invocación", "Arma Legendaria"];
+  private readonly DEVELOPABLE_CATEGORY_KEYWORDS = [
+    'complement',
+    'arma legendaria',
+    'invocaci',
+    'pacto'
+  ];
+
+  private isDevelopableCategory(category: string): boolean {
+    const normalizedCategory = category.trim().toLowerCase();
+    return this.DEVELOPABLE_CATEGORY_KEYWORDS.some((keyword) => normalizedCategory.includes(keyword));
+  }
 
   /**
    * 🌀 Asigna una Plaza a un personaje de forma atómica.
@@ -27,6 +37,8 @@ export class PlazaService {
     const db = txClient || this.prisma;
 
     const executeLogic = async (tx: any) => {
+      const grantType = data.grantType ?? 'DESARROLLO';
+
       // 1. LECTURA DE DATOS
       const character = await tx.character.findUnique({ 
         where: { id: data.characterId },
@@ -50,24 +62,44 @@ export class PlazaService {
         throw new Error(`⛔ El personaje ya posee la habilidad '${plaza.name}'.`);
       }
 
-      // 3. MOTOR DE REGLAS (Fail-Fast)
-      if (!data.isSpecialWish) {
-        // A. Validación de Categoría de Inicio
-        if (data.isInitialBuild && this.DEVELOPABLE_CATEGORIES.includes(plaza.category)) {
-          throw new Error(`⛔ REGLA DE DESARROLLO: Las habilidades de categoría '${plaza.category}' no pueden tomarse en la creación del personaje.`);
+      // Check if plaza has slots available (maxHolders = 9999 means unlimited)
+      if (plaza.maxHolders > 0) {
+        const holdersCount = await tx.characterPlaza.count({ where: { plazaId: plaza.id } });
+        if (holdersCount >= plaza.maxHolders) {
+          throw new Error(`⛔ No quedan plazas para '${plaza.name}'. Cupo máximo: ${plaza.maxHolders}.`);
         }
+      }
 
-        // B. Lógica Económica (Cupos, BTS, BES)
-        if (!data.isFreeInheritance) {
-          if (data.costoBts && character.bts < data.costoBts) {
-            throw new Error(`⛔ FONDOS INSUFICIENTES: Necesitas ${data.costoBts} BTS. Tienes ${character.bts}.`);
-          }
-          if (data.costoBes && character.bes < data.costoBes) {
-            throw new Error(`⛔ FONDOS INSUFICIENTES: Necesitas ${data.costoBes} BES. Tienes ${character.bes}.`);
-          }
-          if (!data.costoBts && !data.costoBes && character.cupos < plaza.costCupos) {
-            throw new Error(`⛔ CUPOS INSUFICIENTES: La habilidad cuesta ${plaza.costCupos} cupos y tienes ${character.cupos}.`);
-          }
+      // 3. MOTOR DE REGLAS (Fail-Fast)
+      const isDevelopable = this.isDevelopableCategory(plaza.category);
+      const isSpecialWish = grantType === 'DESEO_ESPECIAL';
+
+      if (data.costoBts && data.costoBes) {
+        throw new Error('⛔ No puedes pagar con BTS y BES al mismo tiempo. Usa una sola ruta de costo.');
+      }
+
+      if (grantType === 'INICIAL' && isDevelopable) {
+        throw new Error(`⛔ REGLA DE DESARROLLO: '${plaza.category}' no puede tomarse como habilidad inicial.`);
+      }
+
+      if (grantType === 'DESARROLLO' && !isDevelopable) {
+        throw new Error(`⛔ '${plaza.name}' no es una habilidad desarrollable. Usa otro tipo de otorgamiento.`);
+      }
+
+      if (isSpecialWish && character.specialWishUsed) {
+        throw new Error('⛔ Este personaje ya consumió su único Deseo Especial.');
+      }
+
+      // B. Lógica Económica (Cupos, BTS, BES)
+      if (!isSpecialWish && !data.isFreeInheritance) {
+        if (data.costoBts && character.bts < data.costoBts) {
+          throw new Error(`⛔ FONDOS INSUFICIENTES: Necesitas ${data.costoBts} BTS. Tienes ${character.bts}.`);
+        }
+        if (data.costoBes && character.bes < data.costoBes) {
+          throw new Error(`⛔ FONDOS INSUFICIENTES: Necesitas ${data.costoBes} BES. Tienes ${character.bes}.`);
+        }
+        if (!data.costoBts && !data.costoBes && character.cupos < plaza.costCupos) {
+          throw new Error(`⛔ CUPOS INSUFICIENTES: La habilidad cuesta ${plaza.costCupos} cupos y tienes ${character.cupos}.`);
         }
       }
 
@@ -75,7 +107,7 @@ export class PlazaService {
       let deltaCupos = 0; let deltaBts = 0; let deltaBes = 0;
       
       if (!data.isFreeInheritance) {
-        deltaCupos = (!data.costoBts && !data.costoBes && !data.isSpecialWish) ? -plaza.costCupos : 0;
+        deltaCupos = (!data.costoBts && !data.costoBes && !isSpecialWish) ? -plaza.costCupos : 0;
         deltaBts = data.costoBts ? -data.costoBts : 0;
         deltaBes = data.costoBes ? -data.costoBes : 0;
         
@@ -85,7 +117,7 @@ export class PlazaService {
             cupos: { increment: deltaCupos },
             bts: { increment: deltaBts },
             bes: { increment: deltaBes },
-            specialWishUsed: data.isSpecialWish ? true : undefined
+            specialWishUsed: isSpecialWish ? true : undefined
           }
         });
       }
@@ -143,13 +175,21 @@ export class PlazaService {
 
       // 8. AUDITORÍA
       if (!data.isFreeInheritance) {
-        const logDetail = data.isSpecialWish ? `[DESEO ESPECIAL] Adquisición de: ${plaza.name}` : `Adquisición de: ${plaza.name}`;
+        const sourceTag = isSpecialWish
+          ? '[DESEO ESPECIAL]'
+          : grantType === 'DESEO_NORMAL'
+            ? '[DESEO NORMAL]'
+            : grantType === 'INICIAL'
+              ? '[INICIAL]'
+              : '[DESARROLLO]';
+
+        const logDetail = `${sourceTag} Adquisición de: ${plaza.name}`;
         await tx.auditLog.create({
           data: {
             characterId: character.id,
             category: "Gestor Habilidades",
             detail: logDetail,
-            evidence: "Sistema/Deseos",
+            evidence: data.evidence ?? "Sistema/Deseos",
             deltaCupos: deltaCupos,
             deltaBts: deltaBts,
             deltaBes: deltaBes

@@ -6,6 +6,10 @@ import * as comprar from '../commands/comprar';
 import * as transferir from '../commands/transferir';
 import * as registrarActividad from '../commands/registrar_actividad';
 import * as aprobarRegistro from '../commands/aprobar_registro';
+import * as validarAscenso from '../commands/validar_ascenso';
+import * as ascender from '../commands/ascender';
+import * as otorgarHabilidad from '../commands/otorgar_habilidad';
+import * as listarTienda from '../commands/listar_tienda';
 
 const commands = [
     registro.data.toJSON(),
@@ -13,7 +17,11 @@ const commands = [
     comprar.data.toJSON(),
     transferir.data.toJSON(),
     registrarActividad.data.toJSON(),
-    aprobarRegistro.data.toJSON()
+    aprobarRegistro.data.toJSON(),
+    validarAscenso.data.toJSON(),
+    ascender.data.toJSON(),
+    otorgarHabilidad.data.toJSON(),
+    listarTienda.data.toJSON()
 ];
 
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);

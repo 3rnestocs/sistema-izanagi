@@ -8,7 +8,6 @@ generator client {
 
 datasource db {
   provider     = "postgresql"
-  relationMode = "prisma"
 }
 
 // ==========================================
@@ -97,6 +96,7 @@ model Plaza {
   name      String @unique
   category  String
   costCupos Int    @default(0)
+  maxHolders Int   @default(0)
 
   // 📈 BONOS DIRECTOS A STATS
   bonusStatName  String? // Ej: "Ninjutsu" o "Fuerza"

@@ -8,7 +8,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter } as any);
 
 const datosExcel = `
-Nombre de Guía de Habilidad	Subcategoría	Costo Cupos	Plazas Totales	Plazas Ocupadas	Estado	Usuarios Poseedores	Extras	Stat Afectado	Valor	Rasgo Gratis
+Nombre de Guía de Habilidad	Subcategoría	Costo Cupos	Plazas Totales	Plazas Ocupadas	Estado	Usuarios Poseedores	Extras	Stat Afectado	Valor	Rasgo Gratis	Rasgo Gratis
 Katon	Elementos	2	0	3	Sin plazas	Gbus, Dom, Bill				
 Fuuton	Elementos	2	0	2	Sin plazas	Gamberrodan, Bill				
 Raiton	Elementos	2	0	1	Sin plazas	Heimdal				
@@ -340,6 +340,9 @@ async function main() {
     const filas = datosExcel.trim().split('\n');
     let inyectadas = 0;
 
+    const pendingInheritances: Array<{ parentName: string; childNames: string[] }> = [];
+    const pendingTraitInheritances: Array<{ plazaName: string; traitNames: string[] }> = [];
+
     for (const fila of filas) {
         const columnas = fila.trim().split('\t');
         const nombre = columnas[0]?.trim();
@@ -347,17 +350,139 @@ async function main() {
         // Saltar cabeceras o filas vacías
         if (!nombre || nombre.includes("Nombre de Guía")) continue;
 
-        const categoria = columnas[1]?.trim() || "Otros";
+        const categoriaRaw = columnas[1]?.trim() || "Otros";
+        const categoria = categoriaRaw === 'Habilidades Secundarias'
+            ? 'Complementarios'
+            : categoriaRaw === 'Habilidades Especiales'
+                ? 'Especiales'
+                : categoriaRaw;
+
         const costoCupos = parseInt(columnas[2] || "0") || 0;
+        const maxHoldersRaw = parseInt(columnas[3] || "0") || 0;
+        // Treat 0 as unlimited (9999) to match old system behavior
+        const maxHolders = maxHoldersRaw === 0 ? 9999 : maxHoldersRaw;
+        const bonusStatName = columnas[8]?.trim() || null;
+        const bonusStatValue = parseInt(columnas[9] || "0") || 0;
+
+        // Parse inheritance fields (columns 7 and 10)
+        const extrasRaw = columnas[7]?.trim() || null;
+        const rasgoGratisRaw = columnas[10]?.trim() || null;
+
+        const plazaPayload = {
+            category: categoria,
+            costCupos: costoCupos,
+            maxHolders,
+            bonusStatValue,
+            ...(bonusStatName ? { bonusStatName } : { bonusStatName: null })
+        };
 
         await prisma.plaza.upsert({
             where: { name: nombre },
-            update: { category: categoria, costCupos: costoCupos },
-            create: { name: nombre, category: categoria, costCupos: costoCupos }
+            update: plazaPayload,
+            create: { name: nombre, ...plazaPayload }
         });
         
-        console.log(`✅ Guía sincronizada: ${nombre} (${categoria}) - Costo Cupos: ${costoCupos}`);
+        console.log(`✅ Guía sincronizada: ${nombre} (${categoria}) - Costo Cupos: ${costoCupos} - Plazas: ${maxHolders}`);
         inyectadas++;
+
+        // Collect inheritance relationships for second pass
+        if (extrasRaw) {
+            const childNames = extrasRaw.split(',').map(n => n.trim()).filter(n => n.length > 0);
+            if (childNames.length > 0) {
+                pendingInheritances.push({ parentName: nombre, childNames });
+            }
+        }
+
+        if (rasgoGratisRaw) {
+            const traitNames = rasgoGratisRaw.split(',').map(n => n.trim()).filter(n => n.length > 0);
+            if (traitNames.length > 0) {
+                pendingTraitInheritances.push({ plazaName: nombre, traitNames });
+            }
+        }
+    }
+
+    // Second pass: Create PlazaPlazaInheritance records
+    console.log("\n🔗 Creating Plaza-to-Plaza inheritance relationships...");
+    for (const inheritance of pendingInheritances) {
+        const parentPlaza = await prisma.plaza.findUnique({
+            where: { name: inheritance.parentName },
+            select: { id: true }
+        });
+
+        if (!parentPlaza) {
+            console.warn(`⚠️  Parent plaza '${inheritance.parentName}' not found`);
+            continue;
+        }
+
+        for (const childName of inheritance.childNames) {
+            const childPlaza = await prisma.plaza.findUnique({
+                where: { name: childName },
+                select: { id: true }
+            });
+
+            if (!childPlaza) {
+                console.warn(`⚠️  Child plaza '${childName}' not found`);
+                continue;
+            }
+
+            await prisma.plazaPlazaInheritance.upsert({
+                where: {
+                    parentId_childId: {
+                        parentId: parentPlaza.id,
+                        childId: childPlaza.id
+                    }
+                },
+                update: {},
+                create: {
+                    parentId: parentPlaza.id,
+                    childId: childPlaza.id
+                }
+            });
+
+            console.log(`  ✓ ${inheritance.parentName} → ${childName}`);
+        }
+    }
+
+    // Third pass: Create PlazaTraitInheritance records
+    console.log("\n🧬 Creating Plaza-to-Trait inheritance relationships...");
+    for (const inheritance of pendingTraitInheritances) {
+        const plaza = await prisma.plaza.findUnique({
+            where: { name: inheritance.plazaName },
+            select: { id: true }
+        });
+
+        if (!plaza) {
+            console.warn(`⚠️  Plaza '${inheritance.plazaName}' not found`);
+            continue;
+        }
+
+        for (const traitName of inheritance.traitNames) {
+            const trait = await prisma.trait.findUnique({
+                where: { name: traitName },
+                select: { id: true }
+            });
+
+            if (!trait) {
+                console.warn(`⚠️  Trait '${traitName}' not found`);
+                continue;
+            }
+
+            await prisma.plazaTraitInheritance.upsert({
+                where: {
+                    plazaId_traitId: {
+                        plazaId: plaza.id,
+                        traitId: trait.id
+                    }
+                },
+                update: {},
+                create: {
+                    plazaId: plaza.id,
+                    traitId: trait.id
+                }
+            });
+
+            console.log(`  ✓ ${inheritance.plazaName} → trait ${traitName}`);
+        }
     }
 
     console.log(`\n🎉 SEED COMPLETADO: ${inyectadas} Guías/Plazas registradas.`);

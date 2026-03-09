@@ -77,7 +77,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 await plazaService.assignPlaza({
                     characterId: nuevoPJ.id,
                     plazaName: plazaName,
-                    isInitialBuild: true // 🚀 Esto activa la regla de "No Armas Legendarias al inicio"
+                    grantType: 'INICIAL'
                 });
                 guiasExitosas.push(plazaName);
             } catch (plazaError: any) {

@@ -45,6 +45,10 @@ export class CharacterService {
       // 3. MOTOR DE VALIDACIÓN DE CONFLICTOS Y CÁLCULO DE BONOS
       let totalRyouBonus = 0;
       let totalRcCost = 0;
+      let totalExpBonus = 0;
+      let totalSpBonus = 0;
+      let totalCuposBonus = 0;
+      let statBonuses: Record<string, number> = {};
       const traitIds = traits.map(t => t.id);
 
       for (const trait of traits) {
@@ -60,6 +64,26 @@ export class CharacterService {
         // B. Sumar costos y bonos iniciales
         totalRcCost += trait.costRC;
         totalRyouBonus += trait.bonusRyou;
+
+        // C. Apply direct stat bonuses (e.g., Sabio +2 Chakra)
+        if (trait.bonusStatName && trait.bonusStatValue !== 0) {
+          const statKey = trait.bonusStatName.toLowerCase();
+          statBonuses[statKey] = (statBonuses[statKey] || 0) + trait.bonusStatValue;
+        }
+
+        // D. Parse mechanics JSON for secondary bonuses
+        if (trait.mechanics && typeof trait.mechanics === 'object') {
+          const mech = trait.mechanics as Record<string, unknown>;
+          if (mech.bonusExp && typeof mech.bonusExp === 'number') {
+            totalExpBonus += mech.bonusExp;
+          }
+          if (mech.bonusSp && typeof mech.bonusSp === 'number') {
+            totalSpBonus += mech.bonusSp;
+          }
+          if (mech.bonusCupos && typeof mech.bonusCupos === 'number') {
+            totalCuposBonus += mech.bonusCupos;
+          }
+        }
       }
 
      // 4. CREACIÓN DE LA FICHA Y RELACIONES
@@ -73,7 +97,19 @@ export class CharacterService {
           moral: data.moral ?? null,       
           
           ryou: totalRyouBonus, 
-          rc: totalRcCost,      
+          rc: totalRcCost,
+          exp: totalExpBonus,
+          sp: totalSpBonus,
+          cupos: totalCuposBonus,
+          
+          // Apply direct stat bonuses from traits
+          fuerza: statBonuses['fuerza'] || 0,
+          resistencia: statBonuses['resistencia'] || 0,
+          velocidad: statBonuses['velocidad'] || 0,
+          percepcion: statBonuses['percepcion'] || 0,
+          chakra: statBonuses['chakra'] || 0,
+          armas: statBonuses['armas'] || 0,
+          inteligencia: statBonuses['inteligencia'] || 0,
           
           traits: {
             create: traits.map(t => ({

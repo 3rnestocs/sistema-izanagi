@@ -60,8 +60,9 @@ export class TransactionService {
         const item = itemsToBuy.find(i => i.name.toUpperCase() === name.toUpperCase());
         if (!item) throw new Error(`El ítem '${name}' no existe en el catálogo.`);
         
-        // Aplicamos el multiplicador al precio base y redondeamos
-        const finalPrice = Math.ceil(item.price * multiplierGasto);
+        const finalPrice = item.currency === 'RYOU'
+          ? Math.ceil(item.price * multiplierGasto)
+          : item.price;
         costs[item.currency as keyof typeof costs] += finalPrice;
 
         itemsToAdd[item.id] = (itemsToAdd[item.id] || 0) + 1;

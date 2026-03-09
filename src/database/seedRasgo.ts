@@ -1,5 +1,5 @@
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import 'dotenv/config';
@@ -133,25 +133,107 @@ async function main() {
         const operacion = columnas[4]?.trim() || '';
         const valorRaw = columnas[5]?.trim().replace(',', '.') || '0';
         const valor = parseFloat(valorRaw) || 0;
+        const afecta2 = columnas[6]?.trim() || '';
+        const operacion2 = columnas[7]?.trim() || '';
+        const valorRaw2 = columnas[8]?.trim().replace(',', '.') || '0';
+        const valor2 = parseFloat(valorRaw2) || 0;
 
         let multiplierGasto = 1;
-        let multiplierGanancia = multiplicadorLunes;
+        const multiplierGanancia = 1;
+        let initialBonusRyou = 0;
 
-        if (afecta.toLowerCase().includes('gasto') && operacion === '*' && valor > 0) {
+        const lowerAfecta = afecta.toLowerCase();
+        const lowerAfecta2 = afecta2.toLowerCase();
+
+        if (lowerAfecta.includes('gasto') && operacion === '*' && valor > 0) {
             multiplierGasto = valor;
         }
-        if (afecta.toLowerCase().includes('ganancia') && operacion === '*' && valor > 0) {
-            multiplierGanancia = valor;
+        if (lowerAfecta2.includes('gasto') && operacion2 === '*' && valor2 > 0) {
+            multiplierGasto = valor2;
         }
 
-        const mechanics = descripcion.length > 0 || sueldoEXP !== 0
-            ? { description: descripcion, bonusExp: sueldoEXP }
+        if (lowerAfecta === 'ryou' && operacion === '+' && valor > 0) {
+            initialBonusRyou += Math.floor(valor);
+        }
+        if (lowerAfecta2 === 'ryou' && operacion2 === '+' && valor2 > 0) {
+            initialBonusRyou += Math.floor(valor2);
+        }
+
+        let mondayTotalMultiplier = 1;
+        const nombreLower = nombre.toLowerCase();
+        if (nombreLower.includes('ambicioso')) {
+            mondayTotalMultiplier *= multiplicadorLunes > 0 ? multiplicadorLunes : 1.5;
+        }
+        if (nombreLower.includes('derrochador')) {
+            mondayTotalMultiplier *= 0.5;
+        }
+
+        let multiplierGanancia = 1.0;
+        let expMultiplier = 1.0;
+        let prMultiplier = 1.0;
+
+        // Map EXP multipliers
+        if (nombreLower.includes('presteza')) {
+            expMultiplier = 1.5;
+        }
+        if (nombreLower.includes('arrepentimiento')) {
+            expMultiplier = 0.5;
+        }
+
+        // Map PR multipliers
+        if (nombreLower.includes('leyenda')) {
+            prMultiplier = 1.25;
+        }
+        if (nombreLower.includes('presionado')) {
+            prMultiplier = 0.75;
+        }
+
+        // Map Ryou multipliers (Ambicioso already handled above in mondayTotalMultiplier)
+        if (nombreLower.includes('ambicioso')) {
+            multiplierGanancia = 1.5;
+        }
+
+        const mechanicsData: Record<string, unknown> = {};
+        if (descripcion.length > 0) {
+            mechanicsData.description = descripcion;
+        }
+        if (sueldoEXP !== 0) {
+            mechanicsData.bonusExp = sueldoEXP;
+        }
+        if (sueldoRyou > 0) {
+            mechanicsData.weeklyRyouBonus = sueldoRyou;
+        }
+        if (mondayTotalMultiplier !== 1) {
+            mechanicsData.mondayTotalMultiplier = mondayTotalMultiplier;
+        }
+        if (expMultiplier !== 1.0) {
+            mechanicsData.expMultiplier = expMultiplier;
+        }
+        if (prMultiplier !== 1.0) {
+            mechanicsData.prMultiplier = prMultiplier;
+        }
+
+        // Store stat blocks and golden points in mechanics
+        const blockedStats: string[] = [];
+        if (nombreLower.includes('lento')) blockedStats.push('Velocidad');
+        if (nombreLower.includes('torpeza')) blockedStats.push('Armas');
+        if (blockedStats.length > 0) {
+            mechanicsData.blockedStats = blockedStats;
+        }
+
+        // Golden Point grants
+        if (nombreLower.includes('astuto')) {
+            mechanicsData.grantedGP = true;
+        }
+
+        const mechanics: Prisma.InputJsonValue | null = Object.keys(mechanicsData).length > 0
+            ? (mechanicsData as Prisma.InputJsonObject)
             : null;
 
         const baseTraitData = {
             category: categoria,
             costRC,
-            bonusRyou: sueldoRyou,
+            bonusRyou: initialBonusRyou,
             multiplierGasto,
             multiplierGanancia,
             minBalanceRule: saldoMinimo,

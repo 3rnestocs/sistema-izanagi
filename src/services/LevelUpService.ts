@@ -74,6 +74,18 @@ export class LevelUpService {
     S2: 1300
   };
 
+  private readonly RANK_DISPLAY_NAMES: Readonly<Record<string, string>> = {
+    CHUUNIN: 'Chuunin',
+    TOKUBETSU_JOUNIN: 'Tokubetsu Jounin',
+    JOUNIN: 'Jounin',
+    ANBU: 'ANBU',
+    BUNTAICHOO: 'Buntaichoo',
+    JOUNIN_HANCHOU: 'Jounin Hanchou',
+    GO_IKENBAN: 'Go-Ikenban',
+    LIDER_DE_CLAN: 'Lider de Clan',
+    KAGE: 'Kage'
+  };
+
   private normalizeTarget(target: string): string {
     return target
       .trim()
@@ -658,6 +670,69 @@ export class LevelUpService {
     return { passed: true, snapshot };
   }
 
+  async applyPromotion(characterId: string, targetRankOrLevel: string, approvedBy: string) {
+    const validation = await this.checkRankRequirements(characterId, targetRankOrLevel);
+    if (!validation.passed) {
+      const details = validation.reason ?? 'Requisitos insuficientes para ascenso.';
+      throw new Error(`⛔ Ascenso rechazado: ${details}`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const character = await tx.character.findUnique({
+        where: { id: characterId },
+        select: { id: true, level: true, rank: true, name: true }
+      });
+
+      if (!character) {
+        throw new Error('Personaje no encontrado.');
+      }
+
+      const normalizedTarget = this.normalizeTarget(targetRankOrLevel);
+      const previousLevel = character.level;
+      const previousRank = character.rank;
+
+      let nextLevel = character.level;
+      let nextRank = character.rank;
+
+      if (this.isInternalLevel(normalizedTarget)) {
+        nextLevel = normalizedTarget;
+      } else {
+        const displayName = this.RANK_DISPLAY_NAMES[normalizedTarget];
+        if (!displayName) {
+          throw new Error(`⛔ Objetivo '${targetRankOrLevel}' no reconocido por el motor de ascenso.`);
+        }
+        nextRank = displayName;
+      }
+
+      await tx.character.update({
+        where: { id: character.id },
+        data: {
+          level: nextLevel,
+          rank: nextRank
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          characterId: character.id,
+          category: 'Ascenso',
+          detail: `Ascenso aplicado por ${approvedBy}. Nivel: ${previousLevel} -> ${nextLevel}. Cargo: ${previousRank} -> ${nextRank}. Objetivo: ${targetRankOrLevel}`,
+          evidence: 'Comando /ascender'
+        }
+      });
+
+      return {
+        success: true,
+        characterName: character.name,
+        previousLevel,
+        nextLevel,
+        previousRank,
+        nextRank,
+        targetApplied: targetRankOrLevel
+      };
+    });
+  }
+
   async claimWeeklySalary(characterId: string) {
     return this.prisma.$transaction(async (tx) => {
       const character = await tx.character.findUnique({
@@ -678,25 +753,29 @@ export class LevelUpService {
 
       const baseSalary = this.BASE_SALARIES[character.rank] ?? 0;
 
-      let multiplierGanancia = 1;
-      let bonusRyou = 0;
-      let hasDerrochador = false;
+      let weeklyTotalMultiplier = 1;
+      let weeklyTraitBonusRyou = 0;
 
       for (const characterTrait of character.traits) {
-        multiplierGanancia *= characterTrait.trait.multiplierGanancia;
-        bonusRyou += characterTrait.trait.bonusRyou;
+        const mechanics = characterTrait.trait.mechanics;
+        if (mechanics && typeof mechanics === 'object' && !Array.isArray(mechanics)) {
+          const weeklyBonus = (mechanics as Record<string, unknown>).weeklyRyouBonus;
+          if (typeof weeklyBonus === 'number' && Number.isFinite(weeklyBonus)) {
+            weeklyTraitBonusRyou += Math.floor(weeklyBonus);
+          }
 
-        if (characterTrait.trait.name.toLowerCase().includes('derrochador')) {
-          hasDerrochador = true;
+          const mondayMultiplier = (mechanics as Record<string, unknown>).mondayTotalMultiplier;
+          if (typeof mondayMultiplier === 'number' && Number.isFinite(mondayMultiplier) && mondayMultiplier > 0) {
+            weeklyTotalMultiplier *= mondayMultiplier;
+          }
         }
       }
 
-      const grossSalary = Math.floor((baseSalary + bonusRyou) * multiplierGanancia);
-      const totalBeforeDerrochador = character.ryou + grossSalary;
-
-      const derrochadorLoss = hasDerrochador ? Math.floor(totalBeforeDerrochador / 2) : 0;
-      const finalRyou = totalBeforeDerrochador - derrochadorLoss;
+      const grossSalary = baseSalary + weeklyTraitBonusRyou;
+      const totalBeforeMultiplier = character.ryou + grossSalary;
+      const finalRyou = Math.floor(totalBeforeMultiplier * weeklyTotalMultiplier);
       const netDeltaRyou = finalRyou - character.ryou;
+      const multiplierDelta = finalRyou - totalBeforeMultiplier;
 
       await tx.character.update({
         where: { id: character.id },
@@ -706,8 +785,8 @@ export class LevelUpService {
         }
       });
 
-      const statusDetail = hasDerrochador
-        ? `Cobro semanal: +${grossSalary} Ryou, penalización Derrochador: -${derrochadorLoss}.`
+      const statusDetail = multiplierDelta !== 0
+        ? `Cobro semanal: +${grossSalary} Ryou. Multiplicador lunes aplicado (${weeklyTotalMultiplier.toFixed(2)}x): ${multiplierDelta >= 0 ? '+' : ''}${multiplierDelta} Ryou.`
         : `Cobro semanal exitoso: +${grossSalary} Ryou.`;
 
       await tx.auditLog.create({
@@ -723,10 +802,10 @@ export class LevelUpService {
       return {
         success: true,
         baseSalary,
-        bonusRyou,
-        multiplierGanancia,
+        bonusRyou: weeklyTraitBonusRyou,
+        multiplierGanancia: weeklyTotalMultiplier,
         grossSalary,
-        derrochadorLoss,
+        derrochadorLoss: multiplierDelta < 0 ? Math.abs(multiplierDelta) : 0,
         finalRyou,
         netDeltaRyou
       };
