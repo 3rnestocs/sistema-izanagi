@@ -4,19 +4,19 @@ overview: "Systematically resolve all pending items from ARCHITECTURE.md: 5 crit
 todos:
   - id: p1-maxholders
     content: "Phase 1.1: Fix maxHolders=0 interpretation in PlazaService and seedPlazas"
-    status: pending
+    status: completed
   - id: p1-inheritance
     content: "Phase 1.2: Seed PlazaPlazaInheritance and PlazaTraitInheritance records in seedPlazas.ts"
-    status: pending
+    status: completed
   - id: p1-relationmode
     content: "Phase 1.3: Remove relationMode=prisma from schema.prisma and generate FK migration"
-    status: pending
+    status: completed
   - id: p1-traitbonuses
     content: "Phase 1.4: Apply trait stat bonuses (EXP, SP, Cupos, stats) at character creation in CharacterService"
-    status: pending
+    status: completed
   - id: p1-multiplier
     content: "Phase 1.5: Fix multiplierGanancia and trait effect mapping in seedRasgo.ts"
-    status: pending
+    status: completed
   - id: p2-prisma-extract
     content: "Phase 2.1: Extract Prisma client to src/lib/prisma.ts, update all imports"
     status: pending

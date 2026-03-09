@@ -29,9 +29,13 @@ export class PlazaService {
 
   /**
    * 🌀 Asigna una Plaza a un personaje de forma atómica.
-   * Si la Plaza tiene "Hijas", se llama a sí misma recursivamente.
+   * Si la Plaza tiene "Hijas", se llama a sí misma recursivamente con cycle detection.
    */
-  async assignPlaza(data: AssignPlazaDTO, txClient?: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">) {
+  async assignPlaza(
+    data: AssignPlazaDTO, 
+    txClient?: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">,
+    visitedPlazaIds: Set<string> = new Set()
+  ) {
     // Patrón Unit of Work: Si ya venimos de una transacción (ej. Recursividad o Registro), usamos ese TX. 
     // Si no, abrimos una nueva transacción ACID.
     const db = txClient || this.prisma;
@@ -54,6 +58,14 @@ export class PlazaService {
         }
       });
       if (!plaza) throw new Error(`⛔ La guía/plaza '${data.plazaName}' no existe en el sistema.`);
+
+      // 🔄 CYCLE DETECTION: Check if this plaza is already being processed
+      if (visitedPlazaIds.has(plaza.id)) {
+        throw new Error(`⛔ CYCLE DETECTED in plaza inheritance: '${plaza.name}' would create a circular dependency.`);
+      }
+
+      // Add this plaza to visited set for this recursion path
+      visitedPlazaIds.add(plaza.id);
 
       // 2. VALIDACIÓN DE DUPLICADOS
       const alreadyHasPlaza = character.plazas.some((cp: any) => cp.plazaId === plaza.id);
@@ -164,12 +176,12 @@ export class PlazaService {
         for (const childPlazaRel of plaza.inheritedPlazas) {
           const childPlaza = childPlazaRel.child;
           
-          // 🌀 LLAMADA RECURSIVA: Asignamos la hija pasando "isFreeInheritance = true"
+          // 🌀 LLAMADA RECURSIVA: Asignamos la hija pasando "isFreeInheritance = true" y visitedPlazaIds
           await this.assignPlaza({
             characterId: character.id,
             plazaName: childPlaza.name,
             isFreeInheritance: true 
-          }, tx);
+          }, tx, visitedPlazaIds);
         }
       }
 

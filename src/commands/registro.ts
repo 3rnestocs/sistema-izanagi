@@ -1,7 +1,7 @@
 // src/commands/registro.ts
 
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
-import { prisma } from '../index'; // Asegúrate de que esta ruta apunte a tu cliente Prisma
+import { prisma } from '../lib/prisma'; // Asegúrate de que esta ruta apunte a tu cliente Prisma
 import { CharacterService } from '../services/CharacterService';
 import { PlazaService } from '../services/PlazaService';
 

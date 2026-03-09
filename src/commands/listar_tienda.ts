@@ -4,7 +4,7 @@ import {
   PermissionFlagsBits
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 

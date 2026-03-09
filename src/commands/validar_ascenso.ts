@@ -3,10 +3,10 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits
 } from 'discord.js';
-import { prisma } from '../index';
-import { LevelUpService } from '../services/LevelUpService';
+import { prisma } from '../lib/prisma';
+import { PromotionService } from '../services/PromotionService';
 
-const levelUpService = new LevelUpService(prisma);
+const promotionService = new PromotionService(prisma);
 
 const TARGET_CHOICES: Array<{ name: string; value: string }> = [
   { name: 'Nivel D2', value: 'D2' },
@@ -72,7 +72,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       throw new Error(`⛔ ${targetUser.username} no tiene ficha registrada.`);
     }
 
-    const result = await levelUpService.checkRankRequirements(character.id, objective);
+    const result = await promotionService.checkRankRequirements(character.id, objective);
 
     const lines: string[] = [
       '📋 **Validación de Ascenso**',

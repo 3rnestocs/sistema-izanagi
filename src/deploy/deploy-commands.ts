@@ -1,46 +1,38 @@
-import { REST, Routes } from 'discord.js';
 import 'dotenv/config';
-import * as registro from '../commands/registro';
-import * as invertirSp from '../commands/invertir_sp';
-import * as comprar from '../commands/comprar';
-import * as transferir from '../commands/transferir';
-import * as registrarActividad from '../commands/registrar_actividad';
-import * as aprobarRegistro from '../commands/aprobar_registro';
-import * as validarAscenso from '../commands/validar_ascenso';
-import * as ascender from '../commands/ascender';
-import * as otorgarHabilidad from '../commands/otorgar_habilidad';
-import * as listarTienda from '../commands/listar_tienda';
-
-const commands = [
-    registro.data.toJSON(),
-    invertirSp.data.toJSON(),
-    comprar.data.toJSON(),
-    transferir.data.toJSON(),
-    registrarActividad.data.toJSON(),
-    aprobarRegistro.data.toJSON(),
-    validarAscenso.data.toJSON(),
-    ascender.data.toJSON(),
-    otorgarHabilidad.data.toJSON(),
-    listarTienda.data.toJSON()
-];
-
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN!);
+import { loadCommands } from '../lib/commandLoader';
 
 (async () => {
     try {
-        console.log(`⏳ Iniciando el registro de ${commands.length} comandos...`);
+        if (!process.env.DISCORD_TOKEN || !process.env.CLIENT_ID || !process.env.GUILD_ID) {
+            throw new Error('❌ Missing required environment variables: DISCORD_TOKEN, CLIENT_ID, GUILD_ID');
+        }
 
-        // Usamos el Application ID de tu panel de desarrollador
+        // Load all commands dynamically
+        const commands = await loadCommands();
+        
+        if (commands.size === 0) {
+            throw new Error('❌ No commands were loaded');
+        }
+
+        // Use the same registration function
+        const { REST, Routes } = await import('discord.js');
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+
+        console.log(`⏳ Registering ${commands.size} commands to Discord...`);
+
+        const commandData = Array.from(commands.values()).map(cmd => cmd.data.toJSON());
+        
         const data: any = await rest.put(
             Routes.applicationGuildCommands(
-                process.env.CLIENT_ID!, 
-                process.env.GUILD_ID!
+                process.env.CLIENT_ID,
+                process.env.GUILD_ID
             ),
-            { body: commands },
+            { body: commandData }
         );
 
-        console.log(`✅ ¡Éxito! Se registraron ${data.length} comandos en el servidor.`);
+        console.log(`✅ Successfully registered ${data.length} commands to guild`);
     } catch (error) {
-        console.error("❌ Error al desplegar comandos:", error);
+        console.error("❌ Error deploying commands:", error);
+        process.exit(1);
     }
 })();

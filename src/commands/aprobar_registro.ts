@@ -1,6 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { RewardCalculatorService } from '../services/RewardCalculatorService';
 
 const rewardCalculatorService = new RewardCalculatorService();

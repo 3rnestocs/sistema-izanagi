@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 export const data = new SlashCommandBuilder()
     .setName('registrar_actividad')

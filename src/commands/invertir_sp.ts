@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { StatValidatorService, StatInvestmentDTO } from '../services/StatValidatorService';
 

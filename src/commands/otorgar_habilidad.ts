@@ -3,7 +3,7 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits
 } from 'discord.js';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { PlazaService, PlazaGrantType } from '../services/PlazaService';
 
 const plazaService = new PlazaService(prisma);

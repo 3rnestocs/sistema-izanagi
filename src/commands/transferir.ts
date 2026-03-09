@@ -1,5 +1,5 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 
 const transactionService = new TransactionService(prisma);

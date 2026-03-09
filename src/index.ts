@@ -1,22 +1,10 @@
-import { Client, GatewayIntentBits, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-import { PrismaPg } from "@prisma/adapter-pg";
-import { Pool } from "pg";
-import * as registro from './commands/registro';
-import * as invertirSp from './commands/invertir_sp';
-import * as comprar from './commands/comprar';
-import * as transferir from './commands/transferir';
-import * as registrarActividad from './commands/registrar_actividad';
-import * as aprobarRegistro from './commands/aprobar_registro';
-import * as validarAscenso from './commands/validar_ascenso';
-import * as ascender from './commands/ascender';
-import * as otorgarHabilidad from './commands/otorgar_habilidad';
-import * as listarTienda from './commands/listar_tienda';
+import { prisma, disconnectPrisma } from './lib/prisma';
+import { loadCommands, Command } from './lib/commandLoader';
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-export const prisma = new PrismaClient({ adapter } as any);
+// Commands will be loaded dynamically
+let commands: Collection<string, Command>;
 
 const client = new Client({
     intents: [
@@ -27,48 +15,49 @@ const client = new Client({
     ]
 });
 
-client.once(Events.ClientReady, (c) => {
+client.once(Events.ClientReady, async (c) => {
     console.log(`✅ Sistema IZANAGI en línea. Bot: ${c.user.tag}`);
+    
+    // Load commands on startup
+    commands = await loadCommands();
+    console.log(`📦 Loaded ${commands.size} commands`);
 });
 
-// 🧠 MANEJADOR DE COMANDOS
+// 🧠 MANEJADOR DE COMANDOS (Dynamic)
 client.on(Events.InteractionCreate, async interaction => {
     if (!interaction.isChatInputCommand()) return;
 
-    switch (interaction.commandName) {
-        case 'registro':
-            await registro.execute(interaction);
-            break;
-        case 'invertir_sp':
-            await invertirSp.execute(interaction);
-            break;
-        case 'comprar':
-            await comprar.execute(interaction);
-            break;
-        case 'transferir':
-            await transferir.execute(interaction);
-            break;
-        case 'registrar_actividad':
-            await registrarActividad.execute(interaction);
-            break;
-        case 'aprobar_registro':
-            await aprobarRegistro.execute(interaction);
-            break;
-        case 'validar_ascenso':
-            await validarAscenso.execute(interaction);
-            break;
-        case 'ascender':
-            await ascender.execute(interaction);
-            break;
-        case 'otorgar_habilidad':
-            await otorgarHabilidad.execute(interaction);
-            break;
-        case 'listar_tienda':
-            await listarTienda.execute(interaction);
-            break;
-        default:
-            break;
+    const command = commands.get(interaction.commandName);
+    if (!command) {
+        console.warn(`⚠️  No command found for: ${interaction.commandName}`);
+        return;
     }
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(`❌ Error executing command ${interaction.commandName}:`, error);
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: '❌ Error al ejecutar el comando', ephemeral: true });
+        } else if (interaction.deferred) {
+            await interaction.editReply({ content: '❌ Error al ejecutar el comando' });
+        }
+    }
+});
+
+// 🛑 GRACEFUL SHUTDOWN
+process.on('SIGINT', async () => {
+    console.log('\n🛑 SIGINT received. Shutting down gracefully...');
+    await disconnectPrisma();
+    await client.destroy();
+    process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+    console.log('\n🛑 SIGTERM received. Shutting down gracefully...');
+    await disconnectPrisma();
+    await client.destroy();
+    process.exit(0);
 });
 
 client.login(process.env.DISCORD_TOKEN);
