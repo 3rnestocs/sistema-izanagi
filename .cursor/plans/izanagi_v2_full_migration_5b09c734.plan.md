@@ -34,28 +34,28 @@ todos:
     status: completed
   - id: p3-cobrar-sueldo
     content: "Phase 3.1: Create /cobrar_sueldo command using SalaryService"
-    status: pending
+    status: completed
   - id: p3-vender
     content: "Phase 3.2: Implement sellItems() in TransactionService and /vender command"
-    status: pending
+    status: completed
   - id: p3-tienda
     content: "Phase 3.3: Create player-facing /tienda command (clone of listar_tienda without admin perms)"
-    status: pending
+    status: completed
   - id: p3-ficha
     content: "Phase 3.4: Create /ficha character profile viewer command"
-    status: pending
+    status: completed
   - id: p3-otorgar-rasgo
     content: "Phase 3.5: Implement post-creation trait add/remove in CharacterService and /otorgar_rasgo command"
-    status: pending
+    status: completed
   - id: p3-retirar-habilidad
     content: "Phase 3.6: Implement removePlaza() in PlazaService and /retirar_habilidad command"
-    status: pending
+    status: completed
   - id: p3-rechazar-registro
     content: "Phase 3.7: Create /rechazar_registro command for activity rejection"
-    status: pending
+    status: completed
   - id: p3-trait-multipliers
     content: "Phase 3.8: Apply trait multipliers (EXP, Ryou, PR) in RewardCalculatorService"
-    status: pending
+    status: completed
   - id: p4-shutdown
     content: "Phase 4.1: Add graceful shutdown (SIGINT/SIGTERM) for Prisma and pg Pool"
     status: pending
