@@ -30,19 +30,25 @@ export class RewardCalculatorService {
     S: 30
   };
 
-  public calculateRewards(character: Character, activity: ActivityRecord): RewardBreakdown {
+  public calculateRewards(
+    character: Character & { traits?: any[] },
+    activity: ActivityRecord
+  ): RewardBreakdown {
     const normalizedType = activity.type.trim();
     const normalizedResult = activity.result?.trim().toUpperCase();
 
+    let baseRewards: RewardBreakdown;
+
     if (normalizedType === 'Misión') {
-      return this.calculateMissionRewards(activity.rank, normalizedResult);
+      baseRewards = this.calculateMissionRewards(activity.rank, normalizedResult);
+    } else if (normalizedType === 'Combate') {
+      baseRewards = this.calculateCombatRewards(character.level, activity.rank, normalizedResult);
+    } else {
+      return { exp: 0, pr: 0, ryou: 0 };
     }
 
-    if (normalizedType === 'Combate') {
-      return this.calculateCombatRewards(character.level, activity.rank, normalizedResult);
-    }
-
-    return { exp: 0, pr: 0, ryou: 0 };
+    // Apply trait multipliers if character has traits
+    return this.applyTraitMultipliers(baseRewards, character.traits ?? []);
   }
 
   private calculateMissionRewards(rank: string | null, result: string | undefined): RewardBreakdown {
@@ -104,4 +110,46 @@ export class RewardCalculatorService {
     const pr = this.COMBAT_PR_REWARD[enemyRankLetter] ?? 0;
     return { exp, pr, ryou: 0 };
   }
-}
+
+  /**
+   * 🧬 Aplicar multiplicadores de rasgos a las recompensas
+   * - multiplierGanancia para Ryou (Ambicioso 1.5x)
+   * - mechanics.expMultiplier para EXP (Presteza 1.5x, Arrepentimiento 0.5x)
+   * - mechanics.prMultiplier para PR (Leyenda 1.25x, Presionado 0.75x)
+   */
+  private applyTraitMultipliers(
+    rewards: RewardBreakdown,
+    traits: any[]
+  ): RewardBreakdown {
+    let ryouMultiplier = 1.0;
+    let expMultiplier = 1.0;
+    let prMultiplier = 1.0;
+
+    for (const traitRecord of traits) {
+      const trait = traitRecord.trait || traitRecord;
+
+      // Aplicar multiplierGanancia para Ryou
+      if (trait.multiplierGanancia && typeof trait.multiplierGanancia === 'number') {
+        ryouMultiplier *= trait.multiplierGanancia;
+      }
+
+      // Aplicar multiplicadores de mechanics
+      if (trait.mechanics && typeof trait.mechanics === 'object' && !Array.isArray(trait.mechanics)) {
+        const mech = trait.mechanics as Record<string, unknown>;
+
+        if (mech.expMultiplier && typeof mech.expMultiplier === 'number') {
+          expMultiplier *= mech.expMultiplier;
+        }
+
+        if (mech.prMultiplier && typeof mech.prMultiplier === 'number') {
+          prMultiplier *= mech.prMultiplier;
+        }
+      }
+    }
+
+    return {
+      exp: Math.floor(rewards.exp * expMultiplier),
+      pr: Math.floor(rewards.pr * prMultiplier),
+      ryou: Math.floor(rewards.ryou * ryouMultiplier)
+    };
+  }

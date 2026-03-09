@@ -19,19 +19,19 @@ todos:
     status: completed
   - id: p2-prisma-extract
     content: "Phase 2.1: Extract Prisma client to src/lib/prisma.ts, update all imports"
-    status: pending
+    status: completed
   - id: p2-dynamic-commands
     content: "Phase 2.2: Implement dynamic Collection-based command handler in index.ts and deploy-commands.ts"
-    status: pending
+    status: completed
   - id: p2-error-handling
     content: "Phase 2.3: Create centralized error handler in src/utils/errorHandler.ts"
-    status: pending
+    status: completed
   - id: p2-cycle-guard
     content: "Phase 2.4: Add visited-set cycle guard to PlazaService recursive inheritance"
-    status: pending
+    status: completed
   - id: p2-split-levelup
     content: "Phase 2.5: Split LevelUpService into PromotionService and SalaryService"
-    status: pending
+    status: completed
   - id: p3-cobrar-sueldo
     content: "Phase 3.1: Create /cobrar_sueldo command using SalaryService"
     status: pending

@@ -10,6 +10,12 @@ export interface SellDTO {
   itemNames: string[]; // Lo que desea vender
 }
 
+export interface SellResult {
+  success: boolean;
+  itemsSold: Array<{ itemName: string; quantity: number; basePrice: number; sellPrice: number }>;
+  totalRyouGained: number;
+}
+
 export interface TransferDTO {
   senderId: string;
   receiverId: string;
@@ -114,8 +120,97 @@ export class TransactionService {
   }
 
   // ==========================================
-  // 🤝 TRANSFERENCIA ATÓMICA
+  // 💸 VENTA ATÓMICA
   // ==========================================
+  async sellItems(data: SellDTO) {
+    return await this.prisma.$transaction(async (tx) => {
+      const character = await tx.character.findUnique({
+        where: { id: data.characterId },
+        include: { inventory: { include: { item: true } } }
+      });
+      if (!character) throw new Error('Personaje no encontrado.');
+
+      // 1. Buscar items en el catálogo global
+      const catalog = await tx.item.findMany({
+        where: { name: { in: data.itemNames } }
+      });
+
+      if (catalog.length === 0) throw new Error('Ninguno de los ítems existe en el catálogo.');
+
+      // 2. Agrupar items a vender y calcular ingresos
+      const itemsToSell: Record<string, { quantity: number; basePrice: number; item: any }> = {};
+      let totalRyouGained = 0;
+      const soldDetails: Array<{ itemName: string; quantity: number; basePrice: number; sellPrice: number }> = [];
+
+      for (const name of data.itemNames) {
+        const catalogItem = catalog.find(i => i.name.toUpperCase() === name.toUpperCase());
+        if (!catalogItem) throw new Error(`El ítem '${name}' no existe en el catálogo.`);
+
+        // Solo procesamos items con precio en RYOU (venta solo en moneda)
+        if (catalogItem.currency !== 'RYOU') {
+          throw new Error(`⛔ El ítem '${name}' no se puede vender (no es una moneda compatible).`);
+        }
+
+        if (!itemsToSell[catalogItem.id]) {
+          itemsToSell[catalogItem.id] = { quantity: 0, basePrice: catalogItem.price, item: catalogItem };
+        }
+        itemsToSell[catalogItem.id].quantity += 1;
+      }
+
+      // 3. Validar inventario y calcular ingresos
+      for (const [itemId, sellData] of Object.entries(itemsToSell)) {
+        const invItem = character.inventory.find(inv => inv.itemId === itemId);
+        if (!invItem || invItem.quantity < sellData.quantity) {
+          throw new Error(`⛔ No tienes suficiente cantidad de '${sellData.item.name}' para vender.`);
+        }
+
+        const sellPrice = Math.floor(sellData.basePrice * this.SELL_PERCENTAGE);
+        const totalSalePrice = sellPrice * sellData.quantity;
+        totalRyouGained += totalSalePrice;
+
+        soldDetails.push({
+          itemName: sellData.item.name,
+          quantity: sellData.quantity,
+          basePrice: sellData.basePrice,
+          sellPrice: totalSalePrice
+        });
+      }
+
+      // 4. Remover items del inventario
+      for (const [itemId, sellData] of Object.entries(itemsToSell)) {
+        const invItem = character.inventory.find(inv => inv.itemId === itemId)!;
+        
+        if (invItem.quantity === sellData.quantity) {
+          await tx.inventoryItem.delete({ where: { id: invItem.id } });
+        } else {
+          await tx.inventoryItem.update({
+            where: { id: invItem.id },
+            data: { quantity: { decrement: sellData.quantity } }
+          });
+        }
+      }
+
+      // 5. Acreditar Ryou al personaje
+      await tx.character.update({
+        where: { id: character.id },
+        data: { ryou: { increment: totalRyouGained } }
+      });
+
+      // 6. Auditoría
+      const itemNames = soldDetails.map(d => d.itemName).join(', ');
+      await tx.auditLog.create({
+        data: {
+          characterId: character.id,
+          category: 'Venta (Mercado)',
+          detail: `Vendió: ${itemNames}. Ganancia: ${totalRyouGained} Ryou.`,
+          evidence: 'Sistema de Transacciones',
+          deltaRyou: totalRyouGained
+        }
+      });
+
+      return { success: true, itemsSold: soldDetails, totalRyouGained };
+    });
+  }
   async transferItems(data: TransferDTO) {
     return await this.prisma.$transaction(async (tx) => {
       const sender = await tx.character.findUnique({

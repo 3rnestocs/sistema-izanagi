@@ -134,4 +134,170 @@ export class CharacterService {
       return newCharacter;
     });
   }
+
+  /**
+   * 🧬 Agregar rasgo post-creación (Staff command)
+   * Valida incompatibilidades, costos RC, y aplica bonificaciones.
+   */
+  async addTrait(characterId: string, traitName: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Cargar personaje y el rasgo a agregar
+      const character = await tx.character.findUnique({
+        where: { id: characterId },
+        include: { traits: { include: { trait: { include: { incompatibilitiesA: true, incompatibilitiesB: true } } } } }
+      });
+
+      if (!character) {
+        throw new Error('⛔ Personaje no encontrado.');
+      }
+
+      const traitToAdd = await tx.trait.findUnique({
+        where: { name: traitName },
+        include: { incompatibilitiesA: true, incompatibilitiesB: true }
+      });
+
+      if (!traitToAdd) {
+        throw new Error(`⛔ El rasgo '${traitName}' no existe en el sistema.`);
+      }
+
+      // 2. Verificar si ya tiene el rasgo
+      if (character.traits.some((ct) => ct.trait.id === traitToAdd.id)) {
+        throw new Error(`⛔ El personaje ya posee el rasgo '${traitName}'.`);
+      }
+
+      // 3. Validar incompatibilidades
+      const existingTraitIds = character.traits.map((ct) => ct.trait.id);
+      const conflicts = [...traitToAdd.incompatibilitiesA, ...traitToAdd.incompatibilitiesB];
+      for (const conflict of conflicts) {
+        const conflictingId = conflict.traitAId === traitToAdd.id ? conflict.traitBId : conflict.traitAId;
+        if (existingTraitIds.includes(conflictingId)) {
+          const conflictingTrait = character.traits.find((ct) => ct.trait.id === conflictingId);
+          throw new Error(`⛔ CONFLICTO: '${traitName}' es incompatible con '${conflictingTrait?.trait.name}'.`);
+        }
+      }
+
+      // 4. Validar categoría única (ORIGEN, NACIMIENTO)
+      const uniqueCategories = ['Origen', 'Nacimiento'];
+      if (uniqueCategories.includes(traitToAdd.category)) {
+        const existing = character.traits.find((ct) => ct.trait.category === traitToAdd.category);
+        if (existing) {
+          throw new Error(`⛔ El personaje ya tiene un rasgo de categoría '${traitToAdd.category}'. Solo puede haber uno.`);
+        }
+      }
+
+      // 5. Validar costo RC
+      const totalRcNeeded = Math.abs(traitToAdd.costRC);
+      if (traitToAdd.costRC > 0 && character.rc < traitToAdd.costRC) {
+        throw new Error(`⛔ No hay suficientes RC. Necesitas ${traitToAdd.costRC}, tienes ${character.rc}.`);
+      }
+
+      // 6. Calcular bonificaciones
+      let rcDelta = -traitToAdd.costRC;
+      let statBonuses: Record<string, number> = {};
+
+      if (traitToAdd.bonusStatName && traitToAdd.bonusStatValue !== 0) {
+        const statKey = traitToAdd.bonusStatName.toLowerCase();
+        statBonuses[statKey] = traitToAdd.bonusStatValue;
+      }
+
+      // 7. Aplicar el rasgo y actualizar stats
+      const updateData: Record<string, any> = {
+        traits: { create: { trait: { connect: { id: traitToAdd.id } } } },
+        rc: { increment: rcDelta }
+      };
+
+      // Aplicar bonificaciones de stats
+      for (const [stat, bonus] of Object.entries(statBonuses)) {
+        updateData[stat] = { increment: bonus };
+      }
+
+      const updatedCharacter = await tx.character.update({
+        where: { id: characterId },
+        data: updateData
+      });
+
+      // 8. Auditar
+      await tx.auditLog.create({
+        data: {
+          characterId,
+          category: 'Rasgo Asignado',
+          detail: `Rasgo '${traitName}' agregado. Costo RC: ${traitToAdd.costRC}`,
+          evidence: 'Comando /otorgar_rasgo',
+          deltaRc: rcDelta
+        }
+      });
+
+      return updatedCharacter;
+    });
+  }
+
+  /**
+   * 🗑️ Remover rasgo post-creación (Staff command)
+   * Revierte bonificaciones y reembolsa RC.
+   */
+  async removeTrait(characterId: string, traitName: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Cargar personaje y el rasgo a remover
+      const character = await tx.character.findUnique({
+        where: { id: characterId },
+        include: { traits: { include: { trait: true } } }
+      });
+
+      if (!character) {
+        throw new Error('⛔ Personaje no encontrado.');
+      }
+
+      const traitToRemove = await tx.trait.findUnique({
+        where: { name: traitName }
+      });
+
+      if (!traitToRemove) {
+        throw new Error(`⛔ El rasgo '${traitName}' no existe en el sistema.`);
+      }
+
+      // 2. Verificar si el personaje tiene el rasgo
+      const hasTraitRecord = character.traits.find((ct) => ct.trait.id === traitToRemove.id);
+      if (!hasTraitRecord) {
+        throw new Error(`⛔ El personaje no posee el rasgo '${traitName}'.`);
+      }
+
+      // 3. Revertir bonificaciones
+      let rcDelta = traitToRemove.costRC;
+      let statReversals: Record<string, number> = {};
+
+      if (traitToRemove.bonusStatName && traitToRemove.bonusStatValue !== 0) {
+        const statKey = traitToRemove.bonusStatName.toLowerCase();
+        statReversals[statKey] = -traitToRemove.bonusStatValue;
+      }
+
+      // 4. Eliminar la relación y actualizar stats
+      const updateData: Record<string, any> = {
+        traits: { delete: { characterId_traitId: { characterId, traitId: traitToRemove.id } } },
+        rc: { increment: rcDelta }
+      };
+
+      // Revertir bonificaciones de stats
+      for (const [stat, reversal] of Object.entries(statReversals)) {
+        updateData[stat] = { increment: reversal };
+      }
+
+      const updatedCharacter = await tx.character.update({
+        where: { id: characterId },
+        data: updateData
+      });
+
+      // 5. Auditar
+      await tx.auditLog.create({
+        data: {
+          characterId,
+          category: 'Rasgo Removido',
+          detail: `Rasgo '${traitName}' removido. Reembolso RC: ${rcDelta}`,
+          evidence: 'Comando /otorgar_rasgo',
+          deltaRc: rcDelta
+        }
+      });
+
+      return updatedCharacter;
+    });
+  }
 }

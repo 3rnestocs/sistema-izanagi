@@ -219,4 +219,120 @@ export class PlazaService {
       return await this.prisma.$transaction(executeLogic);
     }
   }
+
+  /**
+   * 🗑️ Remover una Plaza de un personaje.
+   * Revierte stat bonuses y elimina rasgos heredados.
+   * NO es recursiva para plazas hijas (solo herencia de rasgos).
+   */
+  async removePlaza(characterId: string, plazaName: string) {
+    return await this.prisma.$transaction(async (tx) => {
+      // 1. Cargar personaje y plaza
+      const character = await tx.character.findUnique({
+        where: { id: characterId },
+        include: { plazas: { include: { plaza: true } } }
+      });
+
+      if (!character) {
+        throw new Error('⛔ Personaje no encontrado.');
+      }
+
+      const plaza = await tx.plaza.findUnique({
+        where: { name: plazaName },
+        include: {
+          inheritedTraits: { include: { trait: true } },
+          inheritedPlazas: true
+        }
+      });
+
+      if (!plaza) {
+        throw new Error(`⛔ La habilidad '${plazaName}' no existe en el sistema.`);
+      }
+
+      // 2. Verificar que el personaje tiene la plaza
+      const characterPlaza = character.plazas.find((cp) => cp.plazaId === plaza.id);
+      if (!characterPlaza) {
+        throw new Error(`⛔ El personaje no posee la habilidad '${plazaName}'.`);
+      }
+
+      // 3. Revertir bonificaciones de stats
+      const statReversals: any = {};
+      if (plaza.bonusStatName && plaza.bonusStatValue !== 0) {
+        const statKey = plaza.bonusStatName.toLowerCase();
+        statReversals[statKey] = { increment: -plaza.bonusStatValue };
+      }
+
+      // 4. Eliminar rasgos heredados
+      let traitsRemoved = 0;
+      if (plaza.inheritedTraits && plaza.inheritedTraits.length > 0) {
+        for (const inheritedTrait of plaza.inheritedTraits) {
+          const traitExists = await tx.characterTrait.findUnique({
+            where: {
+              characterId_traitId: {
+                characterId,
+                traitId: inheritedTrait.traitId
+              }
+            }
+          });
+
+          if (traitExists) {
+            await tx.characterTrait.delete({
+              where: {
+                characterId_traitId: {
+                  characterId,
+                  traitId: inheritedTrait.traitId
+                }
+              }
+            });
+            traitsRemoved++;
+          }
+        }
+      }
+
+      // 5. Remover la relación CharacterPlaza
+      await tx.characterPlaza.delete({
+        where: {
+          characterId_plazaId: {
+            characterId,
+            plazaId: plaza.id
+          }
+        }
+      });
+
+      // 6. Actualizar stats si hay reversiones
+      if (Object.keys(statReversals).length > 0) {
+        await tx.character.update({
+          where: { id: characterId },
+          data: statReversals
+        });
+      }
+
+      // 7. Reembolsar recursos (inversión original)
+      let refundCupos = plaza.costCupos;
+      await tx.character.update({
+        where: { id: characterId },
+        data: {
+          cupos: { increment: refundCupos }
+        }
+      });
+
+      // 8. Auditoría
+      const auditDetail =
+        traitsRemoved > 0
+          ? `Removida: ${plaza.name}. Revertidas ${traitsRemoved} herencias de rasgos. Reembolso: ${refundCupos} cupos.`
+          : `Removida: ${plaza.name}. Reembolso: ${refundCupos} cupos.`;
+
+      await tx.auditLog.create({
+        data: {
+          characterId,
+          category: 'Gestor Habilidades',
+          detail: auditDetail,
+          evidence: 'Comando /retirar_habilidad',
+          deltaCupos: refundCupos
+        }
+      });
+
+      return true;
+    });
+  }
 }
