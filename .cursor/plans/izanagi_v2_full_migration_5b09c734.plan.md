@@ -58,7 +58,7 @@ todos:
     status: completed
   - id: p4-shutdown
     content: "Phase 4.1: Add graceful shutdown (SIGINT/SIGTERM) for Prisma and pg Pool"
-    status: pending
+    status: completed
   - id: p4-docs
     content: "Phase 4.2: Create .env.example and README with setup/architecture docs"
     status: pending

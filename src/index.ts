@@ -46,18 +46,38 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 // 🛑 GRACEFUL SHUTDOWN
-process.on('SIGINT', async () => {
-    console.log('\n🛑 SIGINT received. Shutting down gracefully...');
-    await disconnectPrisma();
-    await client.destroy();
-    process.exit(0);
-});
+const gracefulShutdown = async (signal: string) => {
+    console.log(`\n🛑 ${signal} received. Shutting down gracefully...`);
+    
+    try {
+        // Set timeout: force shutdown after 10 seconds
+        const shutdownTimeout = setTimeout(() => {
+            console.error('❌ Graceful shutdown timeout. Force exiting...');
+            process.exit(1);
+        }, 10000);
 
-process.on('SIGTERM', async () => {
-    console.log('\n🛑 SIGTERM received. Shutting down gracefully...');
-    await disconnectPrisma();
-    await client.destroy();
-    process.exit(0);
-});
+        // Disconnect Discord bot
+        console.log('📡 Disconnecting from Discord...');
+        await client.destroy();
+        console.log('✅ Discord bot disconnected');
+
+        // Disconnect database
+        console.log('💾 Disconnecting from database...');
+        await disconnectPrisma();
+        console.log('✅ Database disconnected');
+
+        // Clear timeout if we got here successfully
+        clearTimeout(shutdownTimeout);
+        
+        console.log('✅ Graceful shutdown completed');
+        process.exit(0);
+    } catch (error) {
+        console.error('❌ Error during graceful shutdown:', error);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 
 client.login(process.env.DISCORD_TOKEN);
