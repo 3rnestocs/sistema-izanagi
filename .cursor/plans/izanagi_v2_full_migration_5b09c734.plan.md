@@ -67,7 +67,7 @@ todos:
     status: pending
   - id: p4-seed-files
     content: "Phase 4.4: Migrate embedded TSV seed data to structured JSON files"
-    status: pending
+    status: completed
 isProject: false
 ---
 
