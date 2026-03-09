@@ -1,0 +1,22 @@
+[
+  {"name": "Katon", "category": "Elementos", "costCupos": 2, "maxHolders": 9999, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Fuuton", "category": "Elementos", "costCupos": 2, "maxHolders": 9999, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Raiton", "category": "Elementos", "costCupos": 2, "maxHolders": 9999, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Doton", "category": "Elementos", "costCupos": 2, "maxHolders": 9999, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Suiton", "category": "Elementos", "costCupos": 2, "maxHolders": 9999, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Iryouninjutsu", "category": "Elementos", "costCupos": 2, "maxHolders": 9999, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Inton Genjutsu", "category": "Elementos", "costCupos": 2, "maxHolders": 9999, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Jinton Velocidad", "category": "Elementos", "costCupos": 3, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Kouton", "category": "Elementos", "costCupos": 3, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Meiton", "category": "Elementos", "costCupos": 5, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Hyouton", "category": "Elementos", "costCupos": 5, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Suiton", "Fuuton"], "traitGrants": []},
+  {"name": "Ranton", "category": "Elementos", "costCupos": 5, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Suiton", "Raiton"], "traitGrants": []},
+  {"name": "Shakuton", "category": "Elementos", "costCupos": 5, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Fuuton", "Katon"], "traitGrants": []},
+  {"name": "Uchiha Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Katon"], "traitGrants": ["Presteza"]},
+  {"name": "Hyuuga Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": ["Noble"]},
+  {"name": "Chakra del meteorito", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": "Chakra", "bonusStatValue": 2, "extras": [], "traitGrants": []},
+  {"name": "Rinnegan", "category": "Habilidades Especiales", "costCupos": 10, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 4, "extras": [], "traitGrants": []},
+  {"name": "Golden Point en Armas", "category": "Golden Points", "costCupos": 1, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Golden Point en Chakra", "category": "Golden Points", "costCupos": 1, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []},
+  {"name": "Firma Gama", "category": "Pactos de Invocación", "costCupos": 3, "maxHolders": 3, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": []}
+]
