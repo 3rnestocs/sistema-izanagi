@@ -4,6 +4,7 @@ import {
   EmbedBuilder
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
+import { handleCommandError } from '../utils/errorHandler';
 
 const PLAZA_CATEGORIES = [
   'Elementos',
@@ -168,7 +169,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply({ embeds: embeds.slice(0, 10) });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al listar plazas activas.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'listar',
+      fallbackMessage: 'Error desconocido al listar plazas activas.',
+      ephemeral: true
+    });
+    return;
   }
 }

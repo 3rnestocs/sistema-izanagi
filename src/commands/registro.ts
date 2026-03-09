@@ -12,6 +12,7 @@ import { CharacterService } from '../services/CharacterService';
 import { PlazaService } from '../services/PlazaService';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { BuildApprovalService } from '../services/BuildApprovalService';
+import { AppCommandError, CommandErrorType, handleCommandError } from '../utils/errorHandler';
 
 const characterService = new CharacterService(prisma);
 const plazaService = new PlazaService(prisma);
@@ -736,14 +737,33 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         return interaction.editReply(mensajeExito);
     } catch (error: unknown) {
-        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-            return interaction.editReply(formatRegistroErrorMessage('⛔ Ya existe una ficha para este usuario de Discord o para ese keko.', false));
-        }
+        const wrappedError =
+            error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002'
+                ? new AppCommandError({
+                    type: CommandErrorType.Conflict,
+                    userMessage: 'Ya existe una ficha para este usuario de Discord o para ese keko.',
+                    context: { includeInputNameNote: false },
+                    internalCode: 'REG_DUPLICATE_ID'
+                })
+                : new AppCommandError({
+                    type: CommandErrorType.BusinessRule,
+                    userMessage: error instanceof Error ? error.message : 'Error desconocido en registro.',
+                    context: {
+                        includeInputNameNote: shouldShowInputNameNote(error instanceof Error ? error.message : 'Error desconocido en registro.')
+                    },
+                    internalCode: 'REG_GENERAL_FLOW',
+                    cause: error
+                });
 
-        const message = error instanceof Error ? error.message : 'Error desconocido en registro.';
-        const shouldShowNote = shouldShowInputNameNote(message);
-        const finalMessage = formatRegistroErrorMessage(message, shouldShowNote);
-        console.error('Error en /registro:', error);
-        return interaction.editReply(finalMessage);
+        await handleCommandError(wrappedError, interaction, {
+            commandName: 'registro',
+            fallbackMessage: 'Error desconocido en registro.',
+            ephemeral: true,
+            customFormatter: (appError) => {
+                const includeInputNameNote = Boolean(appError.context?.includeInputNameNote);
+                return formatRegistroErrorMessage(`⛔ ${appError.userMessage}`, includeInputNameNote);
+            }
+        });
+        return;
     }
 }

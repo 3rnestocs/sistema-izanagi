@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { CharacterService } from '../services/CharacterService';
+import { handleCommandError } from '../utils/errorHandler';
 
 const characterService = new CharacterService(prisma);
 
@@ -71,7 +72,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       );
     }
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al gestionar rasgo.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'otorgar_rasgo',
+      fallbackMessage: 'Error desconocido al gestionar rasgo.',
+      ephemeral: true
+    });
+    return;
   }
 }

@@ -6,6 +6,8 @@ import {
 import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
+import { handleCommandError } from '../utils/errorHandler';
 
 const transactionService = new TransactionService(prisma);
 
@@ -44,6 +46,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       throw new Error('⛔ Debes especificar al menos un ítem para vender.');
     }
 
+    cleanupExpiredCooldowns();
+    consumeCommandCooldown({
+      commandName: 'vender',
+      actorId: interaction.user.id
+    });
+
     const result = await transactionService.sellItems({
       characterId: character.id,
       itemNames
@@ -65,7 +73,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply({ embeds: [embed] });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al vender ítems.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'vender',
+      fallbackMessage: 'Error desconocido al vender ítems.',
+      ephemeral: false
+    });
+    return;
   }
 }

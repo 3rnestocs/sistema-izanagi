@@ -10,6 +10,7 @@ import {
 import { prisma } from '../lib/prisma';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { StatValidatorService } from '../services/StatValidatorService';
+import { handleCommandError } from '../utils/errorHandler';
 
 const statValidatorService = new StatValidatorService();
 const ZERO_WIDTH_SPACE = '\u200B';
@@ -318,10 +319,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.reply({ embeds: [statsEmbed], components: [deleteButton], ephemeral: false });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al obtener ficha.';
-    if (interaction.replied || interaction.deferred) {
-      return interaction.followUp({ content: `❌ ${message}`, ephemeral: true });
-    }
-    return interaction.reply({ content: `❌ ${message}`, ephemeral: true });
+    await handleCommandError(error, interaction, {
+      commandName: 'ficha',
+      fallbackMessage: 'Error desconocido al obtener ficha.',
+      ephemeral: true
+    });
+    return;
   }
 }

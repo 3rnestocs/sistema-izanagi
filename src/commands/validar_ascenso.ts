@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PromotionService } from '../services/PromotionService';
+import { handleCommandError } from '../utils/errorHandler';
 
 const promotionService = new PromotionService(prisma);
 
@@ -109,7 +110,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply(lines.join('\n'));
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al validar ascenso.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'validar_ascenso',
+      fallbackMessage: 'Error desconocido al validar ascenso.',
+      ephemeral: true
+    });
+    return;
   }
 }

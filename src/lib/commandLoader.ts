@@ -16,9 +16,12 @@ export async function loadCommands(): Promise<Collection<string, Command>> {
   const commands = new Collection<string, Command>();
   const commandsPath = path.join(__dirname, '..', 'commands');
 
-  // Always look for .js files in dist/ (compiled output)
-  const files = fs.readdirSync(commandsPath)
-    .filter(file => file.endsWith('.js') && !file.endsWith('.d.ts'));
+  const allFiles = fs.readdirSync(commandsPath);
+  const jsFiles = allFiles.filter((file) => file.endsWith('.js') && !file.endsWith('.d.ts'));
+  const tsFiles = allFiles.filter((file) => file.endsWith('.ts') && !file.endsWith('.d.ts'));
+
+  // Prefer JS when available (dist runtime), otherwise fallback to TS (ts-node runtime).
+  const files = jsFiles.length > 0 ? jsFiles : tsFiles;
 
   for (const file of files) {
     const filePath = path.join(commandsPath, file);

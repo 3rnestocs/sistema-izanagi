@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { handleCommandError } from '../utils/errorHandler';
 
 type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 
@@ -114,7 +115,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const message = [...header, ...lines].join('\n');
     return interaction.editReply(message);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al listar tienda.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'listar_tienda',
+      fallbackMessage: 'Error desconocido al listar tienda.',
+      ephemeral: true
+    });
+    return;
   }
 }

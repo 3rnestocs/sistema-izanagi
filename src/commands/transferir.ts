@@ -2,6 +2,8 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
+import { handleCommandError } from '../utils/errorHandler';
 
 const transactionService = new TransactionService(prisma);
 
@@ -53,6 +55,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         // 2. Preparar los ítems
         const itemNames = rawItems ? rawItems.split(',').map(item => item.trim()).filter(Boolean) : [];
 
+        cleanupExpiredCooldowns();
+        consumeCommandCooldown({
+            commandName: 'transferir',
+            actorId: interaction.user.id,
+            scopeKey: targetUser.id
+        });
+
         // 3. Ejecutar la transferencia atómica
         await transactionService.transferItems({
             senderId: sender.id,
@@ -68,7 +77,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         return interaction.editReply(mensajeExito);
 
-    } catch (error: any) {
-        return interaction.editReply(`❌ **Transferencia Fallida:**\n${error.message}`);
+    } catch (error: unknown) {
+        await handleCommandError(error, interaction, {
+            commandName: 'transferir',
+            fallbackMessage: 'Transferencia fallida por error del sistema.',
+            ephemeral: false
+        });
+        return;
     }
 }

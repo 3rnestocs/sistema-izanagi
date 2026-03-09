@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PlazaService, PlazaGrantType } from '../services/PlazaService';
+import { handleCommandError } from '../utils/errorHandler';
 
 const plazaService = new PlazaService(prisma);
 
@@ -130,7 +131,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply(responseLines.join('\n'));
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al otorgar habilidad.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'otorgar_habilidad',
+      fallbackMessage: 'Error desconocido al otorgar habilidad.',
+      ephemeral: true
+    });
+    return;
   }
 }

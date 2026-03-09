@@ -16,7 +16,7 @@ datasource db {
 
 model Character {
   id            String    @id @default(uuid())
-  discordId     String    @unique
+  discordId     String?   @unique
   name          String    @unique // El "Keko"
   fullName      String?   // Asegúrate de que este campo EXISTA aquí
   age           Int?
@@ -25,6 +25,9 @@ model Character {
   rank          String    @default("Genin") // Genin, Chuunin, Jounin...
   isSpecialRank Boolean   @default(false)   // True si es ANBU, Sannin, etc.
   canCreateNPC Boolean @default(false)      // Candado para creación de NPCs (Solo para altos cargos)
+  isNpc         Boolean   @default(false)
+  isRetired     Boolean   @default(false)
+  retiredAt     DateTime?
   title         String?                     // Kage, Líder de Clan, Sannin (Coexisten con el Rank)
 
   // 💰 SISTEMA DE SUELDOS
@@ -58,6 +61,9 @@ model Character {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([isNpc, isRetired])
+  @@index([isNpc, createdAt])
 }
 
 model CharacterBuildApproval {

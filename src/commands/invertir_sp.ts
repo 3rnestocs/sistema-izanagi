@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { StatValidatorService, StatInvestmentDTO } from '../services/StatValidatorService';
 import { assertForumPostContext } from '../utils/channelGuards';
+import { handleCommandError } from '../utils/errorHandler';
 
 // Instanciamos el Pilar Matemático
 const statValidator = new StatValidatorService();
@@ -112,9 +113,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         return interaction.editReply(mensajeExito);
 
-    } catch (error: any) {
-        // Aquí atrapamos los errores de Capa 8: "⛔ REGLA RANGO B: Solo un stat..." o "⛔ FONDOS INSUFICIENTES"
-        console.error("Error en /invertir_sp:", error);
-        return interaction.editReply(`❌ **Inversión Rechazada:**\n${error.message}`);
+    } catch (error: unknown) {
+        await handleCommandError(error, interaction, {
+            commandName: 'invertir_sp',
+            fallbackMessage: 'Error desconocido en inversión de SP.',
+            ephemeral: true
+        });
+        return;
     }
 }

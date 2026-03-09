@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits }
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { RewardCalculatorService } from '../services/RewardCalculatorService';
+import { handleCommandError } from '../utils/errorHandler';
 
 const rewardCalculatorService = new RewardCalculatorService();
 
@@ -83,7 +84,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply(response);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al aprobar el registro.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'aprobar_registro',
+      fallbackMessage: 'Error desconocido al aprobar el registro.',
+      ephemeral: true
+    });
+    return;
   }
 }

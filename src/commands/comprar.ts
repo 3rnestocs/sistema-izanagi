@@ -2,6 +2,8 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
+import { handleCommandError } from '../utils/errorHandler';
 
 const transactionService = new TransactionService(prisma);
 
@@ -37,6 +39,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return interaction.editReply("⚠️ Debes escribir al menos un objeto válido.");
         }
 
+        cleanupExpiredCooldowns();
+        consumeCommandCooldown({
+            commandName: 'comprar',
+            actorId: interaction.user.id
+        });
+
         // 3. Ejecutar la transacción atómica
         const resultado = await transactionService.buyItems({
             characterId: character.id,
@@ -51,9 +59,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         return interaction.editReply(mensajeExito);
 
-    } catch (error: any) {
-        // Atrapa bloqueos del servicio (Fondos insuficientes, Regla Tacaño, Ítem no existe)
-        console.error("Error en /comprar:", error);
-        return interaction.editReply(`❌ **Compra Rechazada:**\n${error.message}`);
+    } catch (error: unknown) {
+        await handleCommandError(error, interaction, {
+            commandName: 'comprar',
+            fallbackMessage: 'Error desconocido al procesar la compra.',
+            ephemeral: true
+        });
+        return;
     }
 }

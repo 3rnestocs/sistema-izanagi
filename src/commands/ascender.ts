@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PromotionService } from '../services/PromotionService';
+import { handleCommandError } from '../utils/errorHandler';
 
 const promotionService = new PromotionService(prisma);
 
@@ -83,7 +84,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply(response);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al aplicar ascenso.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'ascender',
+      fallbackMessage: 'Error desconocido al aplicar ascenso.',
+      ephemeral: true
+    });
+    return;
   }
 }

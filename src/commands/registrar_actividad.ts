@@ -1,6 +1,8 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { assertForumPostContext } from '../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
+import { handleCommandError } from '../utils/errorHandler';
 
 export const data = new SlashCommandBuilder()
     .setName('registrar_actividad')
@@ -80,6 +82,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             return interaction.editReply("⚠️ **Atención:** Las Misiones, Combates y Experimentos requieren obligatoriamente que selecciones un `rango` y un `resultado`.");
         }
 
+        cleanupExpiredCooldowns();
+        consumeCommandCooldown({
+            commandName: 'registrar_actividad',
+            actorId: interaction.user.id
+        });
+
         // 4. Guardar en la Base de Datos
         const nuevaActividad = await prisma.activityRecord.create({
             data: {
@@ -103,8 +111,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         return interaction.editReply(mensajeExito);
 
-    } catch (error: any) {
-        console.error("Error al registrar actividad:", error);
-        return interaction.editReply(`❌ **Error del Sistema:** No se pudo guardar el registro.`);
+    } catch (error: unknown) {
+        await handleCommandError(error, interaction, {
+            commandName: 'registrar_actividad',
+            fallbackMessage: 'No se pudo guardar el registro.',
+            ephemeral: false
+        });
+        return;
     }
 }

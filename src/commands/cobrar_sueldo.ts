@@ -6,6 +6,8 @@ import {
 import { prisma } from '../lib/prisma';
 import { SalaryService } from '../services/SalaryService';
 import { assertForumPostContext } from '../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
+import { handleCommandError } from '../utils/errorHandler';
 
 const salaryService = new SalaryService(prisma);
 
@@ -27,6 +29,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     if (!character) {
       throw new Error('⛔ No tienes un personaje registrado. Usa `/registro` para crear uno.');
     }
+
+    cleanupExpiredCooldowns();
+    consumeCommandCooldown({
+      commandName: 'cobrar_sueldo',
+      actorId: interaction.user.id
+    });
 
     const result = await salaryService.claimWeeklySalary(character.id);
 
@@ -55,7 +63,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply({ embeds: [embed] });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al cobrar sueldo.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'cobrar_sueldo',
+      fallbackMessage: 'Error desconocido al cobrar sueldo.',
+      ephemeral: false
+    });
+    return;
   }
 }

@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PlazaService } from '../services/PlazaService';
+import { handleCommandError } from '../utils/errorHandler';
 
 const plazaService = new PlazaService(prisma);
 
@@ -52,7 +53,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         `Cupos reembolsados. Rasgos heredados revertidos.`
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al remover habilidad.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'retirar_habilidad',
+      fallbackMessage: 'Error desconocido al remover habilidad.',
+      ephemeral: true
+    });
+    return;
   }
 }

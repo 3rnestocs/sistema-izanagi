@@ -4,6 +4,7 @@ import {
   EmbedBuilder
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
+import { handleCommandError } from '../utils/errorHandler';
 
 const RASGO_CATEGORIES = [
   'Origen',
@@ -248,7 +249,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     return interaction.editReply({ embeds: embeds.slice(0, 10) });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al consultar catalogo.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'catalogo',
+      fallbackMessage: 'Error desconocido al consultar catalogo.',
+      ephemeral: true
+    });
+    return;
   }
 }

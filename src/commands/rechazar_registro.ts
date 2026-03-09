@@ -4,6 +4,7 @@ import {
   PermissionFlagsBits
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
+import { handleCommandError } from '../utils/errorHandler';
 
 export const data = new SlashCommandBuilder()
   .setName('rechazar_registro')
@@ -70,7 +71,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         `Razón: ${reason}`
     );
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Error desconocido al rechazar actividad.';
-    return interaction.editReply(`❌ ${message}`);
+    await handleCommandError(error, interaction, {
+      commandName: 'rechazar_registro',
+      fallbackMessage: 'Error desconocido al rechazar actividad.',
+      ephemeral: true
+    });
+    return;
   }
 }
