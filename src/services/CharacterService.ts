@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { StatValidatorService } from './StatValidatorService';
 
 // DTO (Data Transfer Object) para tipar estrictamente lo que entra desde Discord
 export interface CreateCharacterDTO {
@@ -7,19 +8,26 @@ export interface CreateCharacterDTO {
   fullName: string;  // Nombre del PJ
   age?: number;
   moral?: string;
+  level?: string;
   traitNames: string[]; // Array de nombres de rasgos (Origen, Nacimiento, Extras)
 }
 
 export class CharacterService {
   constructor(private prisma: PrismaClient) {}
 
+  private static readonly BASE_INITIAL_RC = 6;
+  private static readonly BASE_INITIAL_CUPOS = 15;
+  private static readonly DEFAULT_INITIAL_LEVEL = 'D1';
+
   /**
    * 🧙‍♂️ Creación Unificada de Ficha (V2)
    * Envuelto en una transacción ACID para evitar datos corruptos.
    */
-  async createCharacter(data: CreateCharacterDTO) {
-    // 🛡️ LOCK ATÓMICO: Iniciamos la transacción de Prisma
-    return await this.prisma.$transaction(async (tx) => {
+  async createCharacter(
+    data: CreateCharacterDTO,
+    txClient?: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">
+  ) {
+    const executeLogic = async (tx: any) => {
       
       // 1. FAIL-FAST: Verificar si el Keko o el DiscordID ya tienen ficha
       const existingChar = await tx.character.findFirst({
@@ -49,7 +57,7 @@ export class CharacterService {
       let totalSpBonus = 0;
       let totalCuposBonus = 0;
       let statBonuses: Record<string, number> = {};
-      const traitIds = traits.map(t => t.id);
+      const traitIds = traits.map((t: any) => t.id);
 
       for (const trait of traits) {
         // A. Validar Incompatibilidades
@@ -57,7 +65,9 @@ export class CharacterService {
         for (const conflict of conflicts) {
           const conflictingTraitId = conflict.traitAId === trait.id ? conflict.traitBId : conflict.traitAId;
           if (traitIds.includes(conflictingTraitId)) {
-            throw new Error(`⛔ CONFLICTO DETECTADO: El rasgo '${trait.name}' es incompatible con otro rasgo seleccionado.`);
+            const conflictingTrait = traits.find((candidate: any) => candidate.id === conflictingTraitId);
+            const conflictingName = conflictingTrait?.name ?? 'otro rasgo seleccionado';
+            throw new Error(`⛔ El rasgo ${trait.name} es incompatible con el rasgo ${conflictingName}. Elimina uno de los dos.`);
           }
         }
 
@@ -83,21 +93,31 @@ export class CharacterService {
         }
       }
 
+      const initialLevel = data.level ?? CharacterService.DEFAULT_INITIAL_LEVEL;
+      const initialSp = StatValidatorService.getInitialSpForLevel(initialLevel);
+      const finalRcAtCreation = CharacterService.BASE_INITIAL_RC + totalRcCost;
+
+      if (finalRcAtCreation < 0) {
+        throw new Error(`⛔ RC inválido al crear la ficha: ${finalRcAtCreation}. Ajusta la selección de rasgos.`);
+      }
+
      // 4. CREACIÓN DE LA FICHA Y RELACIONES
       const newCharacter = await tx.character.create({
         data: {
           discordId: data.discordId,
           name: data.name,
+          level: initialLevel,
           // 🚀 SOLUCIÓN: Convertimos undefined a null para satisfacer a Prisma
           fullName: data.fullName ?? null, 
           age: data.age ?? null,           
           moral: data.moral ?? null,       
           
           ryou: totalRyouBonus, 
-          rc: totalRcCost,
+          rc: finalRcAtCreation,
           exp: totalExpBonus,
-          sp: totalSpBonus,
-          cupos: totalCuposBonus,
+          sp: initialSp + totalSpBonus,
+          // Base de cupos iniciales (15) + bonos de rasgos que otorguen cupos.
+          cupos: CharacterService.BASE_INITIAL_CUPOS + totalCuposBonus,
           
           // Apply direct stat bonuses from traits
           fuerza: statBonuses['fuerza'] || 0,
@@ -109,7 +129,7 @@ export class CharacterService {
           inteligencia: statBonuses['inteligencia'] || 0,
           
           traits: {
-            create: traits.map(t => ({
+            create: traits.map((t: any) => ({
               trait: { connect: { id: t.id } }
             }))
           }
@@ -129,7 +149,14 @@ export class CharacterService {
       });
 
       return newCharacter;
-    });
+    };
+
+    if (txClient) {
+      return await executeLogic(txClient);
+    }
+
+    // 🛡️ LOCK ATÓMICO: Iniciamos la transacción de Prisma
+    return await this.prisma.$transaction(executeLogic);
   }
 
   /**

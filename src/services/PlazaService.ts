@@ -90,11 +90,11 @@ export class PlazaService {
         throw new Error('⛔ No puedes pagar con BTS y BES al mismo tiempo. Usa una sola ruta de costo.');
       }
 
-      if (grantType === 'INICIAL' && isDevelopable) {
+      if (!data.isFreeInheritance && grantType === 'INICIAL' && isDevelopable) {
         throw new Error(`⛔ REGLA DE DESARROLLO: '${plaza.category}' no puede tomarse como habilidad inicial.`);
       }
 
-      if (grantType === 'DESARROLLO' && !isDevelopable) {
+      if (!data.isFreeInheritance && grantType === 'DESARROLLO' && !isDevelopable) {
         throw new Error(`⛔ '${plaza.name}' no es una habilidad desarrollable. Usa otro tipo de otorgamiento.`);
       }
 

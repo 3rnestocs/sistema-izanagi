@@ -21,6 +21,10 @@ const PLAZA_CATEGORIES = [
   'Bijuu'
 ];
 
+const PLAZA_CATEGORY_ALIASES: Record<string, string[]> = {
+  especiales: ['especiales', 'habilidades especiales']
+};
+
 function normalizeText(value: string): string {
   return value
     .normalize('NFD')
@@ -56,6 +60,19 @@ function chunkByItems<T>(items: T[], getSize: (item: T) => number, maxSize = 100
   }
 
   return chunks;
+}
+
+function getCategoryCandidates(input: string): string[] {
+  const normalizedInput = normalizeText(input);
+  const aliasSet = new Set<string>([input]);
+
+  for (const aliases of Object.values(PLAZA_CATEGORY_ALIASES)) {
+    if (aliases.includes(normalizedInput)) {
+      aliases.forEach((alias) => aliasSet.add(alias));
+    }
+  }
+
+  return Array.from(aliasSet);
 }
 
 interface TraitDisplay {
@@ -111,7 +128,7 @@ function formatPlazasTable(plazas: PlazaDisplay[]): string {
 
 export const data = new SlashCommandBuilder()
   .setName('catalogo')
-  .setDescription('Consulta el catalogo de rasgos y plazas disponibles para tu personaje.')
+  .setDescription('Consulta el catalogo de rasgos y habilidades disponibles para tu personaje.')
   .addSubcommand((subcommand) =>
     subcommand
       .setName('rasgos')
@@ -126,12 +143,12 @@ export const data = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) =>
     subcommand
-      .setName('plazas')
-      .setDescription('Lista plazas por categoria')
+      .setName('habilidades')
+      .setDescription('Lista habilidades por categoria')
       .addStringOption((option) =>
         option
           .setName('categoria')
-          .setDescription('Categoria de plazas')
+          .setDescription('Categoria de habilidades')
           .setRequired(true)
           .addChoices(...PLAZA_CATEGORIES.map((category) => ({ name: category, value: category })))
       )
@@ -181,24 +198,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       return interaction.editReply({ embeds: embeds.slice(0, 10) });
     }
 
-    const rawCategory = interaction.options.getString('categoria', true);
-    const requested = normalizeText(rawCategory);
-
-    const distinctCategories = await prisma.plaza.findMany({
-      select: { category: true },
-      distinct: ['category']
-    });
-
-    const resolvedCategory = distinctCategories
-      .map((entry) => entry.category)
-      .find((category) => normalizeText(category) === requested);
-
-    if (!resolvedCategory) {
-      throw new Error(`Categoria no encontrada: ${rawCategory}`);
+    if (subcommand !== 'habilidades') {
+      throw new Error('Subcomando no soportado.');
     }
 
-    const plazas = await prisma.plaza.findMany({
-      where: { category: { equals: resolvedCategory, mode: 'insensitive' } },
+    const rawCategory = interaction.options.getString('categoria', true);
+    const candidates = getCategoryCandidates(rawCategory);
+
+    const habilidades = await prisma.plaza.findMany({
+      where: {
+        OR: candidates.map((candidate) => ({
+          category: { equals: candidate, mode: 'insensitive' as const }
+        }))
+      },
       orderBy: [{ name: 'asc' }],
       include: {
         characters: {
@@ -211,11 +223,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       }
     });
 
-    if (plazas.length === 0) {
-      throw new Error('No hay plazas que coincidan con ese filtro.');
+    if (habilidades.length === 0) {
+      throw new Error('No hay habilidades que coincidan con ese filtro.');
     }
 
-    const plazasDisplay: PlazaDisplay[] = plazas.map((plaza) => {
+    const plazasDisplay: PlazaDisplay[] = habilidades.map((plaza) => {
       const holdersCount = plaza.characters.length;
       const slotsLabel = plaza.maxHolders === 0
         ? '∞'
@@ -236,9 +248,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const embeds = plazaChunks.map((chunk, index) =>
       new EmbedBuilder()
         .setColor(0x43b581)
-        .setTitle(`Catálogo de Plazas - ${resolvedCategory}`)
+        .setTitle(`Catálogo de Habilidades - ${rawCategory}`)
         .setDescription(formatPlazasTable(chunk))
-        .setFooter({ text: `Página ${index + 1} de ${plazaChunks.length} • Total: ${plazas.length} plazas` })
+        .setFooter({ text: `Página ${index + 1} de ${plazaChunks.length} • Total: ${habilidades.length} habilidades` })
         .setTimestamp()
     );
 

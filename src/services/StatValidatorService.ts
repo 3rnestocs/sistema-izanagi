@@ -1,5 +1,13 @@
 import { Character, Trait } from '@prisma/client';
 
+export type InternalLevel = 'D1' | 'D2' | 'D3' | 'C1' | 'C2' | 'C3' | 'B1' | 'B2' | 'B3' | 'A1' | 'A2' | 'A3' | 'S1' | 'S2';
+
+export interface LevelProgressionEntry {
+  rankLetter: 'D' | 'C' | 'B' | 'A' | 'S';
+  expRequired: number;
+  spGranted: number;
+}
+
 export interface StatInvestmentDTO {
   fuerza?: number | undefined;
   resistencia?: number | undefined;
@@ -13,6 +21,24 @@ export interface StatInvestmentDTO {
 export class StatValidatorService {
   private readonly CHAKRA_MULTIPLIER = 2;
   private readonly CHAKRA_MAX_FLAT = 20;
+
+  // 📚 SSOT de progresión interna (EXP/SP por nivel)
+  private static readonly LEVEL_PROGRESSION: Record<InternalLevel, LevelProgressionEntry> = {
+    D1: { rankLetter: 'D', expRequired: 0, spGranted: 3 },
+    D2: { rankLetter: 'D', expRequired: 40, spGranted: 1 },
+    D3: { rankLetter: 'D', expRequired: 80, spGranted: 1 },
+    C1: { rankLetter: 'C', expRequired: 100, spGranted: 2 },
+    C2: { rankLetter: 'C', expRequired: 150, spGranted: 1 },
+    C3: { rankLetter: 'C', expRequired: 200, spGranted: 1 },
+    B1: { rankLetter: 'B', expRequired: 250, spGranted: 2 },
+    B2: { rankLetter: 'B', expRequired: 325, spGranted: 1 },
+    B3: { rankLetter: 'B', expRequired: 400, spGranted: 1 },
+    A1: { rankLetter: 'A', expRequired: 500, spGranted: 4 },
+    A2: { rankLetter: 'A', expRequired: 700, spGranted: 1 },
+    A3: { rankLetter: 'A', expRequired: 900, spGranted: 1 },
+    S1: { rankLetter: 'S', expRequired: 1000, spGranted: 1 },
+    S2: { rankLetter: 'S', expRequired: 1300, spGranted: 1 }
+  };
 
   // 📈 MATRIZ DE ESCALAS (SSOT)
   // Índice:      0, 1, 2,  3,  4,  5,   6 (GP)
@@ -36,13 +62,34 @@ export class StatValidatorService {
   };
 
   // 🛑 LÍMITES MÁXIMOS DE ÍNDICE POR RANGO (Caps)
-  private readonly RANK_CAPS: Record<string, number> = {
+  private readonly RANK_CAPS: Record<string, number | null> = {
     "D": 2, // 3ra escala
     "C": 3, // 4ta escala
     "B": 4, // 5ta escala (Regla asimétrica permite uno en 5)
-    "A": 5, // 6ta escala (Máximo normal 20/20)
-    "S": 5  // El S no tiene límite de SP, pero su tope normal sigue siendo la escala 6. El índice 6 (GP) requiere autorización.
+    "A": null, // Sin límite de escala por rango (solo restringe SP disponible)
+    "S": null  // Sin límite de escala por rango (solo restringe SP disponible)
   };
+
+  public static getLevelProgression(level: string): LevelProgressionEntry {
+    const normalizedLevel = level.trim().toUpperCase() as InternalLevel;
+    const entry = this.LEVEL_PROGRESSION[normalizedLevel];
+    if (!entry) {
+      throw new Error(`Nivel no reconocido para progresión: ${level}`);
+    }
+    return entry;
+  }
+
+  public static getLevelExpRequirements(): Record<InternalLevel, number> {
+    const requirements = {} as Record<InternalLevel, number>;
+    (Object.keys(this.LEVEL_PROGRESSION) as InternalLevel[]).forEach((level) => {
+      requirements[level] = this.LEVEL_PROGRESSION[level].expRequired;
+    });
+    return requirements;
+  }
+
+  public static getInitialSpForLevel(level: string): number {
+    return this.getLevelProgression(level).spGranted;
+  }
 
   public calculateNewStats(
     character: Character, 
@@ -73,7 +120,8 @@ export class StatValidatorService {
 
     const rankLetter = character.level.charAt(0).toUpperCase();
     const isAsymmetric = rankLetter === "B";
-    const rankCapNormal = this.RANK_CAPS[rankLetter] || 2;
+    const hasUnlimitedScaleCaps = rankLetter === 'A' || rankLetter === 'S';
+    const rankCapNormal = this.RANK_CAPS[rankLetter] ?? 2;
     const baseIndices = this.RANK_BASES[rankLetter] || this.RANK_BASES["D"];
 
     let statsAtMaxScale = 0; // Para la regla del Rango B
@@ -114,6 +162,10 @@ export class StatValidatorService {
       }
 
       // B. Validar Golden Point (7ma Escala = Índice 6)
+      if (hasUnlimitedScaleCaps) {
+        continue;
+      }
+
       if (projectedIndex === 6) {
         if (!authorizedGPs.has(statName)) {
           throw new Error(`⛔ GOLDEN POINT: No posees el Rasgo de Autorización requerido para alcanzar el GP de ${statName.toUpperCase()}.`);

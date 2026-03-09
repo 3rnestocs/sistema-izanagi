@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import { StatValidatorService } from './StatValidatorService';
 
 interface RequirementCheck {
   passed: boolean;
@@ -57,22 +58,7 @@ export class LevelUpService {
     'LIDER_DE_CLAN'
   ]);
 
-  private readonly LEVEL_EXP_REQUIREMENTS: Readonly<Record<string, number>> = {
-    D1: 0,
-    D2: 40,
-    D3: 80,
-    C1: 100,
-    C2: 150,
-    C3: 200,
-    B1: 250,
-    B2: 350,
-    B3: 450,
-    A1: 500,
-    A2: 700,
-    A3: 900,
-    S1: 1000,
-    S2: 1300
-  };
+  private readonly LEVEL_EXP_REQUIREMENTS: Readonly<Record<string, number>> = StatValidatorService.getLevelExpRequirements();
 
   private readonly RANK_DISPLAY_NAMES: Readonly<Record<string, string>> = {
     CHUUNIN: 'Chuunin',
