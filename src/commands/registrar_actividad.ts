@@ -2,7 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
 
 export const data = new SlashCommandBuilder()
     .setName('registrar_actividad')
@@ -57,9 +57,10 @@ export const data = new SlashCommandBuilder()
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: false }); // Público para presumir el rol
-
-    try {
+    await executeWithErrorHandling(
+        interaction,
+        'registrar_actividad',
+        async (interaction) => {
         assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
         // 1. Identificar al personaje del usuario
@@ -68,7 +69,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         });
 
         if (!character) {
-            return interaction.editReply("❌ No tienes ninguna ficha registrada. Usa `/registro` primero.");
+            throw validationError('No tienes ninguna ficha registrada. Usa `/registro` primero.');
         }
 
         // 2. Extraer los datos del formulario
@@ -79,7 +80,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         // 3. Validación de Capa 8 (Evitar incoherencias)
         if ((tipo === 'Misión' || tipo === 'Combate' || tipo === 'Experimento') && (!rango || !resultado)) {
-            return interaction.editReply("⚠️ **Atención:** Las Misiones, Combates y Experimentos requieren obligatoriamente que selecciones un `rango` y un `resultado`.");
+            throw validationError('Las Misiones, Combates y Experimentos requieren obligatoriamente que selecciones un `rango` y un `resultado`.');
         }
 
         cleanupExpiredCooldowns();
@@ -110,13 +111,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         mensajeExito += `**Evidencia:** [Ver Prueba](${evidencia})`;
 
         return interaction.editReply(mensajeExito);
-
-    } catch (error: unknown) {
-        await handleCommandError(error, interaction, {
-            commandName: 'registrar_actividad',
+        },
+        {
+            defer: { ephemeral: false },
             fallbackMessage: 'No se pudo guardar el registro.',
-            ephemeral: false
-        });
-        return;
-    }
+            errorEphemeral: false
+        }
+    );
 }

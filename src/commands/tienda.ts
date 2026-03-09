@@ -6,7 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { assertForumPostContext } from '../utils/channelGuards';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 
@@ -50,9 +50,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: false });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'tienda',
+    async (interaction) => {
     assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
     const currency = interaction.options.getString('moneda') as StoreCurrency | null;
@@ -136,12 +137,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     embed.setTimestamp();
 
     return interaction.editReply({ embeds: [embed] });
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'tienda',
+    },
+    {
+      defer: { ephemeral: false },
       fallbackMessage: 'Error desconocido al listar tienda.',
-      ephemeral: false
-    });
-    return;
-  }
+      errorEphemeral: false
+    }
+  );
 }

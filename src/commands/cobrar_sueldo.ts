@@ -7,7 +7,7 @@ import { prisma } from '../lib/prisma';
 import { SalaryService } from '../services/SalaryService';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
 
 const salaryService = new SalaryService(prisma);
 
@@ -16,9 +16,10 @@ export const data = new SlashCommandBuilder()
   .setDescription('Cobra tu sueldo semanal como personaje');
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: false });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'cobrar_sueldo',
+    async (interaction) => {
     assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
     const character = await prisma.character.findUnique({
@@ -27,7 +28,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     });
 
     if (!character) {
-      throw new Error('⛔ No tienes un personaje registrado. Usa `/registro` para crear uno.');
+      throw validationError('No tienes un personaje registrado. Usa `/registro` para crear uno.');
     }
 
     cleanupExpiredCooldowns();
@@ -62,12 +63,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       .setTimestamp();
 
     return interaction.editReply({ embeds: [embed] });
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'cobrar_sueldo',
+    },
+    {
+      defer: { ephemeral: false },
       fallbackMessage: 'Error desconocido al cobrar sueldo.',
-      ephemeral: false
-    });
-    return;
-  }
+      errorEphemeral: false
+    }
+  );
 }

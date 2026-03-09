@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { CharacterService } from '../services/CharacterService';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const characterService = new CharacterService(prisma);
 
@@ -37,9 +37,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'otorgar_rasgo',
+    async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       throw new Error('⛔ Este comando es exclusivo de Staff.');
     }
@@ -71,12 +72,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           `RC reembolsado: **${result.rc}** | Stats restaurados.`
       );
     }
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'otorgar_rasgo',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al gestionar rasgo.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

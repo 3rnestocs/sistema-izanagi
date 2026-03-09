@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 
@@ -50,9 +50,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'listar_tienda',
+    async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       throw new Error('⛔ Este comando es exclusivo de Staff.');
     }
@@ -114,12 +115,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     const message = [...header, ...lines].join('\n');
     return interaction.editReply(message);
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'listar_tienda',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al listar tienda.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

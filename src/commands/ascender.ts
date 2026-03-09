@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PromotionService } from '../services/PromotionService';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const promotionService = new PromotionService(prisma);
 
@@ -53,9 +53,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'ascender',
+    async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       throw new Error('⛔ Este comando es exclusivo de Staff.');
     }
@@ -83,12 +84,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     ].join('\n');
 
     return interaction.editReply(response);
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'ascender',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al aplicar ascenso.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

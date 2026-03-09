@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PlazaService, PlazaGrantType } from '../services/PlazaService';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const plazaService = new PlazaService(prisma);
 
@@ -60,9 +60,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'otorgar_habilidad',
+    async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       throw new Error('⛔ Este comando es exclusivo de Staff.');
     }
@@ -130,12 +131,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     ];
 
     return interaction.editReply(responseLines.join('\n'));
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'otorgar_habilidad',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al otorgar habilidad.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

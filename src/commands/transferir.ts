@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { handleCommandError } from '../utils/errorHandler';
+import { businessRuleError, executeWithErrorHandling, validationError } from '../utils/errorHandler';
 
 const transactionService = new TransactionService(prisma);
 
@@ -28,9 +28,10 @@ export const data = new SlashCommandBuilder()
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: false }); // Público para que el otro jugador lo vea
-
-    try {
+    await executeWithErrorHandling(
+        interaction,
+        'transferir',
+        async (interaction) => {
         assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
         const targetUser = interaction.options.getUser('destinatario', true);
@@ -38,19 +39,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const rawItems = interaction.options.getString('items');
 
         if (!ryouAmount && !rawItems) {
-            return interaction.editReply("⚠️ Debes especificar Ryou o al menos un objeto para transferir.");
+            throw validationError('Debes especificar Ryou o al menos un objeto para transferir.');
         }
 
         if (targetUser.id === interaction.user.id) {
-            return interaction.editReply("🤡 ERROR DE CAPA 8: No puedes transferirte cosas a ti mismo.");
+            throw businessRuleError('No puedes transferirte cosas a ti mismo.');
         }
 
         // 1. Buscar a los actores en la DB
         const sender = await prisma.character.findUnique({ where: { discordId: interaction.user.id } });
         const receiver = await prisma.character.findUnique({ where: { discordId: targetUser.id } });
 
-        if (!sender) return interaction.editReply("❌ No tienes una ficha registrada.");
-        if (!receiver) return interaction.editReply(`❌ El usuario ${targetUser.username} no tiene una ficha registrada.`);
+        if (!sender) throw validationError('No tienes una ficha registrada.');
+        if (!receiver) throw validationError(`El usuario ${targetUser.username} no tiene una ficha registrada.`);
 
         // 2. Preparar los ítems
         const itemNames = rawItems ? rawItems.split(',').map(item => item.trim()).filter(Boolean) : [];
@@ -77,12 +78,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         return interaction.editReply(mensajeExito);
 
-    } catch (error: unknown) {
-        await handleCommandError(error, interaction, {
-            commandName: 'transferir',
+        },
+        {
+            defer: { ephemeral: false },
             fallbackMessage: 'Transferencia fallida por error del sistema.',
-            ephemeral: false
-        });
-        return;
-    }
+            errorEphemeral: false
+        }
+    );
 }

@@ -4,7 +4,7 @@ import {
   EmbedBuilder
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const PLAZA_CATEGORIES = [
   'Elementos',
@@ -88,9 +88,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'listar',
+    async (interaction) => {
     const subcommand = interaction.options.getSubcommand(true);
 
     if (subcommand !== 'plazas') {
@@ -168,12 +169,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     );
 
     return interaction.editReply({ embeds: embeds.slice(0, 10) });
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'listar',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al listar plazas activas.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

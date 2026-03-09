@@ -7,7 +7,7 @@ import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
 
 const transactionService = new TransactionService(prisma);
 
@@ -22,9 +22,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: false });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'vender',
+    async (interaction) => {
     assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
     const character = await prisma.character.findUnique({
@@ -33,7 +34,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     });
 
     if (!character) {
-      throw new Error('⛔ No tienes un personaje registrado. Usa `/registro` para crear uno.');
+      throw validationError('No tienes un personaje registrado. Usa `/registro` para crear uno.');
     }
 
     const itemsInput = interaction.options.getString('items', true);
@@ -43,7 +44,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       .filter((item) => item.length > 0);
 
     if (itemNames.length === 0) {
-      throw new Error('⛔ Debes especificar al menos un ítem para vender.');
+      throw validationError('Debes especificar al menos un ítem para vender.');
     }
 
     cleanupExpiredCooldowns();
@@ -72,12 +73,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       .setTimestamp();
 
     return interaction.editReply({ embeds: [embed] });
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'vender',
+    },
+    {
+      defer: { ephemeral: false },
       fallbackMessage: 'Error desconocido al vender ítems.',
-      ephemeral: false
-    });
-    return;
-  }
+      errorEphemeral: false
+    }
+  );
 }

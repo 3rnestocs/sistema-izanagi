@@ -6,7 +6,7 @@ import {
 import { prisma } from '../lib/prisma';
 import { NpcService } from '../services/NpcService';
 import { assertStaffAccess } from '../utils/staffGuards';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const npcService = new NpcService(prisma);
 
@@ -153,9 +153,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'npc',
+    async (interaction) => {
     const subcommand = interaction.options.getSubcommand(true);
 
     if (subcommand === 'listar') {
@@ -243,12 +244,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     return interaction.editReply('❌ Subcomando no reconocido.');
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'npc',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido en gestión de NPCs.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

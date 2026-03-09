@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { StatValidatorService, StatInvestmentDTO } from '../services/StatValidatorService';
 import { assertForumPostContext } from '../utils/channelGuards';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
 
 // Instanciamos el Pilar Matemático
 const statValidator = new StatValidatorService();
@@ -21,9 +21,10 @@ export const data = new SlashCommandBuilder()
     .addIntegerOption(opt => opt.setName('chakra').setDescription('SP a invertir en Chakra (1 SP = +2 Puntos)').setMinValue(1));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
-
-    try {
+    await executeWithErrorHandling(
+        interaction,
+        'invertir_sp',
+        async (interaction) => {
         assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
         // 1. OBTENER AL PERSONAJE DEL USUARIO QUE EJECUTA EL COMANDO
@@ -36,7 +37,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         });
 
         if (!character) {
-            return interaction.editReply("❌ No tienes ninguna ficha registrada. Usa `/registro` primero.");
+            throw validationError('No tienes ninguna ficha registrada. Usa `/registro` primero.');
         }
 
         // 2. RECOLECTAR LA INVERSIÓN (DTO)
@@ -53,7 +54,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         // Pre-validación rápida: ¿Escribió al menos un número?
         const hasInvestment = Object.values(investment).some(val => val !== undefined);
         if (!hasInvestment) {
-            return interaction.editReply("⚠️ Debes indicar al menos un stat para invertir tus SP.");
+            throw validationError('Debes indicar al menos un stat para invertir tus SP.');
         }
 
         // 3. 🧠 EL MOTOR MATEMÁTICO (Fail-Fast)
@@ -112,13 +113,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                              `✨ **SP Restantes:** \`${validationResult.remainingSp}\``;
 
         return interaction.editReply(mensajeExito);
-
-    } catch (error: unknown) {
-        await handleCommandError(error, interaction, {
-            commandName: 'invertir_sp',
+        },
+        {
+            defer: { ephemeral: true },
             fallbackMessage: 'Error desconocido en inversión de SP.',
-            ephemeral: true
-        });
-        return;
-    }
+            errorEphemeral: true
+        }
+    );
 }

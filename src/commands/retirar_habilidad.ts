@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PlazaService } from '../services/PlazaService';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const plazaService = new PlazaService(prisma);
 
@@ -27,9 +27,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'retirar_habilidad',
+    async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       throw new Error('⛔ Este comando es exclusivo de Staff.');
     }
@@ -52,12 +53,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       `✅ Habilidad '${habilidadName}' removida de **${character.name}**.\n` +
         `Cupos reembolsados. Rasgos heredados revertidos.`
     );
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'retirar_habilidad',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al remover habilidad.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

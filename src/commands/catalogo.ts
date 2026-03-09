@@ -4,7 +4,7 @@ import {
   EmbedBuilder
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const RASGO_CATEGORIES = [
   'Origen',
@@ -139,9 +139,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'catalogo',
+    async (interaction) => {
     const subcommand = interaction.options.getSubcommand(true);
 
     if (subcommand === 'rasgos') {
@@ -248,12 +249,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     );
 
     return interaction.editReply({ embeds: embeds.slice(0, 10) });
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'catalogo',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al consultar catalogo.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

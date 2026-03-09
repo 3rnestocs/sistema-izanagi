@@ -258,7 +258,7 @@ export function cooldownError(message: string, seconds?: number): AppCommandErro
 export async function executeWithErrorHandling(
   interaction: ChatInputCommandInteraction,
   commandName: string,
-  executor: (interaction: ChatInputCommandInteraction) => Promise<void>,
+  executor: (interaction: ChatInputCommandInteraction) => Promise<unknown>,
   options?: {
     defer?: { ephemeral: boolean } | false;
     fallbackMessage?: string;

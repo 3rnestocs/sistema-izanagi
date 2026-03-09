@@ -4,7 +4,7 @@ import {
   PermissionFlagsBits
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 export const data = new SlashCommandBuilder()
   .setName('rechazar_registro')
@@ -24,9 +24,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'rechazar_registro',
+    async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       throw new Error('⛔ Este comando es exclusivo de Staff.');
     }
@@ -70,12 +71,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         `Tipo: ${updatedActivity.type}\n` +
         `Razón: ${reason}`
     );
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'rechazar_registro',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al rechazar actividad.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

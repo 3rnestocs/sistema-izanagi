@@ -2,7 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, PermissionFlagsBits }
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { RewardCalculatorService } from '../services/RewardCalculatorService';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const rewardCalculatorService = new RewardCalculatorService();
 
@@ -21,9 +21,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'aprobar_registro',
+    async (interaction) => {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
       throw new Error('⛔ Este comando es exclusivo de Staff.');
     }
@@ -83,12 +84,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     ].join('\n');
 
     return interaction.editReply(response);
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'aprobar_registro',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al aprobar el registro.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

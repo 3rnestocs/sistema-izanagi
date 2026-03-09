@@ -5,7 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { PromotionService } from '../services/PromotionService';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling } from '../utils/errorHandler';
 
 const promotionService = new PromotionService(prisma);
 
@@ -52,9 +52,10 @@ export const data = new SlashCommandBuilder()
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-  await interaction.deferReply({ ephemeral: true });
-
-  try {
+  await executeWithErrorHandling(
+    interaction,
+    'validar_ascenso',
+    async (interaction) => {
     const targetUser = interaction.options.getUser('usuario') ?? interaction.user;
     const isSelfCheck = targetUser.id === interaction.user.id;
 
@@ -109,12 +110,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     return interaction.editReply(lines.join('\n'));
-  } catch (error: unknown) {
-    await handleCommandError(error, interaction, {
-      commandName: 'validar_ascenso',
+    },
+    {
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al validar ascenso.',
-      ephemeral: true
-    });
-    return;
-  }
+      errorEphemeral: true
+    }
+  );
 }

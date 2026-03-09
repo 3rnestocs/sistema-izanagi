@@ -3,7 +3,7 @@ import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { handleCommandError } from '../utils/errorHandler';
+import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
 
 const transactionService = new TransactionService(prisma);
 
@@ -17,9 +17,10 @@ export const data = new SlashCommandBuilder()
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
-    await interaction.deferReply({ ephemeral: true });
-
-    try {
+    await executeWithErrorHandling(
+        interaction,
+        'comprar',
+        async (interaction) => {
         assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
         // 1. Identificar al comprador
@@ -28,7 +29,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         });
 
         if (!character) {
-            return interaction.editReply("❌ No tienes ninguna ficha registrada.");
+            throw validationError('No tienes ninguna ficha registrada.');
         }
 
         // 2. Sanitizar el input del usuario (Capa 8)
@@ -36,7 +37,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const itemNames = rawItems.split(',').map(item => item.trim()).filter(Boolean);
 
         if (itemNames.length === 0) {
-            return interaction.editReply("⚠️ Debes escribir al menos un objeto válido.");
+            throw validationError('Debes escribir al menos un objeto válido.');
         }
 
         cleanupExpiredCooldowns();
@@ -58,13 +59,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         if (resultado.costs.PR > 0) mensajeExito += `🏆 \`${resultado.costs.PR} PR\`\n`;
 
         return interaction.editReply(mensajeExito);
-
-    } catch (error: unknown) {
-        await handleCommandError(error, interaction, {
-            commandName: 'comprar',
+        },
+        {
+            defer: { ephemeral: true },
             fallbackMessage: 'Error desconocido al procesar la compra.',
-            ephemeral: true
-        });
-        return;
-    }
+            errorEphemeral: true
+        }
+    );
 }
