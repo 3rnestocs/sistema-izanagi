@@ -8,6 +8,22 @@ export interface LevelProgressionEntry {
   spGranted: number;
 }
 
+export type NonChakraStatName = 'fuerza' | 'resistencia' | 'velocidad' | 'percepcion' | 'inteligencia' | 'armas';
+export type StatName = NonChakraStatName | 'chakra';
+
+export interface StatDisplayValue {
+  current: number;
+  cap: number | null;
+  formatted: string;
+}
+
+export interface StatBonusBreakdown {
+  traitBonus?: number;
+  traitGradationBonus?: number;
+  plazaBonus?: number;
+  externalBonus?: number;
+}
+
 export interface StatInvestmentDTO {
   fuerza?: number | undefined;
   resistencia?: number | undefined;
@@ -21,6 +37,7 @@ export interface StatInvestmentDTO {
 export class StatValidatorService {
   private readonly CHAKRA_MULTIPLIER = 2;
   private readonly CHAKRA_MAX_FLAT = 20;
+  private readonly LIMITED_STATS: Set<StatName> = new Set(['resistencia']);
 
   // 📚 SSOT de progresión interna (EXP/SP por nivel)
   private static readonly LEVEL_PROGRESSION: Record<InternalLevel, LevelProgressionEntry> = {
@@ -42,7 +59,7 @@ export class StatValidatorService {
 
   // 📈 MATRIZ DE ESCALAS (SSOT)
   // Índice:      0, 1, 2,  3,  4,  5,   6 (GP)
-  private readonly SCALES: Record<string, number[]> = {
+  private readonly SCALES: Record<NonChakraStatName, number[]> = {
     fuerza:       [1, 5, 8, 12, 16, 20, 99], // 99 representa el GPF
     resistencia:  [1, 4, 8, 12, 16, 20, 99], // 99 representa el GPR
     velocidad:    [1, 3, 7, 13, 17, 20, 99],
@@ -70,6 +87,15 @@ export class StatValidatorService {
     "S": null  // Sin límite de escala por rango (solo restringe SP disponible)
   };
 
+  private readonly STAT_SCALE_CAPS: Record<NonChakraStatName, number> = {
+    fuerza: 20,
+    resistencia: 20,
+    velocidad: 20,
+    percepcion: 20,
+    inteligencia: 20,
+    armas: 12
+  };
+
   public static getLevelProgression(level: string): LevelProgressionEntry {
     const normalizedLevel = level.trim().toUpperCase() as InternalLevel;
     const entry = this.LEVEL_PROGRESSION[normalizedLevel];
@@ -91,6 +117,59 @@ export class StatValidatorService {
     return this.getLevelProgression(level).spGranted;
   }
 
+  public getRankLetterFromLevel(level: string): string {
+    return level.charAt(0).toUpperCase();
+  }
+
+  public getDisplayValueForStat(level: string, statName: StatName, investedPoints: number): StatDisplayValue {
+    return this.getEffectiveDisplayValueForStat(level, statName, investedPoints);
+  }
+
+  public getEffectiveDisplayValueForStat(
+    level: string,
+    statName: StatName,
+    investedPoints: number,
+    bonusBreakdown: StatBonusBreakdown = {}
+  ): StatDisplayValue {
+    const traitBonus = bonusBreakdown.traitBonus ?? 0;
+    const traitGradationBonus = bonusBreakdown.traitGradationBonus ?? 0;
+    const plazaBonus = bonusBreakdown.plazaBonus ?? 0;
+    const externalBonus = bonusBreakdown.externalBonus ?? 0;
+
+    if (statName === 'chakra') {
+      const baseCurrent = 2 + (investedPoints * this.CHAKRA_MULTIPLIER) + traitBonus;
+      const current = Math.min(baseCurrent, this.CHAKRA_MAX_FLAT);
+      const bonusLabel = externalBonus !== 0 ? ` (${externalBonus > 0 ? '+' : ''}${externalBonus})` : '';
+      return {
+        current,
+        cap: this.CHAKRA_MAX_FLAT,
+        formatted: `${current}/${this.CHAKRA_MAX_FLAT}${bonusLabel}`
+      };
+    }
+
+    const rankLetter = this.getRankLetterFromLevel(level);
+    const baseIndices = (this.RANK_BASES[rankLetter] || this.RANK_BASES['D']) as Record<NonChakraStatName, number>;
+    const scale = this.SCALES[statName];
+    const baseIndex = baseIndices[statName] ?? 0;
+    const projectedIndex = Math.max(0, baseIndex + investedPoints + traitGradationBonus);
+    const boundedIndex = Math.min(projectedIndex, scale.length - 1);
+    const baseCurrent = (scale[boundedIndex] ?? scale[scale.length - 1] ?? 0) + traitBonus;
+    const cap = this.STAT_SCALE_CAPS[statName];
+    const rawCurrent = baseCurrent + plazaBonus;
+    const current = this.LIMITED_STATS.has(statName)
+      ? Math.min(rawCurrent, cap)
+      : rawCurrent;
+    const bonusLabel = this.LIMITED_STATS.has(statName) && plazaBonus !== 0
+      ? ` (${plazaBonus > 0 ? '+' : ''}${plazaBonus})`
+      : '';
+
+    return {
+      current,
+      cap,
+      formatted: `${current}/${cap}${bonusLabel}`
+    };
+  }
+
   public calculateNewStats(
     character: Character, 
     characterTraits: Trait[], 
@@ -105,15 +184,43 @@ export class StatValidatorService {
     // 1. Extraer Mecánicas de Rasgos (Bloqueos y Golden Points)
     const blockedStats = new Set<string>();
     const authorizedGPs = new Set<string>();
+    const traitGradationBonuses: Record<NonChakraStatName, number> = {
+      fuerza: 0,
+      resistencia: 0,
+      velocidad: 0,
+      percepcion: 0,
+      inteligencia: 0,
+      armas: 0
+    };
+    let traitChakraBonus = 0;
 
     for (const trait of characterTraits) {
       if (trait.mechanics && typeof trait.mechanics === 'object') {
-        const mech = trait.mechanics as any;
+        const mech = trait.mechanics as Record<string, unknown>;
         if (Array.isArray(mech.blockedStats)) {
           mech.blockedStats.forEach((stat: string) => blockedStats.add(stat.toLowerCase()));
         }
         if (typeof mech.grantedGP === 'string') {
           authorizedGPs.add(mech.grantedGP.toLowerCase());
+        }
+        if (typeof mech.bonusChakra === 'number') {
+          traitChakraBonus += mech.bonusChakra;
+        }
+        if (mech.bonusGradations && typeof mech.bonusGradations === 'object' && !Array.isArray(mech.bonusGradations)) {
+          for (const [rawKey, rawValue] of Object.entries(mech.bonusGradations as Record<string, unknown>)) {
+            if (typeof rawValue !== 'number') {
+              continue;
+            }
+
+            const normalizedKey = rawKey
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .toLowerCase();
+
+            if (normalizedKey in traitGradationBonuses) {
+              traitGradationBonuses[normalizedKey as NonChakraStatName] += rawValue;
+            }
+          }
         }
       }
     }
@@ -141,7 +248,7 @@ export class StatValidatorService {
     if (investment.chakra && investment.chakra > 0) {
       newInvestedSP.chakra += investment.chakra;
     }
-    const finalChakraPoints = 2 + (newInvestedSP.chakra * this.CHAKRA_MULTIPLIER);
+    const finalChakraPoints = 2 + (newInvestedSP.chakra * this.CHAKRA_MULTIPLIER) + traitChakraBonus;
     if (finalChakraPoints > this.CHAKRA_MAX_FLAT) {
       throw new Error(`⛔ LÍMITE SUPERADO: El Chakra no puede exceder los ${this.CHAKRA_MAX_FLAT} puntos.`);
     }
@@ -152,9 +259,10 @@ export class StatValidatorService {
       
       const investedAmount = investment[statName as keyof StatInvestmentDTO] || 0;
       const baseIndex = baseIndices?.[statName as keyof typeof baseIndices] || 0;
+      const traitGradation = traitGradationBonuses[statName as NonChakraStatName] || 0;
       
       // ÍNDICE PROYECTADO = Base del Rango + Total de SP Invertidos históricamente
-      const projectedIndex = baseIndex + totalSpInvested;
+      const projectedIndex = baseIndex + totalSpInvested + traitGradation;
 
       // A. Validar Bloqueos por Rasgo (Ej: Torpeza)
       if (investedAmount > 0 && blockedStats.has(statName)) {

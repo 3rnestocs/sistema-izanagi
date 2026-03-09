@@ -1,18 +1,75 @@
-import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Collection, PermissionFlagsBits, Partials } from 'discord.js';
 import 'dotenv/config';
 import { prisma, disconnectPrisma } from './lib/prisma';
 import { loadCommands, Command } from './lib/commandLoader';
+import { BuildApprovalService } from './services/BuildApprovalService';
 
 // Commands will be loaded dynamically
 let commands: Collection<string, Command>;
+const buildApprovalService = new BuildApprovalService(prisma);
+const APPROVAL_CHANNEL_ID = process.env.APPROVAL_CHANNEL_ID;
 
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.GuildMessageReactions,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers // Vital para ver IDs de usuario
-    ]
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+});
+
+client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    if (user.bot) return;
+
+    try {
+        if (reaction.partial) await reaction.fetch();
+        if (reaction.message.partial) await reaction.message.fetch();
+
+        if (reaction.emoji.name !== '✅') return;
+        if (!APPROVAL_CHANNEL_ID) return;
+        if (reaction.message.channelId !== APPROVAL_CHANNEL_ID) return;
+        if (!reaction.message.guild) return;
+
+        const member = await reaction.message.guild.members.fetch(user.id);
+        if (!member.permissions.has(PermissionFlagsBits.Administrator)) return;
+
+        const fullMessage = await reaction.message.fetch();
+        await buildApprovalService.upsertApprovalFromMessage(fullMessage, user.id);
+        console.log(`✅ Build aprobado desde reacción en mensaje ${reaction.message.id}`);
+    } catch (error) {
+        console.error('❌ Error procesando aprobación por reacción:', error);
+    }
+});
+
+client.on(Events.MessageReactionRemove, async (reaction, user) => {
+    if (user.bot) return;
+
+    try {
+        if (reaction.partial) await reaction.fetch();
+        if (reaction.message.partial) await reaction.message.fetch();
+
+        if (reaction.emoji.name !== '✅') return;
+        if (!APPROVAL_CHANNEL_ID) return;
+        if (reaction.message.channelId !== APPROVAL_CHANNEL_ID) return;
+        if (!reaction.message.guild) return;
+
+        const users = await reaction.users.fetch();
+        const adminCheckResults = await Promise.all(
+            users
+                .filter((u) => !u.bot)
+                .map(async (u) => {
+                    const member = await reaction.message.guild!.members.fetch(u.id);
+                    return member.permissions.has(PermissionFlagsBits.Administrator);
+                })
+        );
+
+        const hasAdminApprover = adminCheckResults.some(Boolean);
+        await buildApprovalService.setApprovalActiveStateByMessageId(reaction.message.id, hasAdminApprover);
+    } catch (error) {
+        console.error('❌ Error procesando remoción de aprobación por reacción:', error);
+    }
 });
 
 client.once(Events.ClientReady, async (c) => {
@@ -25,6 +82,36 @@ client.once(Events.ClientReady, async (c) => {
 
 // 🧠 MANEJADOR DE COMANDOS (Dynamic)
 client.on(Events.InteractionCreate, async interaction => {
+    if (interaction.isButton()) {
+        if (!interaction.customId.startsWith('ficha_delete:')) {
+            return;
+        }
+
+        const ownerId = interaction.customId.split(':')[1];
+        const isOwner = interaction.user.id === ownerId;
+        const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+
+        if (!isOwner && !isAdmin) {
+            await interaction.reply({
+                content: '⛔ Solo el autor de la ficha (o staff) puede eliminar este mensaje.',
+                ephemeral: true
+            });
+            return;
+        }
+
+        try {
+            await interaction.message.delete();
+        } catch (error) {
+            if (!interaction.replied && !interaction.deferred) {
+                await interaction.reply({
+                    content: '❌ No se pudo eliminar el mensaje de ficha.',
+                    ephemeral: true
+                });
+            }
+        }
+        return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
 
     const command = commands.get(interaction.commandName);

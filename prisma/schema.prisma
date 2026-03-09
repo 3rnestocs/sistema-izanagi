@@ -53,9 +53,32 @@ model Character {
   logs   AuditLog[]
   inventory   InventoryItem[]
   activities ActivityRecord[]
+  approvalId String? @unique
+  approval CharacterBuildApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model CharacterBuildApproval {
+  id               String   @id @default(uuid())
+  discordId        String
+  keko             String
+  sourceMessageId  String   @unique
+  sourceChannelId  String
+  sourceGuildId    String
+  sourceMessageUrl String
+  approvedPlazas   String[]
+  approvedByIds    String[]
+  isActive         Boolean  @default(true)
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  character Character?
+
+  @@index([discordId, isActive])
+  @@index([sourceGuildId, sourceChannelId, isActive])
 }
 
 // ==========================================

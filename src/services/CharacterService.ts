@@ -18,6 +18,65 @@ export class CharacterService {
   private static readonly BASE_INITIAL_RC = 6;
   private static readonly BASE_INITIAL_CUPOS = 15;
   private static readonly DEFAULT_INITIAL_LEVEL = 'D1';
+  private static readonly RESTRICTED_TRAIT_CATEGORIES = new Set(['origen', 'nacimiento', 'moral']);
+
+  private normalizeCategory(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  private getCategoryLabel(category: string): string {
+    const labels: Record<string, string> = {
+      origen: 'Origen',
+      nacimiento: 'Nacimiento',
+      moral: 'Moral'
+    };
+
+    return labels[category] ?? category;
+  }
+
+  private assertRestrictedCategoryUniqueness(traits: Array<{ name: string; category: string }>): void {
+    const grouped = new Map<string, string[]>();
+
+    for (const trait of traits) {
+      const normalizedCategory = this.normalizeCategory(trait.category);
+      if (!CharacterService.RESTRICTED_TRAIT_CATEGORIES.has(normalizedCategory)) {
+        continue;
+      }
+
+      const current = grouped.get(normalizedCategory) ?? [];
+      current.push(trait.name);
+      grouped.set(normalizedCategory, current);
+    }
+
+    for (const [category, names] of grouped.entries()) {
+      if (names.length > 1) {
+        throw new Error(
+          `⛔ CONFLICTO DE CATEGORIA: Solo puedes tener un rasgo de '${this.getCategoryLabel(category)}'. Encontrados: ${names.join(', ')}.`
+        );
+      }
+    }
+  }
+
+  private assertRestrictedCategoryAvailable(
+    existingTraits: Array<{ name: string; category: string }>,
+    traitToAdd: { name: string; category: string }
+  ): void {
+    const incomingCategory = this.normalizeCategory(traitToAdd.category);
+
+    if (!CharacterService.RESTRICTED_TRAIT_CATEGORIES.has(incomingCategory)) {
+      return;
+    }
+
+    const existing = existingTraits.find((trait) => this.normalizeCategory(trait.category) === incomingCategory);
+    if (existing) {
+      throw new Error(
+        `⛔ CONFLICTO DE CATEGORIA: '${traitToAdd.name}' no puede asignarse porque ya tienes '${existing.name}' en '${this.getCategoryLabel(incomingCategory)}'.`
+      );
+    }
+  }
 
   /**
    * 🧙‍♂️ Creación Unificada de Ficha (V2)
@@ -49,6 +108,10 @@ export class CharacterService {
       if (traits.length !== data.traitNames.length) {
         throw new Error(`⛔ ERROR DB: Uno o más rasgos proporcionados no existen en el sistema IZANAGI.`);
       }
+
+      this.assertRestrictedCategoryUniqueness(
+        traits.map((trait: any) => ({ name: trait.name, category: trait.category }))
+      );
 
       // 3. MOTOR DE VALIDACIÓN DE CONFLICTOS Y CÁLCULO DE BONOS
       let totalRyouBonus = 0;
@@ -200,14 +263,11 @@ export class CharacterService {
         }
       }
 
-      // 4. Validar categoría única (ORIGEN, NACIMIENTO)
-      const uniqueCategories = ['Origen', 'Nacimiento'];
-      if (uniqueCategories.includes(traitToAdd.category)) {
-        const existing = character.traits.find((ct) => ct.trait.category === traitToAdd.category);
-        if (existing) {
-          throw new Error(`⛔ El personaje ya tiene un rasgo de categoría '${traitToAdd.category}'. Solo puede haber uno.`);
-        }
-      }
+      // 4. Validar restricción global por categoría (Origen, Nacimiento, Moral)
+      this.assertRestrictedCategoryAvailable(
+        character.traits.map((entry) => ({ name: entry.trait.name, category: entry.trait.category })),
+        { name: traitToAdd.name, category: traitToAdd.category }
+      );
 
       // 5. Validar costo RC
       const totalRcNeeded = Math.abs(traitToAdd.costRC);

@@ -21,6 +21,24 @@ export class PlazaService {
     'invocaci',
     'pacto'
   ];
+  private readonly RESTRICTED_TRAIT_CATEGORIES = new Set(['origen', 'nacimiento', 'moral']);
+
+  private normalizeCategory(value: string): string {
+    return value
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  }
+
+  private getCategoryLabel(category: string): string {
+    const labels: Record<string, string> = {
+      origen: 'Origen',
+      nacimiento: 'Nacimiento',
+      moral: 'Moral'
+    };
+
+    return labels[category] ?? category;
+  }
 
   private isDevelopableCategory(category: string): boolean {
     const normalizedCategory = category.trim().toLowerCase();
@@ -46,7 +64,10 @@ export class PlazaService {
       // 1. LECTURA DE DATOS
       const character = await tx.character.findUnique({ 
         where: { id: data.characterId },
-        include: { plazas: { include: { plaza: true } } } 
+        include: {
+          plazas: { include: { plaza: true } },
+          traits: { include: { trait: { select: { id: true, name: true, category: true } } } }
+        }
       });
       if (!character) throw new Error("⛔ Personaje no encontrado.");
 
@@ -134,20 +155,9 @@ export class PlazaService {
         });
       }
 
-      // 5. INYECCIÓN DE LA GUÍA Y SUS BONOS DE STATS
-      // Preparamos la inyección del bono si la plaza otorga uno (Ej: +2 Ninjutsu)
-      const statUpdateObj: any = {};
-      if (plaza.bonusStatName && plaza.bonusStatValue !== 0) {
-        const statKey = plaza.bonusStatName.toLowerCase();
-        statUpdateObj[statKey] = { increment: plaza.bonusStatValue };
-        
-        await tx.character.update({
-          where: { id: character.id },
-          data: statUpdateObj
-        });
-      }
-
-      // Creamos la relación en la tabla intermedia
+      // 5. INYECCIÓN DE LA GUÍA
+      // Los bonos de stats de plazas se calculan de forma derivada en visualización/lógica efectiva,
+      // para no contaminar los contadores de SP invertidos del personaje.
       await tx.characterPlaza.create({
         data: {
           characterId: character.id,
@@ -166,6 +176,26 @@ export class PlazaService {
         for (const traitRel of traitsToConnect) {
           const hasTrait = await tx.characterTrait.findUnique({ where: { characterId_traitId: traitRel.characterId_traitId } });
           if (!hasTrait) {
+            const inheritedTrait = plaza.inheritedTraits.find((it: any) => it.traitId === traitRel.characterId_traitId.traitId)?.trait;
+            if (inheritedTrait) {
+              const incomingCategory = this.normalizeCategory(inheritedTrait.category);
+              if (this.RESTRICTED_TRAIT_CATEGORIES.has(incomingCategory)) {
+                const sameCategory = await tx.characterTrait.findFirst({
+                  where: {
+                    characterId: character.id,
+                    trait: { category: inheritedTrait.category }
+                  },
+                  include: { trait: { select: { name: true } } }
+                });
+
+                if (sameCategory) {
+                  throw new Error(
+                    `⛔ CONFLICTO DE CATEGORIA: '${inheritedTrait.name}' no puede heredarse porque ya tienes '${sameCategory.trait.name}' en '${this.getCategoryLabel(incomingCategory)}'.`
+                  );
+                }
+              }
+            }
+
             await tx.characterTrait.create({ data: { characterId: character.id, traitId: traitRel.characterId_traitId.traitId } });
           }
         }
@@ -255,14 +285,7 @@ export class PlazaService {
         throw new Error(`⛔ El personaje no posee la habilidad '${plazaName}'.`);
       }
 
-      // 3. Revertir bonificaciones de stats
-      const statReversals: any = {};
-      if (plaza.bonusStatName && plaza.bonusStatValue !== 0) {
-        const statKey = plaza.bonusStatName.toLowerCase();
-        statReversals[statKey] = { increment: -plaza.bonusStatValue };
-      }
-
-      // 4. Eliminar rasgos heredados
+      // 3. Eliminar rasgos heredados
       let traitsRemoved = 0;
       if (plaza.inheritedTraits && plaza.inheritedTraits.length > 0) {
         for (const inheritedTrait of plaza.inheritedTraits) {
@@ -299,15 +322,7 @@ export class PlazaService {
         }
       });
 
-      // 6. Actualizar stats si hay reversiones
-      if (Object.keys(statReversals).length > 0) {
-        await tx.character.update({
-          where: { id: characterId },
-          data: statReversals
-        });
-      }
-
-      // 7. Reembolsar recursos (inversión original)
+      // 6. Reembolsar recursos (inversión original)
       let refundCupos = plaza.costCupos;
       await tx.character.update({
         where: { id: characterId },
@@ -316,7 +331,7 @@ export class PlazaService {
         }
       });
 
-      // 8. Auditoría
+      // 7. Auditoría
       const auditDetail =
         traitsRemoved > 0
           ? `Removida: ${plaza.name}. Revertidas ${traitsRemoved} herencias de rasgos. Reembolso: ${refundCupos} cupos.`

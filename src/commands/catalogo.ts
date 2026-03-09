@@ -21,10 +21,6 @@ const PLAZA_CATEGORIES = [
   'Bijuu'
 ];
 
-const PLAZA_CATEGORY_ALIASES: Record<string, string[]> = {
-  especiales: ['especiales', 'habilidades especiales']
-};
-
 function normalizeText(value: string): string {
   return value
     .normalize('NFD')
@@ -60,19 +56,6 @@ function chunkByItems<T>(items: T[], getSize: (item: T) => number, maxSize = 100
   }
 
   return chunks;
-}
-
-function getCategoryCandidates(input: string): string[] {
-  const normalizedInput = normalizeText(input);
-  const aliasSet = new Set<string>([input]);
-
-  for (const aliases of Object.values(PLAZA_CATEGORY_ALIASES)) {
-    if (aliases.includes(normalizedInput)) {
-      aliases.forEach((alias) => aliasSet.add(alias));
-    }
-  }
-
-  return Array.from(aliasSet);
 }
 
 interface TraitDisplay {
@@ -203,14 +186,23 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     }
 
     const rawCategory = interaction.options.getString('categoria', true);
-    const candidates = getCategoryCandidates(rawCategory);
+    const requested = normalizeText(rawCategory);
+
+    const distinctCategories = await prisma.plaza.findMany({
+      select: { category: true },
+      distinct: ['category']
+    });
+
+    const resolvedCategory = distinctCategories
+      .map((entry) => entry.category)
+      .find((category) => normalizeText(category) === requested);
+
+    if (!resolvedCategory) {
+      throw new Error(`Categoria no encontrada: ${rawCategory}`);
+    }
 
     const habilidades = await prisma.plaza.findMany({
-      where: {
-        OR: candidates.map((candidate) => ({
-          category: { equals: candidate, mode: 'insensitive' as const }
-        }))
-      },
+      where: { category: { equals: resolvedCategory, mode: 'insensitive' } },
       orderBy: [{ name: 'asc' }],
       include: {
         characters: {
@@ -248,7 +240,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const embeds = plazaChunks.map((chunk, index) =>
       new EmbedBuilder()
         .setColor(0x43b581)
-        .setTitle(`Catálogo de Habilidades - ${rawCategory}`)
+        .setTitle(`Catálogo de Habilidades - ${resolvedCategory}`)
         .setDescription(formatPlazasTable(chunk))
         .setFooter({ text: `Página ${index + 1} de ${plazaChunks.length} • Total: ${habilidades.length} habilidades` })
         .setTimestamp()

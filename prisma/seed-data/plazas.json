@@ -27,7 +27,7 @@
   {"name": "Mokuton", "category": "Elementos", "costCupos": 7, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Doton", "Suiton"], "traitGrants": []},
   {"name": "Jinton Polvo", "category": "Elementos", "costCupos": 7, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Fuuton", "Katon", "Doton"], "traitGrants": []},
   {"name": "Uchiha Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Katon"], "traitGrants": ["Presteza"]},
-  {"name": "Uzumaki Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": "Chakra", "bonusStatValue": 3, "extras": ["Fuuinjutsu"], "traitGrants": ["Sabio"]},
+  {"name": "Uzumaki Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Fuuinjutsu"], "traitGrants": ["Sabio"]},
   {"name": "Hyuuga Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": ["Noble"]},
   {"name": "Houzuki Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 3, "bonusStatName": null, "bonusStatValue": 0, "extras": ["Suiton"], "traitGrants": []},
   {"name": "Kaguya Ichizoku", "category": "Clanes", "costCupos": 8, "maxHolders": 1, "bonusStatName": null, "bonusStatValue": 0, "extras": [], "traitGrants": ["Preciso"]},
