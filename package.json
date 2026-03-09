@@ -10,10 +10,14 @@
     "deploy:full": "npm run build && node dist/deploy/deploy-commands.js && npm run start",
     "deploy:commands": "ts-node src/deploy/deploy-commands.ts",
     "db:push": "prisma db push",
+    "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
     "db:seed:mercados": "ts-node src/database/seedMercados.ts",
     "db:seed:rasgos": "ts-node src/database/seedRasgo.ts",
-    "db:seed:plazas": "ts-node src/database/seedPlazas.ts"
+    "db:seed:plazas": "ts-node src/database/seedPlazas.ts",
+    "db:audit:plaza-traits": "ts-node src/database/auditPlazaTraitInheritance.ts",
+    "db:bootstrap:fresh": "npm run db:migrate:deploy && npm run db:seed:rasgos && npm run db:seed:plazas && npm run db:audit:plaza-traits && npm run db:seed:mercados",
+    "system:fresh:start": "npm run db:bootstrap:fresh && npm run build && npm run start"
   },
   "keywords": [],
   "author": "",

@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client';
 import { StatValidatorService } from './StatValidatorService';
+import {
+  assertRestrictedCategoryAvailable,
+  assertRestrictedCategoryUniqueness,
+  getCategoryLabel
+} from './TraitRuleService';
 
 // DTO (Data Transfer Object) para tipar estrictamente lo que entra desde Discord
 export interface CreateCharacterDTO {
@@ -18,64 +23,18 @@ export class CharacterService {
   private static readonly BASE_INITIAL_RC = 6;
   private static readonly BASE_INITIAL_CUPOS = 15;
   private static readonly DEFAULT_INITIAL_LEVEL = 'D1';
-  private static readonly RESTRICTED_TRAIT_CATEGORIES = new Set(['origen', 'nacimiento', 'moral']);
-
-  private normalizeCategory(value: string): string {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-  }
-
-  private getCategoryLabel(category: string): string {
-    const labels: Record<string, string> = {
-      origen: 'Origen',
-      nacimiento: 'Nacimiento',
-      moral: 'Moral'
-    };
-
-    return labels[category] ?? category;
-  }
 
   private assertRestrictedCategoryUniqueness(traits: Array<{ name: string; category: string }>): void {
-    const grouped = new Map<string, string[]>();
-
-    for (const trait of traits) {
-      const normalizedCategory = this.normalizeCategory(trait.category);
-      if (!CharacterService.RESTRICTED_TRAIT_CATEGORIES.has(normalizedCategory)) {
-        continue;
-      }
-
-      const current = grouped.get(normalizedCategory) ?? [];
-      current.push(trait.name);
-      grouped.set(normalizedCategory, current);
-    }
-
-    for (const [category, names] of grouped.entries()) {
-      if (names.length > 1) {
-        throw new Error(
-          `⛔ CONFLICTO DE CATEGORIA: Solo puedes tener un rasgo de '${this.getCategoryLabel(category)}'. Encontrados: ${names.join(', ')}.`
-        );
-      }
-    }
+    assertRestrictedCategoryUniqueness(traits);
   }
 
   private assertRestrictedCategoryAvailable(
     existingTraits: Array<{ name: string; category: string }>,
     traitToAdd: { name: string; category: string }
   ): void {
-    const incomingCategory = this.normalizeCategory(traitToAdd.category);
-
-    if (!CharacterService.RESTRICTED_TRAIT_CATEGORIES.has(incomingCategory)) {
-      return;
-    }
-
-    const existing = existingTraits.find((trait) => this.normalizeCategory(trait.category) === incomingCategory);
-    if (existing) {
-      throw new Error(
-        `⛔ CONFLICTO DE CATEGORIA: '${traitToAdd.name}' no puede asignarse porque ya tienes '${existing.name}' en '${this.getCategoryLabel(incomingCategory)}'.`
-      );
-    }
+    assertRestrictedCategoryAvailable(existingTraits, traitToAdd, (category, existingName, incomingName) =>
+      `⛔ CONFLICTO DE CATEGORIA: '${incomingName}' no puede asignarse porque ya tienes '${existingName}' en '${getCategoryLabel(category)}'.`
+    );
   }
 
   /**

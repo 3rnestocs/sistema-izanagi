@@ -1,4 +1,8 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import {
+  assertRestrictedCategoryAvailable,
+  getCategoryLabel
+} from './TraitRuleService';
 
 export type PlazaGrantType = 'INICIAL' | 'DESARROLLO' | 'DESEO_NORMAL' | 'DESEO_ESPECIAL';
 
@@ -21,24 +25,6 @@ export class PlazaService {
     'invocaci',
     'pacto'
   ];
-  private readonly RESTRICTED_TRAIT_CATEGORIES = new Set(['origen', 'nacimiento', 'moral']);
-
-  private normalizeCategory(value: string): string {
-    return value
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
-  }
-
-  private getCategoryLabel(category: string): string {
-    const labels: Record<string, string> = {
-      origen: 'Origen',
-      nacimiento: 'Nacimiento',
-      moral: 'Moral'
-    };
-
-    return labels[category] ?? category;
-  }
 
   private isDevelopableCategory(category: string): boolean {
     const normalizedCategory = category.trim().toLowerCase();
@@ -171,6 +157,10 @@ export class PlazaService {
         const traitsToConnect = plaza.inheritedTraits.map((it: any) => ({
           characterId_traitId: { characterId: character.id, traitId: it.traitId }
         }));
+        const existingCharacterTraits = character.traits.map((entry: any) => ({
+          name: entry.trait.name,
+          category: entry.trait.category
+        }));
         
         // Asignamos los rasgos heredados omitiendo duplicados (onConflict: Do Nothing equivalente)
         for (const traitRel of traitsToConnect) {
@@ -178,25 +168,18 @@ export class PlazaService {
           if (!hasTrait) {
             const inheritedTrait = plaza.inheritedTraits.find((it: any) => it.traitId === traitRel.characterId_traitId.traitId)?.trait;
             if (inheritedTrait) {
-              const incomingCategory = this.normalizeCategory(inheritedTrait.category);
-              if (this.RESTRICTED_TRAIT_CATEGORIES.has(incomingCategory)) {
-                const sameCategory = await tx.characterTrait.findFirst({
-                  where: {
-                    characterId: character.id,
-                    trait: { category: inheritedTrait.category }
-                  },
-                  include: { trait: { select: { name: true } } }
-                });
-
-                if (sameCategory) {
-                  throw new Error(
-                    `⛔ CONFLICTO DE CATEGORIA: '${inheritedTrait.name}' no puede heredarse porque ya tienes '${sameCategory.trait.name}' en '${this.getCategoryLabel(incomingCategory)}'.`
-                  );
-                }
-              }
+              assertRestrictedCategoryAvailable(
+                existingCharacterTraits,
+                { name: inheritedTrait.name, category: inheritedTrait.category },
+                (category, existingName, incomingName) =>
+                  `⛔ CONFLICTO DE CATEGORIA: '${incomingName}' no puede heredarse porque ya tienes '${existingName}' en '${getCategoryLabel(category)}'.`
+              );
             }
 
             await tx.characterTrait.create({ data: { characterId: character.id, traitId: traitRel.characterId_traitId.traitId } });
+            if (inheritedTrait) {
+              existingCharacterTraits.push({ name: inheritedTrait.name, category: inheritedTrait.category });
+            }
           }
         }
       }

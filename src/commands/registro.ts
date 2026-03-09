@@ -10,6 +10,14 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { CharacterService } from '../services/CharacterService';
 import { PlazaService } from '../services/PlazaService';
+import { resolvePlazaInheritance } from '../services/PlazaInheritanceResolver';
+import {
+    RESTRICTED_TRAIT_CATEGORIES,
+    getCategoryLabel,
+    normalizeCategory,
+    normalizeRestrictedCategory,
+    type RestrictedTraitCategory
+} from '../services/TraitRuleService';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { BuildApprovalService } from '../services/BuildApprovalService';
 import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandError } from '../utils/errorHandler';
@@ -37,9 +45,6 @@ interface TraitRecordInput {
 const INPUT_NAME_NOTE = '💡 Nota: Cada nombre de rasgo o habilidad debe coincidir exactamente. Usa /catalogo para verificar nombres antes de enviar.';
 const RECOVERY_NOTE = '↩️ Tip: Si estabas escribiendo en Discord, presiona Ctrl+Z en la caja de chat para recuperar tu ultimo mensaje.';
 const AUTO_TRAIT_TOKEN = 'auto';
-const RESTRICTED_TRAIT_CATEGORIES = ['origen', 'nacimiento', 'moral'] as const;
-
-type RestrictedTraitCategory = typeof RESTRICTED_TRAIT_CATEGORIES[number];
 
 interface CategoryTraitEntry {
     name: string;
@@ -123,13 +128,6 @@ function parseCsv(input: string | null): string[] {
         .filter((value) => value.length > 0);
 }
 
-function normalizeCategory(value: string): string {
-    return value
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .toLowerCase();
-}
-
 function normalizeText(value: string): string {
     return value
         .normalize('NFD')
@@ -156,25 +154,6 @@ function normalizeKekoForComparison(keko: string): string {
 
 function isAutoTraitToken(value: string): boolean {
     return normalizeText(value) === AUTO_TRAIT_TOKEN;
-}
-
-function getCategoryLabel(category: RestrictedTraitCategory): string {
-    const labels: Record<RestrictedTraitCategory, string> = {
-        origen: 'Origen',
-        nacimiento: 'Nacimiento',
-        moral: 'Moral'
-    };
-
-    return labels[category];
-}
-
-function normalizeRestrictedCategory(category: string): RestrictedTraitCategory | null {
-    const normalized = normalizeCategory(category);
-    if (RESTRICTED_TRAIT_CATEGORIES.includes(normalized as RestrictedTraitCategory)) {
-        return normalized as RestrictedTraitCategory;
-    }
-
-    return null;
 }
 
 function shouldShowInputNameNote(message: string): boolean {
@@ -386,55 +365,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             throw new Error(`⛔ Plazas no encontradas: ${missing.join(', ')}`);
         }
 
-        const autoGrantedTraitNames = new Set<string>();
-        const autoGrantedPlazaNames = new Set<string>();
-        const autoGrantedTraitSource = new Map<string, string>();
-        const inheritedRestrictedTraits: CategoryTraitEntry[] = [];
-
-        if (selectedPlazas.length > 0) {
-            const visitedPlazaIds = new Set<string>();
-            const queue = selectedPlazas.map((plaza) => ({ id: plaza.id, sourcePlazaName: plaza.name }));
-
-            while (queue.length > 0) {
-                const current = queue.shift();
-                if (!current || visitedPlazaIds.has(current.id)) continue;
-                visitedPlazaIds.add(current.id);
-
-                const plaza = await prisma.plaza.findUnique({
-                    where: { id: current.id },
-                    include: {
-                        inheritedTraits: { include: { trait: { select: { name: true, category: true } } } },
-                        inheritedPlazas: { include: { child: { select: { id: true, name: true } } } }
-                    }
-                });
-
-                if (!plaza) continue;
-
-                for (const inheritedTrait of plaza.inheritedTraits) {
-                    autoGrantedTraitNames.add(inheritedTrait.trait.name);
-                    if (!autoGrantedTraitSource.has(inheritedTrait.trait.name)) {
-                        autoGrantedTraitSource.set(inheritedTrait.trait.name, current.sourcePlazaName);
-                    }
-
-                    const restrictedCategory = normalizeRestrictedCategory(inheritedTrait.trait.category);
-                    if (restrictedCategory) {
-                        inheritedRestrictedTraits.push({
-                            name: inheritedTrait.trait.name,
-                            category: restrictedCategory,
-                            source: 'herencia',
-                            sourcePlaza: current.sourcePlazaName
-                        });
-                    }
-                }
-
-                for (const inheritedPlaza of plaza.inheritedPlazas) {
-                    autoGrantedPlazaNames.add(inheritedPlaza.child.name);
-                    if (!visitedPlazaIds.has(inheritedPlaza.child.id)) {
-                        queue.push({ id: inheritedPlaza.child.id, sourcePlazaName: current.sourcePlazaName });
-                    }
-                }
-            }
-        }
+        const inheritanceResolution = await resolvePlazaInheritance(
+            prisma,
+            selectedPlazas.map((plaza) => ({ id: plaza.id, name: plaza.name }))
+        );
+        const autoGrantedTraitNames = inheritanceResolution.autoGrantedTraitNames;
+        const autoGrantedPlazaNames = inheritanceResolution.autoGrantedPlazaNames;
+        const autoGrantedTraitSource = inheritanceResolution.autoGrantedTraitSource;
+        const inheritedRestrictedTraits: CategoryTraitEntry[] = inheritanceResolution.inheritedRestrictedTraits;
 
         const redundantTraits = uniqueManualTraitNames.filter((name) => autoGrantedTraitNames.has(name));
         if (redundantTraits.length > 0) {
@@ -479,7 +417,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
             const inheritedForCategory = inheritedRestrictedTraits.filter((entry) => entry.category === input.category);
             if (inheritedForCategory.length === 0) {
-                throw new Error(`⛔ Marcaste '${AUTO_TRAIT_TOKEN}' en ${input.label}, pero ninguna de tus habilidades hereda un rasgo de ${getCategoryLabel(input.category)}.`);
+                throw new Error(
+                    `⛔ Marcaste '${AUTO_TRAIT_TOKEN}' en ${input.label}, pero ninguna de tus habilidades hereda un rasgo de ${getCategoryLabel(input.category)}. Si tu build deberia heredarlo, pide al staff revisar la sincronizacion seed/DB con 'npm run db:audit:plaza-traits'.`
+                );
             }
         }
 

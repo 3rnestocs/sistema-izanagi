@@ -30,10 +30,13 @@ GUILD_ID="your-test-server-id"
 ### 3. Prepare database
 
 ```bash
-npm run db:seed:plazas
 npm run db:seed:rasgos
+npm run db:seed:plazas
+npm run db:audit:plaza-traits
 npm run db:seed:mercados
 ```
+
+If you change `prisma/seed-data/traits.json` or `prisma/seed-data/plazas.json`, re-run the two seed commands above and then the audit command to verify that all `Plaza -> Rasgo` inheritances were persisted in DB.
 
 ### 4. Deploy slash commands
 
