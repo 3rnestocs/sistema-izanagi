@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
+import { assertForumPostContext } from '../utils/channelGuards';
 
 const transactionService = new TransactionService(prisma);
 
@@ -22,6 +23,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ ephemeral: false });
 
   try {
+    assertForumPostContext(interaction, { enforceThreadOwnership: true });
+
     const character = await prisma.character.findUnique({
       where: { discordId: interaction.user.id },
       select: { id: true, name: true }

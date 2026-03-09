@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
+import { assertForumPostContext } from '../utils/channelGuards';
 
 type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 
@@ -51,6 +52,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ ephemeral: false });
 
   try {
+    assertForumPostContext(interaction, { enforceThreadOwnership: true });
+
     const currency = interaction.options.getString('moneda') as StoreCurrency | null;
     const categoryFilter = interaction.options.getString('categoria')?.trim();
     const page = interaction.options.getInteger('pagina') ?? 1;

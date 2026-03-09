@@ -2,6 +2,7 @@ import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { StatValidatorService, StatInvestmentDTO } from '../services/StatValidatorService';
+import { assertForumPostContext } from '../utils/channelGuards';
 
 // Instanciamos el Pilar Matemático
 const statValidator = new StatValidatorService();
@@ -22,6 +23,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ ephemeral: true });
 
     try {
+        assertForumPostContext(interaction, { enforceThreadOwnership: true });
+
         // 1. OBTENER AL PERSONAJE DEL USUARIO QUE EJECUTA EL COMANDO
         // Usamos discordId para que el usuario no tenga que escribir su Keko cada vez
         const character = await prisma.character.findUnique({

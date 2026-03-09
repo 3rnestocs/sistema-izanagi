@@ -1,5 +1,6 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { prisma } from '../lib/prisma';
+import { assertForumPostContext } from '../utils/channelGuards';
 
 export const data = new SlashCommandBuilder()
     .setName('registrar_actividad')
@@ -57,6 +58,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ ephemeral: false }); // Público para presumir el rol
 
     try {
+        assertForumPostContext(interaction, { enforceThreadOwnership: true });
+
         // 1. Identificar al personaje del usuario
         const character = await prisma.character.findUnique({
             where: { discordId: interaction.user.id }

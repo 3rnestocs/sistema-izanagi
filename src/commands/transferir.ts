@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
+import { assertForumPostContext } from '../utils/channelGuards';
 
 const transactionService = new TransactionService(prisma);
 
@@ -28,6 +29,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     await interaction.deferReply({ ephemeral: false }); // Público para que el otro jugador lo vea
 
     try {
+        assertForumPostContext(interaction, { enforceThreadOwnership: true });
+
         const targetUser = interaction.options.getUser('destinatario', true);
         const ryouAmount = interaction.options.getInteger('ryou') || undefined;
         const rawItems = interaction.options.getString('items');

@@ -5,6 +5,7 @@ import {
   PermissionFlagsBits
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
+import { assertForumPostContext } from '../utils/channelGuards';
 
 export const data = new SlashCommandBuilder()
   .setName('ficha')
@@ -20,6 +21,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
   await interaction.deferReply({ ephemeral: false });
 
   try {
+    assertForumPostContext(interaction, { allowStaffBypass: true, enforceThreadOwnership: true });
+
     const targetUser = interaction.options.getUser('usuario') || interaction.user;
 
     // If user is viewing someone else's profile and is not staff, deny
