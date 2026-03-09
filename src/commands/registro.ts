@@ -12,7 +12,7 @@ import { CharacterService } from '../services/CharacterService';
 import { PlazaService } from '../services/PlazaService';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { BuildApprovalService } from '../services/BuildApprovalService';
-import { AppCommandError, CommandErrorType, handleCommandError } from '../utils/errorHandler';
+import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandError } from '../utils/errorHandler';
 
 const characterService = new CharacterService(prisma);
 const plazaService = new PlazaService(prisma);
@@ -46,32 +46,6 @@ interface CategoryTraitEntry {
     category: RestrictedTraitCategory;
     source: 'manual' | 'herencia';
     sourcePlaza?: string;
-}
-
-function sanitizeErrorMessage(message: string): string {
-    return message.replace(/^⛔\s*/, '').trim();
-}
-
-function formatRegistroErrorMessage(message: string, includeInputNameNote: boolean): string {
-    const cleanMessage = sanitizeErrorMessage(message);
-    const contentLines = cleanMessage.split('\n').filter((line) => line.trim().length > 0);
-    const mainLine = contentLines.length > 0 ? contentLines[0] : cleanMessage;
-    const extraLines = contentLines.slice(1);
-
-    const helperLines = [
-        ...(includeInputNameNote
-            ? [`> ${INPUT_NAME_NOTE}`]
-            : []),
-        `> ${RECOVERY_NOTE}`
-    ];
-
-    return [
-        '## :x: Operacion cancelada',
-        `:no_entry: ${mainLine}`,
-        ...extraLines,
-        '',
-        ...helperLines
-    ].join('\n');
 }
 
 function formatSignedRc(costRC: number): string {
@@ -759,9 +733,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             commandName: 'registro',
             fallbackMessage: 'Error desconocido en registro.',
             ephemeral: true,
-            customFormatter: (appError) => {
-                const includeInputNameNote = Boolean(appError.context?.includeInputNameNote);
-                return formatRegistroErrorMessage(`⛔ ${appError.userMessage}`, includeInputNameNote);
+            errorStyle: CommandErrorStyle.MarkdownPanel,
+            styleOptions: {
+                includeInputNameTipFromContext: true,
+                inputNameTip: INPUT_NAME_NOTE,
+                recoveryTip: RECOVERY_NOTE
             }
         });
         return;

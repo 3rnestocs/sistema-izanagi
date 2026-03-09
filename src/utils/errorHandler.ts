@@ -19,6 +19,11 @@ export enum CommandErrorSeverity {
   Critical = 'critical'
 }
 
+export enum CommandErrorStyle {
+  Default = 'default',
+  MarkdownPanel = 'markdown_panel'
+}
+
 interface AppCommandErrorInput {
   type: CommandErrorType;
   userMessage: string;
@@ -58,8 +63,21 @@ interface HandleCommandErrorOptions {
   commandName: string;
   fallbackMessage?: string;
   ephemeral?: boolean;
+  errorStyle?: CommandErrorStyle;
+  styleOptions?: ErrorStyleOptions;
   customFormatter?: (error: AppCommandError) => string;
 }
+
+export interface ErrorStyleOptions {
+  titleLine?: string;
+  mainPrefix?: string;
+  includeRecoveryTip?: boolean;
+  recoveryTip?: string;
+  includeInputNameTipFromContext?: boolean;
+  inputNameTip?: string;
+}
+
+const DEFAULT_RECOVERY_TIP = '↩️ Tip: Si estabas escribiendo en Discord, presiona Ctrl+Z en la caja de chat para recuperar tu ultimo mensaje.';
 
 function sanitizeUserMessage(message: string): string {
   return message.replace(/^[⛔❌🚫\s]+/, '').trim();
@@ -160,6 +178,48 @@ export function formatCommandError(error: AppCommandError): string {
   return lines.join('\n');
 }
 
+function formatMarkdownPanelError(error: AppCommandError, options?: ErrorStyleOptions): string {
+  const titleLine = options?.titleLine ?? '## :x: Operacion cancelada';
+  const mainPrefix = options?.mainPrefix ?? ':no_entry:';
+  const includeRecoveryTip = options?.includeRecoveryTip ?? true;
+  const recoveryTip = options?.recoveryTip ?? DEFAULT_RECOVERY_TIP;
+  const includeInputNameTipFromContext = options?.includeInputNameTipFromContext ?? false;
+  const inputNameTip = options?.inputNameTip;
+
+  const contentLines = sanitizeUserMessage(error.userMessage)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+
+  const mainLine = contentLines.length > 0 ? contentLines[0] : error.userMessage;
+  const extraLines = contentLines.slice(1);
+
+  const helperLines: string[] = [];
+  const includeInputNameTip = includeInputNameTipFromContext && Boolean(error.context?.includeInputNameNote);
+  if (includeInputNameTip && inputNameTip) {
+    helperLines.push(`> ${inputNameTip}`);
+  }
+
+  if (includeRecoveryTip && recoveryTip) {
+    helperLines.push(`> ${recoveryTip}`);
+  }
+
+  return [
+    titleLine,
+    `${mainPrefix} ${mainLine}`,
+    ...extraLines,
+    ...(helperLines.length > 0 ? ['', ...helperLines] : [])
+  ].join('\n');
+}
+
+function formatErrorByStyle(error: AppCommandError, style: CommandErrorStyle, styleOptions?: ErrorStyleOptions): string {
+  if (style === CommandErrorStyle.MarkdownPanel) {
+    return formatMarkdownPanelError(error, styleOptions);
+  }
+
+  return formatCommandError(error);
+}
+
 async function sendErrorResponse(
   interaction: ChatInputCommandInteraction,
   message: string,
@@ -184,7 +244,9 @@ export async function handleCommandError(
   options: HandleCommandErrorOptions
 ): Promise<void> {
   const appError = coerceUnknownToAppError(error, options.fallbackMessage ?? 'Error del sistema. Intenta nuevamente.');
-  const finalMessage = options.customFormatter ? options.customFormatter(appError) : formatCommandError(appError);
+  const finalMessage = options.customFormatter
+    ? options.customFormatter(appError)
+    : formatErrorByStyle(appError, options.errorStyle ?? CommandErrorStyle.Default, options.styleOptions);
 
   console.error(
     `[${new Date().toISOString()}] CommandError`,
@@ -263,6 +325,8 @@ export async function executeWithErrorHandling(
     defer?: { ephemeral: boolean } | false;
     fallbackMessage?: string;
     errorEphemeral?: boolean;
+    errorStyle?: CommandErrorStyle;
+    styleOptions?: ErrorStyleOptions;
     customFormatter?: (error: AppCommandError) => string;
   }
 ): Promise<void> {
@@ -277,6 +341,8 @@ export async function executeWithErrorHandling(
       commandName,
       ...(options?.fallbackMessage ? { fallbackMessage: options.fallbackMessage } : {}),
       ...(typeof options?.errorEphemeral === 'boolean' ? { ephemeral: options.errorEphemeral } : {}),
+      ...(options?.errorStyle ? { errorStyle: options.errorStyle } : {}),
+      ...(options?.styleOptions ? { styleOptions: options.styleOptions } : {}),
       ...(options?.customFormatter ? { customFormatter: options.customFormatter } : {})
     });
   }
