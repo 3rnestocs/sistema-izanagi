@@ -16,9 +16,9 @@ export async function loadCommands(): Promise<Collection<string, Command>> {
   const commands = new Collection<string, Command>();
   const commandsPath = path.join(__dirname, '..', 'commands');
 
-  // Determine file extension based on environment
-  const fileExtension = process.env.NODE_ENV === 'production' ? '.js' : '.ts';
-  const files = fs.readdirSync(commandsPath).filter(file => file.endsWith(fileExtension));
+  // Always look for .js files in dist/ (compiled output)
+  const files = fs.readdirSync(commandsPath)
+    .filter(file => file.endsWith('.js') && !file.endsWith('.d.ts'));
 
   for (const file of files) {
     const filePath = path.join(commandsPath, file);

@@ -154,7 +154,7 @@ export class TransactionService {
         if (!itemsToSell[catalogItem.id]) {
           itemsToSell[catalogItem.id] = { quantity: 0, basePrice: catalogItem.price, item: catalogItem };
         }
-        itemsToSell[catalogItem.id].quantity += 1;
+        itemsToSell[catalogItem.id]!.quantity += 1;
       }
 
       // 3. Validar inventario y calcular ingresos
@@ -178,7 +178,8 @@ export class TransactionService {
 
       // 4. Remover items del inventario
       for (const [itemId, sellData] of Object.entries(itemsToSell)) {
-        const invItem = character.inventory.find(inv => inv.itemId === itemId)!;
+        const invItem = character.inventory.find(inv => inv.itemId === itemId);
+        if (!invItem) continue;
         
         if (invItem.quantity === sellData.quantity) {
           await tx.inventoryItem.delete({ where: { id: invItem.id } });
@@ -279,7 +280,7 @@ export class TransactionService {
       }
 
       // 4. Logs Cruzados
-      const itemsLog = data.itemNames.length > 0 ? data.itemNames.join(", ") : "Ningún objeto";
+      const itemsLog = (data.itemNames && data.itemNames.length > 0) ? data.itemNames.join(", ") : "Ningún objeto";
       const moneyLog = transferAmount > 0 ? ` y ${transferAmount} Ryou` : "";
 
       await tx.auditLog.create({

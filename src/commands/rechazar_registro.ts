@@ -50,8 +50,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const updatedActivity = await prisma.activityRecord.update({
       where: { id: activityId },
       data: {
-        status: 'REJECTED',
-        rejectionReason: reason
+        status: 'REJECTED'
       }
     });
 
@@ -60,14 +59,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       data: {
         characterId: activity.characterId,
         category: 'Actividad Rechazada',
-        detail: `Actividad ${activity.activityType} rechazada. Razón: ${reason}`,
+        detail: `Actividad ${activity.type} rechazada. Razón: ${reason}`,
         evidence: `Comando /rechazar_registro por ${interaction.user.username}`
       }
     });
 
     return interaction.editReply(
       `✅ Actividad **${updatedActivity.id}** de **${activity.character.name}** rechazada.\n` +
-        `Tipo: ${updatedActivity.activityType}\n` +
+        `Tipo: ${updatedActivity.type}\n` +
         `Razón: ${reason}`
     );
   } catch (error: unknown) {

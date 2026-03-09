@@ -77,8 +77,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       '✅ Ascenso aplicado correctamente.',
       `👤 Personaje: **${character.name}**`,
       `🎯 Objetivo: **${objective}**`,
-      `📈 Nivel: **${result.previousLevel}** ➜ **${result.nextLevel}**`,
-      `🏷️ Cargo: **${result.previousRank}** ➜ **${result.nextRank}**`
+      `📈 Nivel Anterior: **${character.level}**`,
+      `🏷️ Cargo Anterior: **${character.rank}**`
     ].join('\n');
 
     return interaction.editReply(response);

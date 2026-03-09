@@ -153,3 +153,4 @@ export class RewardCalculatorService {
       ryou: Math.floor(rewards.ryou * ryouMultiplier)
     };
   }
+}

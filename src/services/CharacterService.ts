@@ -65,11 +65,8 @@ export class CharacterService {
         totalRcCost += trait.costRC;
         totalRyouBonus += trait.bonusRyou;
 
-        // C. Apply direct stat bonuses (e.g., Sabio +2 Chakra)
-        if (trait.bonusStatName && trait.bonusStatValue !== 0) {
-          const statKey = trait.bonusStatName.toLowerCase();
-          statBonuses[statKey] = (statBonuses[statKey] || 0) + trait.bonusStatValue;
-        }
+        // C. Apply direct stat bonuses via mechanics JSON (e.g., Sabio +2 Chakra)
+        // Stat bonuses for traits come from mechanics JSON, not direct fields
 
         // D. Parse mechanics JSON for secondary bonuses
         if (trait.mechanics && typeof trait.mechanics === 'object') {
@@ -195,10 +192,7 @@ export class CharacterService {
       let rcDelta = -traitToAdd.costRC;
       let statBonuses: Record<string, number> = {};
 
-      if (traitToAdd.bonusStatName && traitToAdd.bonusStatValue !== 0) {
-        const statKey = traitToAdd.bonusStatName.toLowerCase();
-        statBonuses[statKey] = traitToAdd.bonusStatValue;
-      }
+      // Stat bonuses for traits come from mechanics JSON, not direct fields
 
       // 7. Aplicar el rasgo y actualizar stats
       const updateData: Record<string, any> = {
@@ -265,10 +259,7 @@ export class CharacterService {
       let rcDelta = traitToRemove.costRC;
       let statReversals: Record<string, number> = {};
 
-      if (traitToRemove.bonusStatName && traitToRemove.bonusStatValue !== 0) {
-        const statKey = traitToRemove.bonusStatName.toLowerCase();
-        statReversals[statKey] = -traitToRemove.bonusStatValue;
-      }
+      // Stat bonuses for traits come from mechanics JSON, not direct fields
 
       // 4. Eliminar la relación y actualizar stats
       const updateData: Record<string, any> = {

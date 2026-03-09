@@ -120,7 +120,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     // Recent Activity
     if (character.activities && character.activities.length > 0) {
       const activityText = character.activities
-        .map((a) => `• ${a.activityType}: +${a.baseReward} (${a.status})`)
+        .map((a) => `• ${a.type}: ${a.status}`)
         .join('\n');
       statsEmbed.addFields({ name: '📋 Actividad Reciente', value: activityText, inline: false });
     }

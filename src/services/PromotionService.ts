@@ -156,7 +156,7 @@ export class PromotionService {
 
     return {
       passed: character.exp >= requiredExp,
-      reason: character.exp >= requiredExp ? undefined : `Necesitas ${requiredExp - character.exp} EXP más.`,
+      ...(character.exp < requiredExp && { reason: `Necesitas ${requiredExp - character.exp} EXP más.` }),
       snapshot
     };
   }

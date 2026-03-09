@@ -41,9 +41,7 @@ async function main() {
             multiplierGasto: trait.multiplierGasto,
             multiplierGanancia: trait.multiplierGanancia,
             minBalanceRule: trait.minBalanceRule,
-            blocksTransfer: trait.blocksTransfer,
-            ...(trait.bonusStatName ? { bonusStatName: trait.bonusStatName } : {}),
-            ...(trait.bonusStatValue ? { bonusStatValue: trait.bonusStatValue } : {})
+            blocksTransfer: trait.blocksTransfer
         };
 
         await prisma.trait.upsert({
