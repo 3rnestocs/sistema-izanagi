@@ -17,7 +17,7 @@ import {
   isSuccessResult
 } from '../domain/activityDomain';
 
-export { RewardBreakdown };
+export type { RewardBreakdown };
 
 export class RewardCalculatorService {
   private readonly RANK_VALUES: Readonly<Record<string, number>> = {

@@ -74,7 +74,8 @@ Las siguientes actividades reciben recompensas **automáticamente** y son aproba
 - Si es una Crónica/Evento nueva (no en el sistema):
   - **Crónica normal**: 15 EXP, 20 PR | **Destacado**: +5 EXP, +5 PR
   - **Evento normal**: 15 EXP, 15 PR | **Destacado**: +5 EXP, +5 PR
-- **Nota**: Los registros con resultado "Destacado" en Crónicas/Eventos quedan en revisión manual por staff/narrador
+- **Nota**: Crónicas/Eventos (incluyendo resultado "Destacado") se auto-aprueban.
+- **Nota de migración**: El catálogo histórico se usa durante la migración de actividades pasadas y podrá retirarse cuando el proceso finalice.
 
 ---
 
@@ -88,7 +89,6 @@ Las siguientes actividades proyectan recompensas pero requieren aprobación manu
 - **Logro de Reputación**: Staff valida el hito y asigna PR
 - **Experimento**: Staff valida el contexto
 - **Timeskip**: Staff define recompensas per-caso
-- **Crónicas/Eventos Destacado**: Staff confirma quién merece Destacado
 
 Para estas actividades, el comando `/registrar_actividad` las guarda como **PENDIENTE** y staff las aprueba con `/aprobar_registro` asignando recompensas manuales.
 
@@ -122,17 +122,17 @@ Para estas actividades, el comando `/registrar_actividad` las guarda como **PEND
 |---|---|---|---|
 | Misión | ✅ | Por rango | Rango + Resultado obligatorios |
 | Combate | ✅ | Por rango enemigo | Rango + Resultado obligatorios; Cap 5/semana |
-| Curación | ✅ | Por severidad | Rango (severidad) obligatorio; Cap 10/semana |
+| Curación | ✅ | Por severidad | `severidad` obligatorio; Cap 10/semana |
 | Desarrollo Personal | ✅ | Por nivel | Automático según tu nivel |
 | Crónica (normal) | ✅ | Histórico o estándar | Opcionalmente `nombre_actividad` |
 | Evento (normal) | ✅ | Histórico o estándar | Opcionalmente `nombre_actividad` |
+| Crónica/Evento Destacado | ✅ | Histórico o estándar + bono Destacado | Auto-aprobado; opcionalmente `nombre_actividad` |
 | Escena | ❌ | Staff decide | Staff aprueba y asigna recompensas |
 | Logro General | ❌ | Staff decide | Staff verifica condición y asigna |
 | Logro de Saga | ❌ | Staff decide | Staff verifica y asigna |
 | Logro de Reputación | ❌ | Staff decide | Staff valida hito y asigna PR |
 | Experimento | ❌ | Staff decide | Staff valida y asigna |
 | Timeskip | ❌ | Staff decide | Staff define per-caso |
-| Crónica/Evento Destacado | ❌ | Staff decide | Staff revisa y confirma Destacado |
 
 ---
 

@@ -1,4 +1,12 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import {
+    SlashCommandBuilder,
+    ChatInputCommandInteraction,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} from 'discord.js';
+import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
 import { assertForumPostContext } from '../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
@@ -6,11 +14,33 @@ import { executeWithErrorHandling, validationError } from '../utils/errorHandler
 import { RewardCalculatorService } from '../services/RewardCalculatorService';
 import { ActivityCapService } from '../services/ActivityCapService';
 import { formatChannelReference } from '../utils/channelRefs';
-import { ActivityStatus, ActivityType, shouldForceManualReview } from '../domain/activityDomain';
+import { ActivityStatus, ActivityType } from '../domain/activityDomain';
+import { getHistoricalNarrationRewards } from '../config/historicalNarrations';
 
 const rewardCalculatorService = new RewardCalculatorService();
 const activityCapService = new ActivityCapService(prisma);
 const ACTIVITY_FORUM_MENTION = formatChannelReference(process.env.ACTIVITY_FORUM_MENTION, '#canal-correcto');
+
+async function publishActivityEmbed(
+    interaction: ChatInputCommandInteraction,
+    embed: EmbedBuilder
+): Promise<void> {
+    const deleteButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`ficha_delete:${interaction.user.id}`)
+            .setLabel('Eliminar mensaje')
+            .setStyle(ButtonStyle.Secondary)
+    );
+
+    await interaction.followUp({
+        embeds: [embed],
+        components: [deleteButton],
+        ephemeral: false
+    });
+
+    // Remove the private deferred placeholder to avoid an extra private message.
+    await interaction.deleteReply();
+}
 
 export const data = new SlashCommandBuilder()
     .setName('registrar_actividad')
@@ -119,6 +149,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const nombreActividad = interaction.options.getString('nombre_actividad'); // Opcional (para Cronica/Evento)
 
         const valorRangoPersistido = tipo === ActivityType.CURACION ? severidad : rango;
+        const isNarration = tipo === ActivityType.CRONICA || tipo === ActivityType.EVENTO;
+        const narrationMissWarning = isNarration && nombreActividad && !getHistoricalNarrationRewards(nombreActividad)
+            ? `El nombre de actividad proporcionado no coincide con el catálogo histórico. Se aplicó la tabla estándar de ${tipo}.`
+            : null;
 
         // 3. Validación de coherencia
         // Misión, Combate: requieren rango y resultado
@@ -154,20 +188,21 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         });
 
         // 5. Guardar en la Base de Datos
+        const activityCreateData: Prisma.ActivityRecordCreateInput = {
+            character: { connect: { id: character.id } },
+            type: tipo,
+            rank: valorRangoPersistido,
+            result: resultado,
+            evidenceUrl: evidencia,
+            ...(isNarration && nombreActividad ? { narrationKey: nombreActividad } : {})
+        };
+
         const nuevaActividad = await prisma.activityRecord.create({
-            data: {
-                characterId: character.id,
-                type: tipo,
-                rank: valorRangoPersistido,
-                result: resultado,
-                evidenceUrl: evidencia,
-                narrationKey: (tipo === ActivityType.CRONICA || tipo === ActivityType.EVENTO) ? nombreActividad : undefined
-            } as any
+            data: activityCreateData
         });
 
         // 6. Check if auto-approvable and process rewards
-        const isAutoApprovable = rewardCalculatorService.isAutoApprovable(tipo)
-            && !shouldForceManualReview(tipo, resultado);
+        const isAutoApprovable = rewardCalculatorService.isAutoApprovable(tipo);
 
         if (isAutoApprovable) {
             // Calculate rewards
@@ -205,30 +240,53 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 });
             });
 
-            // Reply with FINAL rewards (applied)
-            let mensajeExito = `✅ **Actividad Aprobada Automáticamente**\n` +
-                               `**ID de Registro:** ${nuevaActividad.id}\n` +
-                               `**Estado:** APROBADO AUTOMÁTICAMENTE\n` +
-                               `**Ninja:** <@${interaction.user.id}> (${character.name})\n` +
-                               `**Actividad:** ${tipo}\n`;
-            
-            if (valorRangoPersistido) {
-                if (tipo === ActivityType.CURACION) {
-                    mensajeExito += `**Severidad:** ${valorRangoPersistido}\n`;
-                } else {
-                    mensajeExito += `**Rango/Nivel:** ${valorRangoPersistido}\n`;
-                }
-            }
-            if (resultado) mensajeExito += `**Resultado:** ${resultado}\n`;
-            
-            mensajeExito += `**Evidencia:** [Ver Prueba](${evidencia})\n\n` +
-                            `## :moneybag: Recompensas Acreditadas\n` +
-                            `✨ EXP: +${rewards.exp}\n` +
-                            `🏆 PR: +${rewards.pr}\n` +
-                            `🪙 Ryou: +${rewards.ryou}\n\n` +
-                            `> Los recursos han sido acreditados a tu ficha de manera inmediata.`;
+            const rewardLines = [
+                `✨ EXP: +${rewards.exp}`,
+                `🏆 PR: +${rewards.pr}`,
+                `🪙 Ryou: +${rewards.ryou}`
+            ].join('\n');
 
-            return interaction.editReply(mensajeExito);
+            const activitySummary = [
+                `**ID de Registro:** ${nuevaActividad.id}`,
+                `**Estado:** APROBADO AUTOMÁTICAMENTE`,
+                `**Ninja:** <@${interaction.user.id}> (${character.name})`,
+                `**Actividad:** ${tipo}`,
+                ...(valorRangoPersistido
+                    ? [tipo === ActivityType.CURACION
+                        ? `**Severidad:** ${valorRangoPersistido}`
+                        : `**Rango/Nivel:** ${valorRangoPersistido}`]
+                    : []),
+                ...(resultado ? [`**Resultado:** ${resultado}`] : []),
+                `**Evidencia:** [Ver Prueba](${evidencia})`
+            ].join('\n');
+
+            const successEmbed = new EmbedBuilder()
+                .setColor(0x0099FF)
+                .setTitle('✅ Actividad Aprobada Automáticamente')
+                .setDescription(activitySummary)
+                .addFields(
+                    {
+                        name: '💰 Recompensas Acreditadas',
+                        value: rewardLines,
+                        inline: false
+                    },
+                    {
+                        name: 'Estado de Acreditación',
+                        value: 'Los recursos han sido acreditados a tu ficha de manera inmediata.',
+                        inline: false
+                    },
+                    ...(narrationMissWarning
+                        ? [{
+                            name: '⚠️ Aviso',
+                            value: narrationMissWarning,
+                            inline: false
+                        }]
+                        : [])
+                )
+                .setTimestamp();
+
+            await publishActivityEmbed(interaction, successEmbed);
+            return;
         } else {
             // MANUAL tier: calculate projected rewards for display, leave status as PENDIENTE
             const projectedRewards = rewardCalculatorService.calculateRewards(
@@ -236,40 +294,66 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 { ...nuevaActividad, narrationKey: nombreActividad } as any
             );
 
-            // Reply with projected rewards (not applied)
-            let mensajePendiente = `📜 **Registro de Actividad Guardado**\n` +
-                                   `**ID de Registro:** ${nuevaActividad.id}\n` +
-                                   `**Estado:** PENDIENTE (requiere revisión de Staff)\n` +
-                                   `**Ninja:** <@${interaction.user.id}> (${character.name})\n` +
-                                   `**Actividad:** ${tipo}\n`;
-            
-            if (valorRangoPersistido) {
-                if (tipo === ActivityType.CURACION) {
-                    mensajePendiente += `**Severidad:** ${valorRangoPersistido}\n`;
-                } else {
-                    mensajePendiente += `**Rango/Nivel:** ${valorRangoPersistido}\n`;
-                }
-            }
-            if (resultado) mensajePendiente += `**Resultado:** ${resultado}\n`;
-            
-            mensajePendiente += `**Evidencia:** [Ver Prueba](${evidencia})\n\n` +
-                                `## :moneybag: Recompensa Proyectada (Pendiente de Aprobación)\n` +
-                                `✨ EXP: +${projectedRewards.exp}\n` +
-                                `🏆 PR: +${projectedRewards.pr}\n` +
-                                `🪙 Ryou: +${projectedRewards.ryou}\n\n` +
-                                `> Los recursos se acreditan solo cuando Staff aprueba este registro con \`/aprobar_registro\`.`;
+            const projectedRewardLines = [
+                `✨ EXP: +${projectedRewards.exp}`,
+                `🏆 PR: +${projectedRewards.pr}`,
+                `🪙 Ryou: +${projectedRewards.ryou}`
+            ].join('\n');
 
-            if (projectedRewards.exp === 0 && projectedRewards.pr === 0 && projectedRewards.ryou === 0) {
-                mensajePendiente += `\n> Este tipo de actividad requiere revisión manual por parte del staff.`;
-            }
+            const pendingSummary = [
+                `**ID de Registro:** ${nuevaActividad.id}`,
+                `**Estado:** PENDIENTE (requiere revisión de Staff)`,
+                `**Ninja:** <@${interaction.user.id}> (${character.name})`,
+                `**Actividad:** ${tipo}`,
+                ...(valorRangoPersistido
+                    ? [tipo === ActivityType.CURACION
+                        ? `**Severidad:** ${valorRangoPersistido}`
+                        : `**Rango/Nivel:** ${valorRangoPersistido}`]
+                    : []),
+                ...(resultado ? [`**Resultado:** ${resultado}`] : []),
+                `**Evidencia:** [Ver Prueba](${evidencia})`
+            ].join('\n');
 
-            return interaction.editReply(mensajePendiente);
+            const manualNotes = [
+                'Los recursos se acreditan solo cuando Staff aprueba este registro con `/aprobar_registro`.',
+                ...(projectedRewards.exp === 0 && projectedRewards.pr === 0 && projectedRewards.ryou === 0
+                    ? ['Este tipo de actividad requiere revisión manual por parte del staff.']
+                    : [])
+            ].join('\n');
+
+            const pendingEmbed = new EmbedBuilder()
+                .setColor(0x0099FF)
+                .setTitle('📜 Registro de Actividad Guardado')
+                .setDescription(pendingSummary)
+                .addFields(
+                    {
+                        name: '💰 Recompensa Proyectada (Pendiente de Aprobación)',
+                        value: projectedRewardLines,
+                        inline: false
+                    },
+                    {
+                        name: 'Estado de Acreditación',
+                        value: manualNotes,
+                        inline: false
+                    },
+                    ...(narrationMissWarning
+                        ? [{
+                            name: '⚠️ Aviso',
+                            value: narrationMissWarning,
+                            inline: false
+                        }]
+                        : [])
+                )
+                .setTimestamp();
+
+            await publishActivityEmbed(interaction, pendingEmbed);
+            return;
         }
         },
         {
-            defer: { ephemeral: false },
+            defer: { ephemeral: true },
             fallbackMessage: 'No se pudo guardar el registro.',
-            errorEphemeral: false
+            errorEphemeral: true
         }
     );
 }

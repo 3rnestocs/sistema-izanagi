@@ -48,11 +48,11 @@ const ACTIVITY_TYPE_NORMALIZED_MAP: Readonly<Record<string, ActivityTypeValue>> 
   ESCENA: ActivityType.ESCENA,
   EXPERIMENTO: ActivityType.EXPERIMENTO,
   CURACION: ActivityType.CURACION,
-  LOGRO GENERAL: ActivityType.LOGRO_GENERAL,
-  LOGRO DE SAGA: ActivityType.LOGRO_SAGA,
-  LOGRO DE REPUTACION: ActivityType.LOGRO_REPUTACION,
-  LOGROS DE REPUTACION: ActivityType.LOGRO_REPUTACION,
-  DESARROLLO PERSONAL: ActivityType.DESARROLLO_PERSONAL,
+  'LOGRO GENERAL': ActivityType.LOGRO_GENERAL,
+  'LOGRO DE SAGA': ActivityType.LOGRO_SAGA,
+  'LOGRO DE REPUTACION': ActivityType.LOGRO_REPUTACION,
+  'LOGROS DE REPUTACION': ActivityType.LOGRO_REPUTACION,
+  'DESARROLLO PERSONAL': ActivityType.DESARROLLO_PERSONAL,
   TIMESKIP: ActivityType.TIMESKIP
 };
 
@@ -122,13 +122,6 @@ export function isNarrationType(type: string | null | undefined): boolean {
 
 export function isNarrationDestacadoResult(result: string | null | undefined): boolean {
   return canonicalizeActivityResult(result) === ActivityResult.DESTACADO;
-}
-
-export function shouldForceManualReview(
-  type: string | null | undefined,
-  result: string | null | undefined
-): boolean {
-  return isNarrationType(type) && isNarrationDestacadoResult(result);
 }
 
 export function isSuccessResult(result: string | null | undefined): boolean {
