@@ -25,6 +25,17 @@ DATABASE_URL="postgresql://user:password@localhost:5432/izanagi"
 DISCORD_TOKEN="your-bot-token"
 CLIENT_ID="your-discord-app-id"
 GUILD_ID="your-test-server-id"
+ACTIVITY_FORUM_MENTION="#🎯-registro-actividades"
+```
+
+Optional advanced channel routing:
+
+```env
+# Comma-separated forum IDs used as fallback for player commands
+PLAYER_FORUM_CHANNEL_IDS="123456789012345678,234567890123456789"
+
+# Command-specific forum map: commandName:forumId|forumId;otherCommand:forumId
+PLAYER_COMMAND_FORUM_MAP="registrar_actividad:123456789012345678;registro:234567890123456789"
 ```
 
 ### 3. Prepare database

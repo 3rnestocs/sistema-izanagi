@@ -1,5 +1,14 @@
 import { PrismaClient } from '@prisma/client';
 import { StatValidatorService } from './StatValidatorService';
+import {
+  ActivityResult,
+  ActivityStatus,
+  ActivityType,
+  canonicalizeActivityResult,
+  canonicalizeActivityStatus,
+  canonicalizeActivityType,
+  isSuccessResult
+} from '../domain/activityDomain';
 
 interface RequirementCheck {
   passed: boolean;
@@ -33,9 +42,9 @@ interface RequirementCheck {
 export class PromotionService {
   constructor(private prisma: PrismaClient) {}
 
-  private readonly APPROVED_STATUSES = new Set<string>(['APROBADO', 'APROBADA']);
-  private readonly NARRATION_TYPES = new Set<string>(['Evento', 'Crónica', 'Escena']);
-  private readonly ACHIEVEMENT_TYPES = new Set<string>(['Logro General', 'Logro de Saga']);
+  private readonly APPROVED_STATUSES = new Set<string>([ActivityStatus.APROBADO, ActivityStatus.AUTO_APROBADO]);
+  private readonly NARRATION_TYPES = new Set<string>([ActivityType.EVENTO, ActivityType.CRONICA, ActivityType.ESCENA]);
+  private readonly ACHIEVEMENT_TYPES = new Set<string>([ActivityType.LOGRO_GENERAL, ActivityType.LOGRO_SAGA]);
 
   private readonly SANNIN_DISCOUNT_TARGETS = new Set<string>([
     'JOUNIN',
@@ -73,7 +82,12 @@ export class PromotionService {
 
   private async buildMetrics(character: any): Promise<RequirementCheck['snapshot']> {
     const activities = await this.prisma.activityRecord.findMany({
-      where: { characterId: character.id, status: { in: Array.from(this.APPROVED_STATUSES) } }
+      where: { characterId: character.id }
+    });
+
+    const approvedActivities = activities.filter((a) => {
+      const status = canonicalizeActivityStatus(a.status);
+      return status ? this.APPROVED_STATUSES.has(status) : false;
     });
 
     const metrics = {
@@ -81,22 +95,43 @@ export class PromotionService {
       pr: character.pr,
       level: character.level,
       rank: character.rank,
-      missionD: activities.filter(a => a.type === 'Misión' && a.rank === 'D').length,
-      missionC: activities.filter(a => a.type === 'Misión' && a.rank === 'C').length,
-      missionB: activities.filter(a => a.type === 'Misión' && a.rank === 'B').length,
-      missionA: activities.filter(a => a.type === 'Misión' && a.rank === 'A').length,
-      missionS: activities.filter(a => a.type === 'Misión' && a.rank === 'S').length,
-      missionASuccess: activities.filter(a => a.type === 'Misión' && a.rank === 'A' && a.result === 'Completada').length,
-      missionSSuccess: activities.filter(a => a.type === 'Misión' && a.rank === 'S' && a.result === 'Completada').length,
-      missionSAnyResult: activities.filter(a => a.type === 'Misión' && a.rank === 'S').length,
-      narrations: activities.filter(a => this.NARRATION_TYPES.has(a.type)).length,
-      highlightedNarrations: activities.filter(a => this.NARRATION_TYPES.has(a.type) && a.result === 'Destacada').length,
-      combats: activities.filter(a => a.type === 'Combate').length,
-      combatsVsCOrHigher: activities.filter(a => a.type === 'Combate' && ['C', 'B', 'A', 'S'].includes(a.rank || '')).length,
-      combatsVsBOrHigher: activities.filter(a => a.type === 'Combate' && ['B', 'A', 'S'].includes(a.rank || '')).length,
-      combatsVsAOrHigher: activities.filter(a => a.type === 'Combate' && ['A', 'S'].includes(a.rank || '')).length,
-      combatWinsVsAOrHigher: activities.filter(a => a.type === 'Combate' && ['A', 'S'].includes(a.rank || '') && a.result === 'Victoria').length,
-      achievements: activities.filter(a => this.ACHIEVEMENT_TYPES.has(a.type)).length
+      missionD: approvedActivities.filter(a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'D').length,
+      missionC: approvedActivities.filter(a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'C').length,
+      missionB: approvedActivities.filter(a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'B').length,
+      missionA: approvedActivities.filter(a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'A').length,
+      missionS: approvedActivities.filter(a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'S').length,
+      missionASuccess: approvedActivities.filter(
+        a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'A' && isSuccessResult(a.result)
+      ).length,
+      missionSSuccess: approvedActivities.filter(
+        a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'S' && isSuccessResult(a.result)
+      ).length,
+      missionSAnyResult: approvedActivities.filter(a => canonicalizeActivityType(a.type) === ActivityType.MISION && a.rank === 'S').length,
+      narrations: approvedActivities.filter(a => {
+        const type = canonicalizeActivityType(a.type);
+        return type ? this.NARRATION_TYPES.has(type) : false;
+      }).length,
+      highlightedNarrations: approvedActivities.filter(a => {
+        const type = canonicalizeActivityType(a.type);
+        return type ? this.NARRATION_TYPES.has(type) && canonicalizeActivityResult(a.result) === ActivityResult.DESTACADO : false;
+      }).length,
+      combats: approvedActivities.filter(a => canonicalizeActivityType(a.type) === ActivityType.COMBATE).length,
+      combatsVsCOrHigher: approvedActivities.filter(
+        a => canonicalizeActivityType(a.type) === ActivityType.COMBATE && ['C', 'B', 'A', 'S'].includes(a.rank || '')
+      ).length,
+      combatsVsBOrHigher: approvedActivities.filter(
+        a => canonicalizeActivityType(a.type) === ActivityType.COMBATE && ['B', 'A', 'S'].includes(a.rank || '')
+      ).length,
+      combatsVsAOrHigher: approvedActivities.filter(
+        a => canonicalizeActivityType(a.type) === ActivityType.COMBATE && ['A', 'S'].includes(a.rank || '')
+      ).length,
+      combatWinsVsAOrHigher: approvedActivities.filter(
+        a => canonicalizeActivityType(a.type) === ActivityType.COMBATE && ['A', 'S'].includes(a.rank || '') && isSuccessResult(a.result)
+      ).length,
+      achievements: approvedActivities.filter(a => {
+        const type = canonicalizeActivityType(a.type);
+        return type ? this.ACHIEVEMENT_TYPES.has(type) : false;
+      }).length
     };
 
     return metrics;

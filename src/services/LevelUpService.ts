@@ -1,5 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { StatValidatorService } from './StatValidatorService';
+import {
+  ActivityStatus,
+  ActivityType,
+  canonicalizeActivityStatus,
+  canonicalizeActivityType,
+  isDestacadoResult,
+  isSuccessResult
+} from '../domain/activityDomain';
 
 interface RequirementCheck {
   passed: boolean;
@@ -47,9 +55,9 @@ export class LevelUpService {
     Kage: 5000
   };
 
-  private readonly APPROVED_STATUSES = new Set<string>(['APROBADO', 'APROBADA']);
-  private readonly NARRATION_TYPES = new Set<string>(['Evento', 'Crónica', 'Escena']);
-  private readonly ACHIEVEMENT_TYPES = new Set<string>(['Logro General', 'Logro de Saga']);
+  private readonly APPROVED_STATUSES = new Set<string>([ActivityStatus.APROBADO, ActivityStatus.AUTO_APROBADO]);
+  private readonly NARRATION_TYPES = new Set<string>([ActivityType.EVENTO, ActivityType.CRONICA, ActivityType.ESCENA]);
+  private readonly ACHIEVEMENT_TYPES = new Set<string>([ActivityType.LOGRO_GENERAL, ActivityType.LOGRO_SAGA]);
 
   private readonly SANNIN_DISCOUNT_TARGETS = new Set<string>([
     'JOUNIN',
@@ -86,28 +94,19 @@ export class LevelUpService {
   }
 
   private isMissionType(type: string): boolean {
-    return type === 'Misión';
+    return canonicalizeActivityType(type) === ActivityType.MISION;
   }
 
   private isCombatType(type: string): boolean {
-    return type === 'Combate';
+    return canonicalizeActivityType(type) === ActivityType.COMBATE;
   }
 
   private isVictory(result: string | null): boolean {
-    if (!result) {
-      return false;
-    }
-
-    const normalized = result.trim().toUpperCase();
-    return normalized === 'EXITOSA' || normalized === 'VICTORIA';
+    return isSuccessResult(result);
   }
 
   private isHighlighted(result: string | null): boolean {
-    if (!result) {
-      return false;
-    }
-
-    return result.trim().toUpperCase() === 'DESTACADO';
+    return isDestacadoResult(result);
   }
 
   private isLevelAtLeast(level: string, minRankLetter: 'A' | 'B' | 'C' | 'S'): boolean {
@@ -165,7 +164,10 @@ export class LevelUpService {
   private buildMetrics(
     activities: Array<{ type: string; rank: string | null; result: string | null; status: string }>
   ) {
-    const approved = activities.filter((activity) => this.APPROVED_STATUSES.has(activity.status.toUpperCase()));
+    const approved = activities.filter((activity) => {
+      const normalizedStatus = canonicalizeActivityStatus(activity.status);
+      return normalizedStatus ? this.APPROVED_STATUSES.has(normalizedStatus) : false;
+    });
 
     const missionD = approved.filter((activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'D').length;
     const missionC = approved.filter((activity) => this.isMissionType(activity.type) && activity.rank?.toUpperCase() === 'C').length;
@@ -183,9 +185,15 @@ export class LevelUpService {
 
     const missionSAnyResult = missionS;
 
-    const narrations = approved.filter((activity) => this.NARRATION_TYPES.has(activity.type)).length;
+    const narrations = approved.filter((activity) => {
+      const type = canonicalizeActivityType(activity.type);
+      return type ? this.NARRATION_TYPES.has(type) : false;
+    }).length;
     const highlightedNarrations = approved.filter(
-      (activity) => this.NARRATION_TYPES.has(activity.type) && this.isHighlighted(activity.result)
+      (activity) => {
+        const type = canonicalizeActivityType(activity.type);
+        return type ? this.NARRATION_TYPES.has(type) && this.isHighlighted(activity.result) : false;
+      }
     ).length;
 
     const combats = approved.filter((activity) => this.isCombatType(activity.type)).length;
@@ -222,7 +230,10 @@ export class LevelUpService {
       return rank === 'A' || rank === 'S';
     }).length;
 
-    const achievements = approved.filter((activity) => this.ACHIEVEMENT_TYPES.has(activity.type)).length;
+    const achievements = approved.filter((activity) => {
+      const type = canonicalizeActivityType(activity.type);
+      return type ? this.ACHIEVEMENT_TYPES.has(type) : false;
+    }).length;
 
     return {
       missionD,

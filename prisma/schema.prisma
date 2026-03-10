@@ -275,16 +275,21 @@ model ActivityRecord {
   // Categorización estricta para facilitar los conteos (Misión, Combate, Crónica, Curación)
   type        String   
   
-  // Rango de la actividad (D, C, B, A, S). Puede ser nulo para Crónicas/Curaciones.
+  // Rango de la actividad (D, C, B, A, S) para Misión/Combate/Experimento
+  // O severidad de herida para Curación (Herido Leve, Herido Grave, etc.)
   rank        String?  
   
-  // Resultado (Victoria, Derrota, Completada, Destacada)
+  // Resultado (Exitosa, Fallida, Destacado, Participación, Victoria, Derrota, etc.)
   result      String?  
   
   // El link al foro o al mensaje de Discord para que el Staff pueda auditar si alguien hace trampa
   evidenceUrl String   
 
-  status String @default("PENDIENTE") // PENDIENTE, APROBADO, RECHAZADO
+  // Nombre canónico de la Crónica/Evento para lookup en catálogo histórico (usado para auto-approve)
+  narrationKey String?
+
+  // Estado: PENDIENTE (no procesada), AUTO_APROBADO (automáticamente aprobada), APROBADO (aprobada por staff), RECHAZADO
+  status String @default("PENDIENTE")
 
   createdAt   DateTime @default(now())
 

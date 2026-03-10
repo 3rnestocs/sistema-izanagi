@@ -67,19 +67,23 @@ export class SalaryService {
       const netDeltaRyou = finalRyou - character.ryou;
       const multiplierDelta = finalRyou - totalBeforeMultiplier;
 
+      // Weekly EXP bonus (2 EXP every Monday)
+      const weeklyExpBonus = 2;
+
       // Update character
       await tx.character.update({
         where: { id: character.id },
         data: {
           ryou: finalRyou,
+          exp: { increment: weeklyExpBonus },
           lastSalaryClaim: now
         }
       });
 
       // Create audit log
       const statusDetail = multiplierDelta !== 0
-        ? `Cobro semanal: +${grossSalary} Ryou. Multiplicador lunes aplicado (${weeklyTotalMultiplier.toFixed(2)}x): ${multiplierDelta >= 0 ? '+' : ''}${multiplierDelta} Ryou.`
-        : `Cobro semanal exitoso: +${grossSalary} Ryou.`;
+        ? `Cobro semanal: +${grossSalary} Ryou, +${weeklyExpBonus} EXP (bono semanal). Multiplicador lunes aplicado (${weeklyTotalMultiplier.toFixed(2)}x): ${multiplierDelta >= 0 ? '+' : ''}${multiplierDelta} Ryou.`
+        : `Cobro semanal exitoso: +${grossSalary} Ryou, +${weeklyExpBonus} EXP (bono semanal).`;
 
       await tx.auditLog.create({
         data: {
@@ -87,7 +91,8 @@ export class SalaryService {
           category: 'Sueldo Semanal',
           detail: statusDetail,
           evidence: 'Sistema Automatizado',
-          deltaRyou: netDeltaRyou
+          deltaRyou: netDeltaRyou,
+          deltaExp: weeklyExpBonus
         }
       });
 
@@ -99,7 +104,8 @@ export class SalaryService {
         grossSalary,
         derrochadorLoss: multiplierDelta < 0 ? Math.abs(multiplierDelta) : 0,
         finalRyou,
-        netDeltaRyou
+        netDeltaRyou,
+        weeklyExpBonus
       };
     });
   }
@@ -154,6 +160,7 @@ export class SalaryService {
       grossSalary,
       multiplier: weeklyTotalMultiplier,
       estimatedFinalRyou,
+      weeklyExpBonus: 2,
       canClaim,
       daysUntilNextClaim
     };

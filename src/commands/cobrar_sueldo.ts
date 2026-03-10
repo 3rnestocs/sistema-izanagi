@@ -58,6 +58,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           inline: true
         },
         { name: 'Ryou Recibido', value: `+${result.netDeltaRyou} Ryou`, inline: true },
+        { name: 'Bono EXP Semanal', value: `+${result.weeklyExpBonus} EXP`, inline: true },
         { name: 'Total de Ryou', value: `**${result.finalRyou} Ryou**`, inline: false }
       )
       .setTimestamp();

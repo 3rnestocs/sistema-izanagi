@@ -5,6 +5,7 @@ import {
 } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { executeWithErrorHandling } from '../utils/errorHandler';
+import { ActivityStatus, canonicalizeActivityStatus } from '../domain/activityDomain';
 
 export const data = new SlashCommandBuilder()
   .setName('rechazar_registro')
@@ -44,15 +45,15 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       throw new Error(`⛔ No se encontró una actividad con ID '${activityId}'.`);
     }
 
-    if (activity.status !== 'PENDING') {
+    if (canonicalizeActivityStatus(activity.status) !== ActivityStatus.PENDIENTE) {
       throw new Error(`⛔ La actividad ya ha sido procesada (Estado: ${activity.status}).`);
     }
 
-    // Update activity status to REJECTED
+    // Update activity status to canonical rejected value
     const updatedActivity = await prisma.activityRecord.update({
       where: { id: activityId },
       data: {
-        status: 'REJECTED'
+        status: ActivityStatus.RECHAZADO
       }
     });
 

@@ -19,13 +19,14 @@ import {
     type RestrictedTraitCategory
 } from '../services/TraitRuleService';
 import { assertForumPostContext } from '../utils/channelGuards';
+import { formatChannelReference } from '../utils/channelRefs';
 import { BuildApprovalService } from '../services/BuildApprovalService';
 import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandError } from '../utils/errorHandler';
 
 const characterService = new CharacterService(prisma);
 const plazaService = new PlazaService(prisma);
 const buildApprovalService = new BuildApprovalService(prisma);
-const APPROVAL_CHANNEL_ID = process.env.APPROVAL_CHANNEL_ID;
+const APPROVAL_CHANNEL_REFERENCE = formatChannelReference(process.env.APPROVAL_CHANNEL_ID, '#🛠️-registro-builds');
 
 const CLAN_TRAIT_RC_BONUSES: Array<{ plazaName: string; traitName: string; bonusRc: number }> = [
     { plazaName: 'Akimichi Ichizoku', traitName: 'Lento', bonusRc: 2 },
@@ -282,10 +283,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         );
 
         if (!activeApproval) {
-            const approvalChannelText = APPROVAL_CHANNEL_ID
-                ? `<#${APPROVAL_CHANNEL_ID}>`
-                : '#🛠️-registro-builds';
-            throw new Error(`⛔ No tienes una build aprobada por staff. Publica tu solicitud en ${approvalChannelText} y espera la reacción ✅ de un administrador.`);
+            throw new Error(`⛔ No tienes una build aprobada por staff. Publica tu solicitud en ${APPROVAL_CHANNEL_REFERENCE} y espera la reacción ✅ de un administrador.`);
         }
 
         if (normalizeKekoForComparison(activeApproval.keko) !== normalizeKekoForComparison(keko)) {

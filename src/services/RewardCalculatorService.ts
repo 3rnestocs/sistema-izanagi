@@ -1,10 +1,23 @@
 import { Character, ActivityRecord } from '@prisma/client';
+import {
+  MISSION_REWARDS,
+  COMBAT_PR_REWARD,
+  CURACION_PR_BY_SEVERITY,
+  DESARROLLO_PERSONAL_EXP,
+  STANDARD_NARRATION_REWARDS,
+  RewardBreakdown
+} from '../config/activityRewards';
+import { getHistoricalNarrationRewards } from '../config/historicalNarrations';
+import {
+  ActivityType,
+  canonicalizeActivityType,
+  isAutoApprovableType,
+  isDestacadoResult,
+  isFailureResult,
+  isSuccessResult
+} from '../domain/activityDomain';
 
-export interface RewardBreakdown {
-  exp: number;
-  pr: number;
-  ryou: number;
-}
+export { RewardBreakdown };
 
 export class RewardCalculatorService {
   private readonly RANK_VALUES: Readonly<Record<string, number>> = {
@@ -15,35 +28,28 @@ export class RewardCalculatorService {
     S: 5
   };
 
-  private readonly MISSION_REWARDS: Readonly<Record<string, RewardBreakdown>> = {
-    D: { exp: 7, pr: 20, ryou: 700 },
-    C: { exp: 7, pr: 20, ryou: 700 },
-    B: { exp: 15, pr: 45, ryou: 1500 },
-    A: { exp: 30, pr: 100, ryou: 7000 },
-    S: { exp: 60, pr: 200, ryou: 100000 }
-  };
-
-  private readonly COMBAT_PR_REWARD: Readonly<Record<string, number>> = {
-    C: 5,
-    B: 10,
-    A: 20,
-    S: 30
-  };
-
   public calculateRewards(
     character: Character & { traits?: any[] },
-    activity: ActivityRecord
+    activity: ActivityRecord & { narrationKey?: string | null }
   ): RewardBreakdown {
-    const normalizedType = activity.type.trim();
-    const normalizedResult = activity.result?.trim().toUpperCase();
+    const normalizedType = canonicalizeActivityType(activity.type);
 
     let baseRewards: RewardBreakdown;
 
-    if (normalizedType === 'Misión') {
-      baseRewards = this.calculateMissionRewards(activity.rank, normalizedResult);
-    } else if (normalizedType === 'Combate') {
-      baseRewards = this.calculateCombatRewards(character.level, activity.rank, normalizedResult);
+    if (normalizedType === ActivityType.MISION) {
+      baseRewards = this.calculateMissionRewards(activity.rank, activity.result);
+    } else if (normalizedType === ActivityType.COMBATE) {
+      baseRewards = this.calculateCombatRewards(character.level, activity.rank, activity.result);
+    } else if (normalizedType === ActivityType.CURACION) {
+      baseRewards = this.calculateCuracionRewards(activity.rank); // rank stores severidad for Curacion
+    } else if (normalizedType === ActivityType.DESARROLLO_PERSONAL) {
+      baseRewards = this.calculateDesarrolloPersonalRewards(character.level);
+    } else if (normalizedType === ActivityType.CRONICA) {
+      baseRewards = this.calculateCronicaRewards(activity.result, activity.narrationKey);
+    } else if (normalizedType === ActivityType.EVENTO) {
+      baseRewards = this.calculateEventoRewards(activity.result, activity.narrationKey);
     } else {
+      // MANUAL tier types (Escena, Logro General, Logro de Saga, Experimento, Timeskip)
       return { exp: 0, pr: 0, ryou: 0 };
     }
 
@@ -51,18 +57,25 @@ export class RewardCalculatorService {
     return this.applyTraitMultipliers(baseRewards, character.traits ?? []);
   }
 
-  private calculateMissionRewards(rank: string | null, result: string | undefined): RewardBreakdown {
+  /**
+   * Check if an activity type is auto-approvable.
+   */
+  public isAutoApprovable(type: string | null | undefined): boolean {
+    return isAutoApprovableType(type);
+  }
+
+  private calculateMissionRewards(rank: string | null, result: string | null | undefined): RewardBreakdown {
     if (!rank) {
       throw new Error('⛔ La misión no tiene rango definido.');
     }
 
     const normalizedRank = rank.toUpperCase();
-    const rankReward = this.MISSION_REWARDS[normalizedRank];
+    const rankReward = MISSION_REWARDS[normalizedRank];
     if (!rankReward) {
       throw new Error(`⛔ El rango de misión '${rank}' no es válido para recompensas.`);
     }
 
-    const isSuccess = result === 'EXITOSA' || result === 'VICTORIA';
+    const isSuccess = isSuccessResult(result);
     if (!isSuccess) {
       return { exp: rankReward.exp, pr: 0, ryou: 0 };
     }
@@ -73,13 +86,13 @@ export class RewardCalculatorService {
   private calculateCombatRewards(
     characterLevel: string,
     enemyRank: string | null,
-    result: string | undefined
+    result: string | null | undefined
   ): RewardBreakdown {
-    if (result === 'FALLIDA' || result === 'DERROTA') {
+    if (isFailureResult(result)) {
       return { exp: 1, pr: 0, ryou: 0 };
     }
 
-    const isVictory = result === 'EXITOSA' || result === 'VICTORIA';
+    const isVictory = isSuccessResult(result);
     if (!isVictory) {
       return { exp: 0, pr: 0, ryou: 0 };
     }
@@ -107,8 +120,114 @@ export class RewardCalculatorService {
       exp = 3 + (2 * (enemyRankValue - myRankValue));
     }
 
-    const pr = this.COMBAT_PR_REWARD[enemyRankLetter] ?? 0;
+    const pr = COMBAT_PR_REWARD[enemyRankLetter] ?? 0;
     return { exp, pr, ryou: 0 };
+  }
+
+  /**
+   * Calculate rewards for Curación activity.
+   * EXP is always 2. PR depends on wound severity stored in rank field.
+   */
+  private calculateCuracionRewards(severidad: string | null): RewardBreakdown {
+    const exp = 2;
+
+    if (!severidad) {
+      throw new Error('⛔ La curación no tiene severidad de herida definida.');
+    }
+
+    const pr = CURACION_PR_BY_SEVERITY[severidad];
+    if (pr === undefined) {
+      throw new Error(`⛔ La severidad '${severidad}' no es válida.`);
+    }
+
+    return { exp, pr, ryou: 0 };
+  }
+
+  /**
+   * Calculate rewards for Desarrollo Personal activity.
+   * EXP by character level.
+   */
+  private calculateDesarrolloPersonalRewards(characterLevel: string): RewardBreakdown {
+    const levelLetter = characterLevel.charAt(0).toUpperCase();
+    const exp = DESARROLLO_PERSONAL_EXP[levelLetter];
+
+    if (exp === undefined) {
+      throw new Error(`⛔ El nivel '${characterLevel}' no es válido para Desarrollo Personal.`);
+    }
+
+    return { exp, pr: 0, ryou: 0 };
+  }
+
+  /**
+   * Calculate rewards for Crónica activity.
+   * Uses historical catalog if narrationKey matches, otherwise uses standard table.
+   */
+  private calculateCronicaRewards(resultado: string | null | undefined, narrationKey: string | null | undefined): RewardBreakdown {
+    const isDestacado = isDestacadoResult(resultado);
+
+    // Try to lookup in historical catalog
+    if (narrationKey) {
+      const historical = getHistoricalNarrationRewards(narrationKey);
+      if (historical) {
+        const participant = historical.participant;
+        const destacado = historical.destacado;
+        if (isDestacado && (destacado.exp > 0 || destacado.pr > 0)) {
+          return {
+            exp: participant.exp + destacado.exp,
+            pr: participant.pr + destacado.pr,
+            ryou: 0
+          };
+        }
+        return participant;
+      }
+    }
+
+    // Use standard table
+    const standard = STANDARD_NARRATION_REWARDS.Cronica;
+    if (isDestacado) {
+      return {
+        exp: standard.participant.exp + standard.destacado.exp,
+        pr: standard.participant.pr + standard.destacado.pr,
+        ryou: 0
+      };
+    }
+    return standard.participant;
+  }
+
+  /**
+   * Calculate rewards for Evento activity.
+   * Uses historical catalog if narrationKey matches, otherwise uses standard table.
+   */
+  private calculateEventoRewards(resultado: string | null | undefined, narrationKey: string | null | undefined): RewardBreakdown {
+    const isDestacado = isDestacadoResult(resultado);
+
+    // Try to lookup in historical catalog
+    if (narrationKey) {
+      const historical = getHistoricalNarrationRewards(narrationKey);
+      if (historical) {
+        const participant = historical.participant;
+        const destacado = historical.destacado;
+        if (isDestacado && (destacado.exp > 0 || destacado.pr > 0)) {
+          return {
+            exp: participant.exp + destacado.exp,
+            pr: participant.pr + destacado.pr,
+            ryou: 0
+          };
+        }
+        return participant;
+      }
+    }
+
+    // Use standard table
+    const standard = STANDARD_NARRATION_REWARDS.Evento;
+    if (isDestacado) {
+      return {
+        exp: standard.participant.exp + standard.destacado.exp,
+        pr: standard.participant.pr + standard.destacado.pr,
+        ryou: 0
+      };
+    }
+    return standard.participant;
   }
 
   /**

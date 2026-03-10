@@ -3,6 +3,8 @@ import { ChannelType, ChatInputCommandInteraction, PermissionFlagsBits } from 'd
 interface ForumGuardOptions {
   allowStaffBypass?: boolean;
   enforceThreadOwnership?: boolean;
+  invalidForumMessage?: string;
+  invalidThreadOwnershipMessage?: string;
 }
 
 function parseIdList(raw: string | undefined): string[] {
@@ -67,7 +69,12 @@ export function assertForumPostContext(
   interaction: ChatInputCommandInteraction,
   options: ForumGuardOptions = {}
 ): void {
-  const { allowStaffBypass = false, enforceThreadOwnership = false } = options;
+  const {
+    allowStaffBypass = false,
+    enforceThreadOwnership = false,
+    invalidForumMessage,
+    invalidThreadOwnershipMessage
+  } = options;
 
   if (allowStaffBypass && interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
     return;
@@ -100,13 +107,17 @@ export function assertForumPostContext(
   const allowedForumIds = commandForumMap.get(interaction.commandName) ?? getAllowedForumChannelIds();
   if (allowedForumIds.length > 0 && !allowedForumIds.includes(parent.id)) {
     throw new Error(
-      '⛔ Este foro no está habilitado para comandos de ficha. Usa el foro configurado por Staff para creación/gestión de personaje.'
+      invalidForumMessage
+      ?? '⛔ Este foro no está habilitado para comandos de ficha. Usa el foro configurado por Staff para creación/gestión de personaje.'
     );
   }
 
   if (enforceThreadOwnership) {
     if (channel.ownerId && channel.ownerId !== interaction.user.id) {
-      throw new Error('⛔ Debes usar tu propio post del foro para ejecutar comandos de ficha.');
+      throw new Error(
+        invalidThreadOwnershipMessage
+        ?? '⛔ Debes usar tu propio post del foro para ejecutar comandos de ficha.'
+      );
     }
   }
 }
