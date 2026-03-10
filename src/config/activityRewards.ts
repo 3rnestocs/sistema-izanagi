@@ -21,9 +21,9 @@ export const ACTIVITY_TIER: Record<string, 'AUTO' | 'MANUAL'> = {
   [ActivityType.EVENTO]: 'AUTO',
   [ActivityType.ESCENA]: 'MANUAL',
   [ActivityType.EXPERIMENTO]: 'MANUAL',
-  [ActivityType.LOGRO_GENERAL]: 'MANUAL',
+  [ActivityType.LOGRO_GENERAL]: 'AUTO',
   [ActivityType.LOGRO_SAGA]: 'MANUAL',
-  [ActivityType.LOGRO_REPUTACION]: 'MANUAL',
+  [ActivityType.LOGRO_REPUTACION]: 'AUTO',
   [ActivityType.TIMESKIP]: 'MANUAL'
 };
 
@@ -83,48 +83,105 @@ export const WEEKLY_CAPS = {
 // Combat and Curacion are mutually exclusive per week
 export const COMBAT_CURACION_EXCLUSIVE = true;
 
-// Logro General reference catalog (for staff lookup)
-export const LOGRO_REFERENCE_CATALOG: Record<string, RewardBreakdown> = {
-  'Bienvenido al Shinobi Sekai': { exp: 3, pr: 0, ryou: 0 },
-  'Forma un grupo': { exp: 0, pr: 0, ryou: 0 }, // 1 EXP per non-NPC member (variable)
-  'Explorador': { exp: 3, pr: 0, ryou: 0 },
-  'Ninja peligroso': { exp: 10, pr: 0, ryou: 0 },
-  'Ninja especializado': { exp: 10, pr: 0, ryou: 0 },
-  'Un paso por delante': { exp: 10, pr: 0, ryou: 0 },
-  'Gana tu primer combate': { exp: 1, pr: 0, ryou: 0 }, // additional to combat reward
-  'Primera asistencia medica': { exp: 1, pr: 0, ryou: 0 }, // additional to curacion reward
-  'Satsujin Ninja': { exp: 5, pr: 0, ryou: 0 },
-  'Invicto': { exp: 15, pr: 0, ryou: 0 },
-  'Precision absoluta': { exp: 15, pr: 0, ryou: 0 },
-  'Maestro especialista': { exp: 0, pr: 0, ryou: 0 }, // Level-dependent: D=3, C=4, B=5, A=6, S=10
-  'Humildad': { exp: 10, pr: 0, ryou: 0 },
-  'Cientifico de elite': { exp: 5, pr: 0, ryou: 0 },
-  'Que facil es esto': { exp: 20, pr: 0, ryou: 0 },
-  'Traiganme la verdadera pelea': { exp: 10, pr: 0, ryou: 0 },
-  'Luchador formidable I': { exp: 5, pr: 0, ryou: 0 },
-  'Luchador formidable II': { exp: 8, pr: 0, ryou: 0 },
-  'Luchador formidable III': { exp: 10, pr: 0, ryou: 0 },
-  'Luchador formidable IV': { exp: 15, pr: 0, ryou: 0 },
-  'Luchador formidable V': { exp: 20, pr: 0, ryou: 0 },
-  'Medico experimentado I': { exp: 5, pr: 0, ryou: 0 },
-  'Medico experimentado II': { exp: 8, pr: 0, ryou: 0 },
-  'Medico experimentado III': { exp: 10, pr: 0, ryou: 0 },
-  'Medico experimentado IV': { exp: 15, pr: 0, ryou: 0 },
-  'Medico experimentado V': { exp: 20, pr: 0, ryou: 0 },
-  'Nemesis del azar': { exp: 3, pr: 0, ryou: 0 },
-  'Amo del dado': { exp: 8, pr: 0, ryou: 0 },
-  'Lo justo': { exp: 3, pr: 0, ryou: 0 }, // repeatable x2
-  'Aniquilacion inmediata': { exp: 8, pr: 0, ryou: 0 }
-};
+export interface LogroGeneralEntry {
+  key: string;
+  category: 'Iniciales' | 'Libres' | 'Maestria' | 'Dados';
+  rewards: RewardBreakdown;
+  repeatLimit: number;
+  isManualException?: boolean;
+  levelRule?: string;
+  notes?: string;
+}
 
-// Logro de Reputacion reference catalog (PR-only milestones)
-export const LOGRO_REPUTACION_CATALOG: Record<string, number> = {
-  'Alcanza 200000 Ryou': 50,
-  'Kage aldea grande': 100,
-  'Kage aldea pequeña': 50,
-  'Lider de clan': 50,
-  'Requisito Nivel S': 60,
-  'Acumula 400 EXP': 40,
-  'Deseo Nivel A': 20,
-  'Deseo Nivel S': 50
-};
+export interface LogroReputacionEntry {
+  key: string;
+  rewards: RewardBreakdown;
+  repeatLimit: number;
+  notes?: string;
+}
+
+export const LOGRO_GENERAL_CATALOG: LogroGeneralEntry[] = [
+  { key: 'Bienvenido al Shinobi Sekai', category: 'Iniciales', rewards: { exp: 3, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'D' },
+  { key: 'Forma un grupo', category: 'Iniciales', rewards: { exp: 0, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'D', isManualException: true, notes: 'Recompensa variable (+1 EXP por miembro no-NPC).' },
+  { key: 'Explorador', category: 'Iniciales', rewards: { exp: 3, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'D-C' },
+  { key: 'Ninja peligroso', category: 'Libres', rewards: { exp: 10, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Ninja especializado', category: 'Libres', rewards: { exp: 10, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'A-S' },
+  { key: 'Un paso por delante', category: 'Libres', rewards: { exp: 10, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'A-S' },
+  { key: 'Gana tu primer combate', category: 'Maestria', rewards: { exp: 1, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'D-C' },
+  { key: 'Primera asistencia medica', category: 'Maestria', rewards: { exp: 1, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'D-C' },
+  { key: 'Satsujin Ninja', category: 'Maestria', rewards: { exp: 5, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'A-S' },
+  { key: 'Invicto', category: 'Maestria', rewards: { exp: 15, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'S' },
+  { key: 'Precision absoluta', category: 'Maestria', rewards: { exp: 15, pr: 0, ryou: 0 }, repeatLimit: 5, levelRule: 'B-S', notes: 'Una vez por nivel.' },
+  { key: 'Maestro especialista', category: 'Maestria', rewards: { exp: 0, pr: 0, ryou: 0 }, repeatLimit: 5, isManualException: true, notes: 'Recompensa variable por nivel (D/C/B/A/S).' },
+  { key: 'Humildad', category: 'Maestria', rewards: { exp: 10, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'B-S' },
+  { key: 'Cientifico de elite', category: 'Maestria', rewards: { exp: 5, pr: 0, ryou: 0 }, repeatLimit: 1, isManualException: true, notes: 'Valida primera victoria de paciente por experimento.' },
+  { key: 'Que facil es esto', category: 'Maestria', rewards: { exp: 20, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'A' },
+  { key: 'Traiganme la verdadera pelea', category: 'Maestria', rewards: { exp: 10, pr: 0, ryou: 0 }, repeatLimit: 1, levelRule: 'A' },
+  { key: 'Luchador formidable I', category: 'Maestria', rewards: { exp: 5, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Luchador formidable II', category: 'Maestria', rewards: { exp: 8, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Luchador formidable III', category: 'Maestria', rewards: { exp: 10, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Luchador formidable IV', category: 'Maestria', rewards: { exp: 15, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Luchador formidable V', category: 'Maestria', rewards: { exp: 20, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Medico experimentado I', category: 'Maestria', rewards: { exp: 5, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Medico experimentado II', category: 'Maestria', rewards: { exp: 8, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Medico experimentado III', category: 'Maestria', rewards: { exp: 10, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Medico experimentado IV', category: 'Maestria', rewards: { exp: 15, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Medico experimentado V', category: 'Maestria', rewards: { exp: 20, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Nemesis del azar', category: 'Dados', rewards: { exp: 3, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Amo del dado', category: 'Dados', rewards: { exp: 8, pr: 0, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Lo justo', category: 'Dados', rewards: { exp: 3, pr: 0, ryou: 0 }, repeatLimit: 2 },
+  { key: 'Aniquilacion inmediata', category: 'Dados', rewards: { exp: 8, pr: 0, ryou: 0 }, repeatLimit: 1 }
+];
+
+export const LOGRO_REPUTACION_CATALOG: LogroReputacionEntry[] = [
+  { key: 'Alcanza 200000 Ryou', rewards: { exp: 0, pr: 50, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Kage aldea grande', rewards: { exp: 0, pr: 100, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Kage aldea pequeña', rewards: { exp: 0, pr: 50, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Lider de clan', rewards: { exp: 0, pr: 50, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Requisito Nivel S', rewards: { exp: 0, pr: 60, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Acumula 400 EXP', rewards: { exp: 0, pr: 40, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Deseo Nivel A', rewards: { exp: 0, pr: 20, ryou: 0 }, repeatLimit: 1 },
+  { key: 'Deseo Nivel S', rewards: { exp: 0, pr: 50, ryou: 0 }, repeatLimit: 1 }
+];
+
+function normalizeGoalKey(value: string): string {
+  return value
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .toLowerCase();
+}
+
+export function getLogroGeneralEntry(goalName: string | null | undefined): LogroGeneralEntry | undefined {
+  if (!goalName) return undefined;
+  const normalized = normalizeGoalKey(goalName);
+  return LOGRO_GENERAL_CATALOG.find((entry) => normalizeGoalKey(entry.key) === normalized);
+}
+
+export function getLogroReputacionEntry(goalName: string | null | undefined): LogroReputacionEntry | undefined {
+  if (!goalName) return undefined;
+  const normalized = normalizeGoalKey(goalName);
+  return LOGRO_REPUTACION_CATALOG.find((entry) => normalizeGoalKey(entry.key) === normalized);
+}
+
+export function isManualLogroGeneralException(goalName: string | null | undefined): boolean {
+  return getLogroGeneralEntry(goalName)?.isManualException === true;
+}
+
+// Backward-compatible maps for existing references.
+export const LOGRO_REFERENCE_CATALOG: Record<string, RewardBreakdown> = LOGRO_GENERAL_CATALOG.reduce<Record<string, RewardBreakdown>>(
+  (acc, entry) => {
+    acc[entry.key] = entry.rewards;
+    return acc;
+  },
+  {}
+);
+
+export const LOGRO_REPUTACION_PR_CATALOG: Record<string, number> = LOGRO_REPUTACION_CATALOG.reduce<Record<string, number>>(
+  (acc, entry) => {
+    acc[entry.key] = entry.rewards.pr;
+    return acc;
+  },
+  {}
+);

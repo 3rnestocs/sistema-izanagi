@@ -81,7 +81,9 @@ const AUTO_APPROVABLE_TYPES = new Set<ActivityTypeValue>([
   ActivityType.CURACION,
   ActivityType.DESARROLLO_PERSONAL,
   ActivityType.CRONICA,
-  ActivityType.EVENTO
+  ActivityType.EVENTO,
+  ActivityType.LOGRO_GENERAL,
+  ActivityType.LOGRO_REPUTACION
 ]);
 
 const NARRATION_TYPES = new Set<ActivityTypeValue>([ActivityType.CRONICA, ActivityType.EVENTO]);

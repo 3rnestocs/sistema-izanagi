@@ -13,6 +13,16 @@ type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 30;
 
+async function publishPublicTiendaEmbed(
+  interaction: ChatInputCommandInteraction,
+  embed: EmbedBuilder
+): Promise<void> {
+  await interaction.followUp({
+    embeds: [embed],
+    ephemeral: false
+  });
+}
+
 export const data = new SlashCommandBuilder()
   .setName('tienda')
   .setDescription('Explora los ítems del mercado con filtros y paginación.')
@@ -136,12 +146,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     embed.setTimestamp();
 
-    return interaction.editReply({ embeds: [embed] });
+    await publishPublicTiendaEmbed(interaction, embed);
+    return;
     },
     {
-      defer: { ephemeral: false },
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al listar tienda.',
-      errorEphemeral: false
+      errorEphemeral: true
     }
   );
 }

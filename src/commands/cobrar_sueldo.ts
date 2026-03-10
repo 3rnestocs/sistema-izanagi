@@ -11,6 +11,16 @@ import { executeWithErrorHandling, validationError } from '../utils/errorHandler
 
 const salaryService = new SalaryService(prisma);
 
+async function publishPublicSalaryEmbed(
+  interaction: ChatInputCommandInteraction,
+  embed: EmbedBuilder
+): Promise<void> {
+  await interaction.followUp({
+    embeds: [embed],
+    ephemeral: false
+  });
+}
+
 export const data = new SlashCommandBuilder()
   .setName('cobrar_sueldo')
   .setDescription('Cobra tu sueldo semanal como personaje');
@@ -63,12 +73,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       )
       .setTimestamp();
 
-    return interaction.editReply({ embeds: [embed] });
+    await publishPublicSalaryEmbed(interaction, embed);
+    return;
     },
     {
-      defer: { ephemeral: false },
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al cobrar sueldo.',
-      errorEphemeral: false
+      errorEphemeral: true
     }
   );
 }

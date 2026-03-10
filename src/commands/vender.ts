@@ -11,6 +11,16 @@ import { executeWithErrorHandling, validationError } from '../utils/errorHandler
 
 const transactionService = new TransactionService(prisma);
 
+async function publishPublicVenderEmbed(
+  interaction: ChatInputCommandInteraction,
+  embed: EmbedBuilder
+): Promise<void> {
+  await interaction.followUp({
+    embeds: [embed],
+    ephemeral: false
+  });
+}
+
 export const data = new SlashCommandBuilder()
   .setName('vender')
   .setDescription('Vende ítems de tu inventario por Ryou (50% del valor base)')
@@ -72,12 +82,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       )
       .setTimestamp();
 
-    return interaction.editReply({ embeds: [embed] });
+    await publishPublicVenderEmbed(interaction, embed);
+    return;
     },
     {
-      defer: { ephemeral: false },
+      defer: { ephemeral: true },
       fallbackMessage: 'Error desconocido al vender ítems.',
-      errorEphemeral: false
+      errorEphemeral: true
     }
   );
 }

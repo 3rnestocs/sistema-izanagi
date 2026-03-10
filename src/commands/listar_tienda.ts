@@ -1,7 +1,8 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  PermissionFlagsBits
+  PermissionFlagsBits,
+  EmbedBuilder
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
@@ -98,23 +99,30 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     });
 
     if (items.length === 0) {
-      return interaction.editReply('ℹ️ No hay items que coincidan con los filtros.');
+      throw new Error('ℹ️ No hay items que coincidan con los filtros.');
     }
-
-    const header = [
-      '🛒 **Listado de Tienda**',
-      `- Filtros: moneda=${currency ?? 'TODAS'} | categoría=${categoryFilter ?? 'TODAS'}`,
-      `- Página ${page}/${totalPages} | Mostrando ${items.length} de ${totalItems}`,
-      ''
-    ];
 
     const lines = items.map((item, index) => {
       const displayIndex = skip + index + 1;
-      return `${displayIndex}. **${item.name}** | ${item.type} | ${item.currency} ${item.price}`;
+      return `**${displayIndex}. ${item.name}** | ${item.type}\n${item.currency} ${item.price}`;
     });
 
-    const message = [...header, ...lines].join('\n');
-    return interaction.editReply(message);
+    const filterSummary = [
+      `Moneda: ${currency ?? 'TODAS'}`,
+      `Categoría: ${categoryFilter ?? 'TODAS'}`
+    ].join(' • ');
+
+    const embed = new EmbedBuilder()
+      .setColor(0x0099FF)
+      .setTitle('🛒 Listado de Tienda (Staff)')
+      .setDescription(`${filterSummary}`)
+      .addFields(
+        { name: 'Ítems', value: lines.join('\n\n'), inline: false },
+        { name: 'Página', value: `${page}/${totalPages} (${items.length}/${totalItems} ítems)`, inline: true }
+      )
+      .setTimestamp();
+
+    return interaction.editReply({ embeds: [embed] });
     },
     {
       defer: { ephemeral: true },

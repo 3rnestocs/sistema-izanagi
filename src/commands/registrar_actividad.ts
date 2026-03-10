@@ -1,10 +1,8 @@
 import {
     SlashCommandBuilder,
     ChatInputCommandInteraction,
-    EmbedBuilder,
-    ActionRowBuilder,
-    ButtonBuilder,
-    ButtonStyle
+    AutocompleteInteraction,
+    EmbedBuilder
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../lib/prisma';
@@ -16,30 +14,34 @@ import { ActivityCapService } from '../services/ActivityCapService';
 import { formatChannelReference } from '../utils/channelRefs';
 import { ActivityStatus, ActivityType } from '../domain/activityDomain';
 import { getHistoricalNarrationRewards } from '../config/historicalNarrations';
+import {
+    LOGRO_GENERAL_CATALOG,
+    LOGRO_REPUTACION_CATALOG,
+    getLogroGeneralEntry,
+    getLogroReputacionEntry
+} from '../config/activityRewards';
 
 const rewardCalculatorService = new RewardCalculatorService();
 const activityCapService = new ActivityCapService(prisma);
 const ACTIVITY_FORUM_MENTION = formatChannelReference(process.env.ACTIVITY_FORUM_MENTION, '#canal-correcto');
 
+function normalizeForMatch(value: string): string {
+    return value
+        .trim()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .toLowerCase();
+}
+
 async function publishActivityEmbed(
     interaction: ChatInputCommandInteraction,
     embed: EmbedBuilder
 ): Promise<void> {
-    const deleteButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`ficha_delete:${interaction.user.id}`)
-            .setLabel('Eliminar mensaje')
-            .setStyle(ButtonStyle.Secondary)
-    );
-
     await interaction.followUp({
         embeds: [embed],
-        components: [deleteButton],
         ephemeral: false
     });
-
-    // Remove the private deferred placeholder to avoid an extra private message.
-    await interaction.deleteReply();
 }
 
 export const data = new SlashCommandBuilder()
@@ -109,7 +111,37 @@ export const data = new SlashCommandBuilder()
         opt.setName('nombre_actividad')
            .setDescription('Nombre de la Crónica/Evento para aplicar recompensas históricas (opcional)')
            .setRequired(false)
+    )
+    .addStringOption(opt =>
+        opt.setName('nombre_logro')
+           .setDescription('Nombre exacto del Logro General/Reputación del catálogo (obligatorio para esos tipos)')
+           .setAutocomplete(true)
+           .setRequired(false)
     );
+
+export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
+    const focused = interaction.options.getFocused(true);
+    if (focused.name !== 'nombre_logro') {
+        await interaction.respond([]);
+        return;
+    }
+
+    const tipo = interaction.options.getString('tipo');
+    const query = normalizeForMatch(focused.value);
+
+    const sourceEntries = tipo === ActivityType.LOGRO_GENERAL
+        ? LOGRO_GENERAL_CATALOG.map((entry) => entry.key)
+        : tipo === ActivityType.LOGRO_REPUTACION
+            ? LOGRO_REPUTACION_CATALOG.map((entry) => entry.key)
+            : [];
+
+    const suggestions = sourceEntries
+        .filter((name) => normalizeForMatch(name).includes(query))
+        .slice(0, 25)
+        .map((name) => ({ name, value: name }));
+
+    await interaction.respond(suggestions);
+}
 
 export async function execute(interaction: ChatInputCommandInteraction) {
     await executeWithErrorHandling(
@@ -147,9 +179,22 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         const severidad = interaction.options.getString('severidad'); // Opcional (solo Curación)
         const resultado = interaction.options.getString('resultado'); // Opcional
         const nombreActividad = interaction.options.getString('nombre_actividad'); // Opcional (para Cronica/Evento)
+        const nombreLogro = interaction.options.getString('nombre_logro'); // Opcional (para Logro General/Reputación)
 
         const valorRangoPersistido = tipo === ActivityType.CURACION ? severidad : rango;
         const isNarration = tipo === ActivityType.CRONICA || tipo === ActivityType.EVENTO;
+        const isLogroGeneral = tipo === ActivityType.LOGRO_GENERAL;
+        const isLogroReputacion = tipo === ActivityType.LOGRO_REPUTACION;
+        const isLogroCatalogType = isLogroGeneral || isLogroReputacion;
+
+        const generalLogroEntry = isLogroGeneral ? getLogroGeneralEntry(nombreLogro) : undefined;
+        const reputacionLogroEntry = isLogroReputacion ? getLogroReputacionEntry(nombreLogro) : undefined;
+        const selectedLogroEntry = generalLogroEntry ?? reputacionLogroEntry;
+        const selectedCatalogKey = isNarration
+            ? nombreActividad
+            : (isLogroCatalogType ? selectedLogroEntry?.key : null);
+
+        const isManualLogroException = isLogroGeneral && Boolean(generalLogroEntry?.isManualException);
         const narrationMissWarning = isNarration && nombreActividad && !getHistoricalNarrationRewards(nombreActividad)
             ? `El nombre de actividad proporcionado no coincide con el catálogo histórico. Se aplicó la tabla estándar de ${tipo}.`
             : null;
@@ -178,6 +223,39 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             throw validationError('Los Experimentos requieren obligatoriamente que selecciones un `rango` y un `resultado`.');
         }
 
+        if (isLogroCatalogType && !nombreLogro) {
+            throw validationError('Los Logros Generales y de Reputación requieren obligatoriamente el campo `nombre_logro`.');
+        }
+
+        if (!isLogroCatalogType && nombreLogro) {
+            throw validationError('El campo `nombre_logro` solo aplica para Logro General o Logro de Reputación.');
+        }
+
+        if (isLogroGeneral && !generalLogroEntry) {
+            throw validationError('El `nombre_logro` no coincide con el catálogo de Logros Generales.');
+        }
+
+        if (isLogroReputacion && !reputacionLogroEntry) {
+            throw validationError('El `nombre_logro` no coincide con el catálogo de Logros de Reputación.');
+        }
+
+        if (isLogroCatalogType && selectedCatalogKey && selectedLogroEntry) {
+            const approvedClaimCount = await prisma.activityRecord.count({
+                where: {
+                    characterId: character.id,
+                    type: tipo,
+                    narrationKey: selectedCatalogKey,
+                    status: { in: [ActivityStatus.APROBADO, ActivityStatus.AUTO_APROBADO] }
+                }
+            });
+
+            if (approvedClaimCount >= selectedLogroEntry.repeatLimit) {
+                throw validationError(
+                    `Ya alcanzaste el límite de ${selectedLogroEntry.repeatLimit} registro(s) para el logro \`${selectedCatalogKey}\`.`
+                );
+            }
+        }
+
         // 4. Enforce weekly caps (before creating the record)
         await activityCapService.enforceWeeklyCaps(character.id, tipo);
 
@@ -194,7 +272,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             rank: valorRangoPersistido,
             result: resultado,
             evidenceUrl: evidencia,
-            ...(isNarration && nombreActividad ? { narrationKey: nombreActividad } : {})
+            ...(selectedCatalogKey ? { narrationKey: selectedCatalogKey } : {})
         };
 
         const nuevaActividad = await prisma.activityRecord.create({
@@ -202,13 +280,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         });
 
         // 6. Check if auto-approvable and process rewards
-        const isAutoApprovable = rewardCalculatorService.isAutoApprovable(tipo);
+        const isAutoApprovable = rewardCalculatorService.isAutoApprovable(tipo) && !isManualLogroException;
 
         if (isAutoApprovable) {
             // Calculate rewards
             const rewards = rewardCalculatorService.calculateRewards(
                 character as any,
-                { ...nuevaActividad, narrationKey: nombreActividad } as any
+                { ...nuevaActividad, narrationKey: selectedCatalogKey } as any
             );
 
             // Apply rewards in a transaction
@@ -251,6 +329,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 `**Estado:** APROBADO AUTOMÁTICAMENTE`,
                 `**Ninja:** <@${interaction.user.id}> (${character.name})`,
                 `**Actividad:** ${tipo}`,
+                ...(isLogroCatalogType && selectedCatalogKey ? [`**Logro:** ${selectedCatalogKey}`] : []),
                 ...(valorRangoPersistido
                     ? [tipo === ActivityType.CURACION
                         ? `**Severidad:** ${valorRangoPersistido}`
@@ -291,7 +370,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             // MANUAL tier: calculate projected rewards for display, leave status as PENDIENTE
             const projectedRewards = rewardCalculatorService.calculateRewards(
                 character as any,
-                { ...nuevaActividad, narrationKey: nombreActividad } as any
+                { ...nuevaActividad, narrationKey: selectedCatalogKey } as any
             );
 
             const projectedRewardLines = [
@@ -305,6 +384,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 `**Estado:** PENDIENTE (requiere revisión de Staff)`,
                 `**Ninja:** <@${interaction.user.id}> (${character.name})`,
                 `**Actividad:** ${tipo}`,
+                ...(isLogroCatalogType && selectedCatalogKey ? [`**Logro:** ${selectedCatalogKey}`] : []),
                 ...(valorRangoPersistido
                     ? [tipo === ActivityType.CURACION
                         ? `**Severidad:** ${valorRangoPersistido}`
@@ -316,6 +396,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
             const manualNotes = [
                 'Los recursos se acreditan solo cuando Staff aprueba este registro con `/aprobar_registro`.',
+                ...(isManualLogroException
+                    ? ['Este logro está marcado como excepción manual y requiere validación de Staff.']
+                    : []),
                 ...(projectedRewards.exp === 0 && projectedRewards.pr === 0 && projectedRewards.ryou === 0
                     ? ['Este tipo de actividad requiere revisión manual por parte del staff.']
                     : [])

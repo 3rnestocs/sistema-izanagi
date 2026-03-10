@@ -1,4 +1,8 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import {
+    SlashCommandBuilder,
+    ChatInputCommandInteraction,
+    EmbedBuilder
+} from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
@@ -6,6 +10,16 @@ import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/comman
 import { businessRuleError, executeWithErrorHandling, validationError } from '../utils/errorHandler';
 
 const transactionService = new TransactionService(prisma);
+
+async function publishPublicTransferEmbed(
+    interaction: ChatInputCommandInteraction,
+    embed: EmbedBuilder
+): Promise<void> {
+    await interaction.followUp({
+        embeds: [embed],
+        ephemeral: false
+    });
+}
 
 export const data = new SlashCommandBuilder()
     .setName('transferir')
@@ -72,17 +86,37 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         });
 
         // 4. Reporte de éxito
-        let mensajeExito = `🤝 <@${interaction.user.id}> ha realizado una transferencia a <@${targetUser.id}>:\n`;
-        if (ryouAmount) mensajeExito += `🪙 **Ryou:** \`${ryouAmount}\`\n`;
-        if (itemNames.length > 0) mensajeExito += `📦 **Objetos:** \`${itemNames.join(', ')}\`\n`;
+        const transferSummary = [
+            `Emisor: <@${interaction.user.id}>`,
+            `Destinatario: <@${targetUser.id}>`,
+            ...(ryouAmount ? [`Ryou: ${ryouAmount}`] : []),
+            ...(itemNames.length > 0 ? [`Objetos: ${itemNames.join(', ')}`] : [])
+        ].join('\n');
 
-        return interaction.editReply(mensajeExito);
+        const embed = new EmbedBuilder()
+            .setColor(0x0099FF)
+            .setTitle('🤝 Transferencia Realizada')
+            .setDescription(transferSummary)
+            .addFields(
+                {
+                    name: 'Detalle de Recursos',
+                    value: [
+                        ...(ryouAmount ? [`🪙 Ryou: ${ryouAmount}`] : []),
+                        ...(itemNames.length > 0 ? [`📦 Objetos: ${itemNames.join(', ')}`] : [])
+                    ].join('\n'),
+                    inline: false
+                }
+            )
+            .setTimestamp();
+
+        await publishPublicTransferEmbed(interaction, embed);
+        return;
 
         },
         {
-            defer: { ephemeral: false },
+            defer: { ephemeral: true },
             fallbackMessage: 'Transferencia fallida por error del sistema.',
-            errorEphemeral: false
+            errorEphemeral: true
         }
     );
 }

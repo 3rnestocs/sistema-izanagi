@@ -5,6 +5,8 @@ import {
   CURACION_PR_BY_SEVERITY,
   DESARROLLO_PERSONAL_EXP,
   STANDARD_NARRATION_REWARDS,
+  getLogroGeneralEntry,
+  getLogroReputacionEntry,
   RewardBreakdown
 } from '../config/activityRewards';
 import { getHistoricalNarrationRewards } from '../config/historicalNarrations';
@@ -48,8 +50,12 @@ export class RewardCalculatorService {
       baseRewards = this.calculateCronicaRewards(activity.result, activity.narrationKey);
     } else if (normalizedType === ActivityType.EVENTO) {
       baseRewards = this.calculateEventoRewards(activity.result, activity.narrationKey);
+    } else if (normalizedType === ActivityType.LOGRO_GENERAL) {
+      baseRewards = this.calculateLogroGeneralRewards(activity.narrationKey);
+    } else if (normalizedType === ActivityType.LOGRO_REPUTACION) {
+      baseRewards = this.calculateLogroReputacionRewards(activity.narrationKey);
     } else {
-      // MANUAL tier types (Escena, Logro General, Logro de Saga, Experimento, Timeskip)
+      // MANUAL tier types (Escena, Logro de Saga, Experimento, Timeskip)
       return { exp: 0, pr: 0, ryou: 0 };
     }
 
@@ -228,6 +234,29 @@ export class RewardCalculatorService {
       };
     }
     return standard.participant;
+  }
+
+  private calculateLogroGeneralRewards(goalKey: string | null | undefined): RewardBreakdown {
+    const logro = getLogroGeneralEntry(goalKey);
+    if (!logro) {
+      throw new Error('⛔ El logro general seleccionado no existe en el catálogo.');
+    }
+
+    // Manual exceptions keep staff-driven flow and should not auto-credit projected rewards.
+    if (logro.isManualException) {
+      return { exp: 0, pr: 0, ryou: 0 };
+    }
+
+    return logro.rewards;
+  }
+
+  private calculateLogroReputacionRewards(goalKey: string | null | undefined): RewardBreakdown {
+    const logro = getLogroReputacionEntry(goalKey);
+    if (!logro) {
+      throw new Error('⛔ El logro de reputación seleccionado no existe en el catálogo.');
+    }
+
+    return logro.rewards;
   }
 
   /**

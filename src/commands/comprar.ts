@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder } from 'discord.js';
 import { prisma } from '../lib/prisma';
 import { TransactionService } from '../services/TransactionService';
 import { assertForumPostContext } from '../utils/channelGuards';
@@ -53,12 +53,23 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         });
 
         // 4. Reporte de éxito
-        let mensajeExito = `✅ **¡Compra Exitosa!** Has adquirido:\n📦 \`${itemNames.join(', ')}\`\n\n**Costos Aplicados:**\n`;
-        if (resultado.costs.RYOU > 0) mensajeExito += `🪙 \`${resultado.costs.RYOU} Ryou\`\n`;
-        if (resultado.costs.EXP > 0) mensajeExito += `✨ \`${resultado.costs.EXP} EXP\`\n`;
-        if (resultado.costs.PR > 0) mensajeExito += `🏆 \`${resultado.costs.PR} PR\`\n`;
+        const appliedCosts = [
+            ...(resultado.costs.RYOU > 0 ? [`🪙 ${resultado.costs.RYOU} Ryou`] : []),
+            ...(resultado.costs.EXP > 0 ? [`✨ ${resultado.costs.EXP} EXP`] : []),
+            ...(resultado.costs.PR > 0 ? [`🏆 ${resultado.costs.PR} PR`] : [])
+        ].join('\n') || 'Sin costo aplicado';
 
-        return interaction.editReply(mensajeExito);
+        const embed = new EmbedBuilder()
+            .setColor(0x0099FF)
+            .setTitle('✅ Compra Exitosa')
+            .setDescription(`Has adquirido: **${itemNames.join(', ')}**`)
+            .addFields(
+                { name: '📦 Ítems Comprados', value: itemNames.join(', '), inline: false },
+                { name: '💰 Costos Aplicados', value: appliedCosts, inline: false }
+            )
+            .setTimestamp();
+
+        return interaction.editReply({ embeds: [embed] });
         },
         {
             defer: { ephemeral: true },
