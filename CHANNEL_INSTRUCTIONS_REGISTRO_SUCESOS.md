@@ -19,11 +19,11 @@ Antes de enviar un comando, asegúrate de tener:
 - **Evita evidencias incompletas o sin contexto**
 
 ### 3. Registra la Actividad
-Usa el comando `/registrar_actividad` con los detalles correspondientes. El sistema procesará tu solicitud de inmediato.
+Usa el comando `/registrar_suceso` con los detalles correspondientes. El sistema procesará tu solicitud de inmediato.
 
 ---
 
-## 🎯 Estructura del Comando `/registrar_actividad`
+## 🎯 Estructura del Comando `/registrar_suceso`
 
 El comando usa **grupos** y **subcomandos**. Primero elige el grupo, luego el tipo concreto:
 

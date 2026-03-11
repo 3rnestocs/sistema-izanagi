@@ -3,9 +3,9 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { executeWithErrorHandling } from '../utils/errorHandler';
-import { ActivityStatus, canonicalizeActivityStatus } from '../domain/activityDomain';
+import { prisma } from '../../lib/prisma';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
+import { ActivityStatus, canonicalizeActivityStatus } from '../../domain/activityDomain';
 
 export const data = new SlashCommandBuilder()
   .setName('rechazar_registro')

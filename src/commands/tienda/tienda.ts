@@ -4,9 +4,9 @@ import {
   EmbedBuilder
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../lib/prisma';
-import { assertForumPostContext } from '../utils/channelGuards';
-import { executeWithErrorHandling } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
 
 type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 

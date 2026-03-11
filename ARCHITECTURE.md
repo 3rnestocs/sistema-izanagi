@@ -97,14 +97,30 @@ sistema-izanagi/
 │   │   ├── listar_tienda.ts       # Staff: browse market catalog
 │   │   ├── rechazar_registro.ts   # Staff: reject activity record
 │   │   ├── retirar_habilidad.ts   # Staff: revoke plaza
-│   │   ├── tienda.ts              # Player: browse shop
-│   │   ├── otorgar_habilidad.ts   # Staff: grant skill/plaza to character
-│   │   ├── otorgar_rasgo.ts       # Staff: assign/remove traits
-│   │   ├── registrar_actividad.ts # Player: submit activity record
+│   ├── gestion-fichas/            # Character management commands
 │   │   ├── registro.ts            # Player: create character sheet
+│   │   ├── ficha.ts               # Player: view character
+│   │   ├── invertir_sp.ts         # Player: spend skill points
+│   │   ├── otorgar_habilidad.ts   # Staff: grant skill/plaza
+│   │   ├── retirar_habilidad.ts   # Staff: revoke skill
+│   │   ├── otorgar_rasgo.ts       # Staff: assign/remove traits
+│   │   ├── ascender.ts            # Staff: promote character
+│   │   ├── validar_ascenso.ts     # Staff: validate promotion
+│   │   ├── rechazar_registro.ts   # Staff: reject registration
+│   │   ├── catalogo.ts            # Player: browse catalog
+│   │   └── listar.ts              # Staff: list characters
+│   ├── registro-sucesos/          # Activity registration
+│   │   └── registrar_suceso.ts    # Player: submit activity record
+│   ├── tienda/                    # Transaction commands
+│   │   ├── comprar.ts             # Player: buy items
+│   │   ├── vender.ts              # Player: sell items
 │   │   ├── transferir.ts          # Player: transfer items/ryou
-│   │   ├── validar_ascenso.ts     # Both: check promotion requirements
-│   │   └── vender.ts              # Player: sell items
+│   │   ├── cobrar_sueldo.ts       # Player: claim salary
+│   │   ├── tienda.ts              # Player: browse shop
+│   │   └── listar_tienda.ts       # Staff: list shop
+│   └── staff/                     # Staff-only commands
+│       ├── npc.ts                 # Staff: NPC management
+│       └── ajustar_recursos.ts    # Staff: adjust resources
 │   ├── services/                  # 10 business logic services
 │   │   ├── CharacterService.ts    # Character creation with trait validation
 │   │   ├── LevelUpService.ts      # Legacy compatibility service (kept)
@@ -222,7 +238,7 @@ Character ──┬── CharacterTrait ──── Trait
 | Buy items | `GestorTransacciones.js` → Comprar | `TransactionService.buyItems()` + `/comprar` | ✅ Migrated |
 | Sell items | `GestorTransacciones.js` → Vender (50% refund) | **Not implemented** | ❌ Missing |
 | Transfer items/Ryou | `GestorTransacciones.js` → Transferir | `TransactionService.transferItems()` + `/transferir` | ✅ Migrated |
-| Activity registration | `GenerarRegistros.js` → `registrarAccion()` | `/registrar_actividad` | ✅ Migrated |
+| Activity registration | `GenerarRegistros.js` → `registrarAccion()` | `/registrar_suceso` | ✅ Migrated |
 | Activity approval + rewards | Staff reacts ✅ on message, or `/ajustar_recursos otorgar` for edge cases | `ActivityApprovalService` + `RewardCalculatorService` | ✅ Improved |
 | Ascension (rank/level) | `GestorAscensos.js` → `registrarAscenso()` | `LevelUpService` + `/ascender` + `/validar_ascenso` | ✅ Migrated |
 | Weekly salary | `Utilidades.js` → `iniciarProcesoSueldos()` | `LevelUpService.claimWeeklySalary()` | ⚠️ Logic exists, no command |
@@ -258,7 +274,7 @@ TypeScript DTOs (`CreateCharacterDTO`, `StatInvestmentDTO`, `BuyDTO`, etc.) catc
 
 ### 7.5 Self-Service for Players
 
-Players can now directly use commands like `/registro`, `/invertir_sp`, `/comprar`, `/transferir`, and `/registrar_actividad` without staff intervention. The old system required staff to operate every form.
+Players can now directly use commands like `/registro`, `/invertir_sp`, `/comprar`, `/transferir`, and `/registrar_suceso` without staff intervention. The old system required staff to operate every form.
 
 ### 7.6 Automated Reward Calculation
 
@@ -363,7 +379,7 @@ Current concerns:
 |---|---|---|
 | `Config.js` | Cell coordinates, constants, vocabulary | `schema.prisma` + service-level constants |
 | `GenerarFicha.js` | Character creation | `CharacterService` + `/registro` |
-| `GenerarRegistros.js` | Activity registration with rewards | `/registrar_actividad` + `ActivityApprovalService` (reaction-based) + `RewardCalculatorService` |
+| `GenerarRegistros.js` | Activity registration with rewards | `/registrar_suceso` + `ActivityApprovalService` (reaction-based) + `RewardCalculatorService` |
 | `GestorAscensos.js` | Rank/level promotions | `PromotionService` + `/ascender` + `/validar_ascenso` |
 | `GestorHabilidades.js` | Skill assign/remove | `PlazaService` + `/otorgar_habilidad` + `/retirar_habilidad` |
 | `GestorRasgos.js` | Trait assign/remove | `CharacterService` + `/otorgar_rasgo` |

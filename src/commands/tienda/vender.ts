@@ -3,11 +3,12 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { TransactionService } from '../services/TransactionService';
-import { assertForumPostContext } from '../utils/channelGuards';
-import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { TransactionService } from '../../services/TransactionService';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
+import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
+import { COMMAND_NAMES } from '../../config/commandNames';
 
 const transactionService = new TransactionService(prisma);
 
@@ -34,7 +35,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction) {
   await executeWithErrorHandling(
     interaction,
-    'vender',
+    COMMAND_NAMES.vender,
     async (interaction) => {
     assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
@@ -59,7 +60,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     cleanupExpiredCooldowns();
     consumeCommandCooldown({
-      commandName: 'vender',
+      commandName: COMMAND_NAMES.vender,
       actorId: interaction.user.id
     });
 

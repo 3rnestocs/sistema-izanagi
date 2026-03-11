@@ -3,9 +3,9 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { PlazaService } from '../services/PlazaService';
-import { executeWithErrorHandling } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { PlazaService } from '../../services/PlazaService';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
 
 const plazaService = new PlazaService(prisma);
 

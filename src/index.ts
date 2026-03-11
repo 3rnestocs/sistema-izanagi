@@ -4,13 +4,13 @@ import { prisma, disconnectPrisma } from './lib/prisma';
 import { loadCommands, Command } from './lib/commandLoader';
 import { BuildApprovalService } from './services/BuildApprovalService';
 import { ActivityApprovalService } from './services/ActivityApprovalService';
-import { getRegistrarActividadForumIds } from './utils/channelGuards';
+import { getRegistrarSucesoForumIds } from './utils/channelGuards';
 
 // Commands will be loaded dynamically
 let commands: Collection<string, Command>;
 const buildApprovalService = new BuildApprovalService(prisma);
 const activityApprovalService = new ActivityApprovalService(prisma);
-const APPROVAL_CHANNEL_ID = process.env.APPROVAL_CHANNEL_ID;
+const GESTION_FORUM_ID = process.env.GESTION_FORUM_ID;
 
 const client = new Client({
     intents: [
@@ -37,17 +37,17 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         if (!member.permissions.has(PermissionFlagsBits.Administrator)) return;
 
         // Build approval: specific channel
-        if (APPROVAL_CHANNEL_ID && reaction.message.channelId === APPROVAL_CHANNEL_ID) {
+        if (GESTION_FORUM_ID && reaction.message.channelId === GESTION_FORUM_ID) {
             const fullMessage = await reaction.message.fetch();
             await buildApprovalService.upsertApprovalFromMessage(fullMessage, user.id);
             console.log(`✅ Build aprobado desde reacción en mensaje ${reaction.message.id}`);
             return;
         }
 
-        // Activity approval: forum threads for registrar_actividad
+        // Activity approval: forum threads for registrar_suceso
         const channel = reaction.message.channel;
         if (channel?.isThread?.() && channel.parentId) {
-            const activityForumIds = getRegistrarActividadForumIds();
+            const activityForumIds = getRegistrarSucesoForumIds();
             if (activityForumIds.includes(channel.parentId)) {
                 const approved = await activityApprovalService.approveActivityByMessageId(
                     reaction.message.id,
@@ -71,8 +71,8 @@ client.on(Events.MessageReactionRemove, async (reaction, user) => {
         if (reaction.message.partial) await reaction.message.fetch();
 
         if (reaction.emoji.name !== '✅') return;
-        if (!APPROVAL_CHANNEL_ID) return;
-        if (reaction.message.channelId !== APPROVAL_CHANNEL_ID) return;
+        if (!GESTION_FORUM_ID) return;
+        if (reaction.message.channelId !== GESTION_FORUM_ID) return;
         if (!reaction.message.guild) return;
 
         const users = await reaction.users.fetch();

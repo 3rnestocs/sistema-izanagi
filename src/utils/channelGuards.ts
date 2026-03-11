@@ -49,10 +49,10 @@ export function getCommandForumMap(): Map<string, string[]> {
   return map;
 }
 
-const REGISTRAR_ACTIVIDAD_COMMAND = 'registrar_actividad';
+const REGISTRAR_SUCESO_COMMAND = 'registrar_suceso';
 
-export function getRegistrarActividadForumIds(): string[] {
-  return getCommandForumMap().get(REGISTRAR_ACTIVIDAD_COMMAND) ?? [];
+export function getRegistrarSucesoForumIds(): string[] {
+  return getCommandForumMap().get(REGISTRAR_SUCESO_COMMAND) ?? [];
 }
 
 function getMemberRoleIds(interaction: ChatInputCommandInteraction): string[] {

@@ -4,14 +4,14 @@ import {
   PermissionFlagsBits,
   SlashCommandBuilder
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { executeWithErrorHandling } from '../utils/errorHandler';
-import { assertStaffAccess } from '../utils/staffGuards';
+import { prisma } from '../../lib/prisma';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
+import { assertStaffAccess } from '../../utils/staffGuards';
 import {
   ADJUSTABLE_RESOURCES,
   AdjustableResource,
   ResourceAdjustmentService
-} from '../services/ResourceAdjustmentService';
+} from '../../services/ResourceAdjustmentService';
 
 const resourceAdjustmentService = new ResourceAdjustmentService(prisma);
 

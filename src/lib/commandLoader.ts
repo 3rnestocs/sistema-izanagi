@@ -10,22 +10,37 @@ export interface Command {
 }
 
 /**
- * Dynamically load all command files from the commands directory.
+ * Find all command files recursively in the commands directory.
+ * Supports nested folder structure (e.g., gestion-fichas/, registro-sucesos/, tienda/, staff/).
+ */
+function findCommandFiles(commandsPath: string, ext: '.ts' | '.js'): string[] {
+  const files: string[] = [];
+  const entries = fs.readdirSync(commandsPath, { recursive: true, withFileTypes: true });
+  
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith(ext) && !entry.name.endsWith('.d.ts')) {
+      files.push(path.join(entry.parentPath || commandsPath, entry.name));
+    }
+  }
+  
+  return files;
+}
+
+/**
+ * Dynamically load all command files from the commands directory (including nested folders).
  * Returns a Collection of command names to command modules.
  */
 export async function loadCommands(): Promise<Collection<string, Command>> {
   const commands = new Collection<string, Command>();
   const commandsPath = path.join(__dirname, '..', 'commands');
 
-  const allFiles = fs.readdirSync(commandsPath);
-  const jsFiles = allFiles.filter((file) => file.endsWith('.js') && !file.endsWith('.d.ts'));
-  const tsFiles = allFiles.filter((file) => file.endsWith('.ts') && !file.endsWith('.d.ts'));
-
-  // Prefer JS when available (dist runtime), otherwise fallback to TS (ts-node runtime).
+  // Find all command files (recursively) - prefer .js (compiled) over .ts (source)
+  const jsFiles = findCommandFiles(commandsPath, '.js');
+  const tsFiles = findCommandFiles(commandsPath, '.ts');
+  
   const files = jsFiles.length > 0 ? jsFiles : tsFiles;
 
-  for (const file of files) {
-    const filePath = path.join(commandsPath, file);
+  for (const filePath of files) {
     try {
       const command = await import(filePath);
       
@@ -33,10 +48,10 @@ export async function loadCommands(): Promise<Collection<string, Command>> {
         commands.set(command.data.name, command);
         console.log(`✅ Loaded command: ${command.data.name}`);
       } else {
-        console.warn(`⚠️  Command file ${file} does not export data and execute`);
+        console.warn(`⚠️  Command file ${filePath} does not export data and execute`);
       }
     } catch (error) {
-      console.error(`❌ Error loading command ${file}:`, error);
+      console.error(`❌ Error loading command ${filePath}:`, error);
     }
   }
 

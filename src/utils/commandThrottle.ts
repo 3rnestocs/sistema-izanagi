@@ -1,7 +1,7 @@
 const cooldownStore = new Map<string, number>();
 
 const DEFAULT_COOLDOWNS_SECONDS = {
-  registrar_actividad: 45,
+  registrar_suceso: 45,
   comprar: 8,
   vender: 8,
   transferir: 15,

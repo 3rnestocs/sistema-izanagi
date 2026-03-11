@@ -6,26 +6,27 @@ import {
     Message
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../lib/prisma';
-import { assertForumPostContext } from '../utils/channelGuards';
-import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
-import { RewardCalculatorService } from '../services/RewardCalculatorService';
-import { ActivityCapService } from '../services/ActivityCapService';
-import { formatChannelReference } from '../utils/channelRefs';
-import { ActivityStatus, ActivityType } from '../domain/activityDomain';
-import { getHistoricalNarrationRewards, HISTORICAL_NARRATIONS, NARRATION_PREFIX_BY_TYPE } from '../config/historicalNarrations';
+import { prisma } from '../../lib/prisma';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
+import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
+import { RewardCalculatorService } from '../../services/RewardCalculatorService';
+import { ActivityCapService } from '../../services/ActivityCapService';
+import { formatChannelReference } from '../../utils/channelRefs';
+import { ActivityStatus, ActivityType } from '../../domain/activityDomain';
+import { getHistoricalNarrationRewards, HISTORICAL_NARRATIONS, NARRATION_PREFIX_BY_TYPE } from '../../config/historicalNarrations';
+import { COMMAND_NAMES } from '../../config/commandNames';
 import {
     ACTIVITY_TIER,
     LOGRO_GENERAL_CATALOG,
     LOGRO_REPUTACION_CATALOG,
     getLogroGeneralEntry,
     getLogroReputacionEntry
-} from '../config/activityRewards';
+} from '../../config/activityRewards';
 
 const rewardCalculatorService = new RewardCalculatorService();
 const activityCapService = new ActivityCapService(prisma);
-const ACTIVITY_FORUM_MENTION = formatChannelReference(process.env.ACTIVITY_FORUM_MENTION, '#canal-correcto');
+const REGISTRO_SUCESOS_FORUM_ID = formatChannelReference(process.env.REGISTRO_SUCESOS_FORUM_ID, '#canal-correcto');
 
 const TIPO_BY_SUBCOMMAND: Record<string, Record<string, string>> = {
     combate: { mision: ActivityType.MISION, combate: ActivityType.COMBATE },
@@ -95,7 +96,7 @@ async function publishActivityEmbed(
 const evidenciaDesc = 'Link al foro, pantallazo o mensaje de Discord que prueba la actividad';
 
 export const data = new SlashCommandBuilder()
-    .setName('registrar_actividad')
+    .setName(COMMAND_NAMES.registrar_suceso)
     .setDescription('Registra una actividad on-rol (Misiones, Combates, Tramas) para tu historial.')
     .addSubcommandGroup((group) =>
         group
@@ -300,9 +301,9 @@ export const data = new SlashCommandBuilder()
                     .addStringOption((o) =>
                         o
                             .setName('nombre_actividad')
-                            .setDescription('Balance General del catálogo')
+                            .setDescription('Balance General del catálogo (opcional)')
                             .setAutocomplete(true)
-                            .setRequired(true)
+                            .setRequired(false)
                     )
             )
             .addSubcommand((sc) =>
@@ -439,12 +440,12 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
 export async function execute(interaction: ChatInputCommandInteraction) {
     await executeWithErrorHandling(
         interaction,
-        'registrar_actividad',
+        COMMAND_NAMES.registrar_suceso,
         async (interaction) => {
             assertForumPostContext(interaction, {
                 enforceThreadOwnership: true,
                 invalidForumMessage:
-                    `⛔ No puedes usar ese comando en este canal. Ve a ${ACTIVITY_FORUM_MENTION} y lee las instrucciones del post fijado para mas informacion.`,
+                    `⛔ No puedes usar ese comando en este canal. Ve a ${REGISTRO_SUCESOS_FORUM_ID} y lee las instrucciones del post fijado para mas informacion.`,
                 invalidThreadOwnershipMessage:
                     '⛔ Debes usar tu propio post para registrar actividades.'
             });
@@ -504,16 +505,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             const isManualLogroException = isLogroGeneral && Boolean(generalLogroEntry?.isManualException);
             const isManualType = ACTIVITY_TIER[tipo] === 'MANUAL' || isManualLogroException;
 
-            // Validation: Balance General requires valid nombre_actividad from catalog
+            // Validation: Balance General can use catalog name for special rewards, or be manual
             if (tipo === ActivityType.BALANCE_GENERAL) {
-                if (!nombreActividad) {
+                if (nombreActividad && !getHistoricalNarrationRewards(nombreActividad)) {
                     throw validationError(
-                        'Balance General requiere que selecciones una opción en `nombre_actividad` del catálogo.'
-                    );
-                }
-                if (!getHistoricalNarrationRewards(nombreActividad)) {
-                    throw validationError(
-                        'El nombre de actividad no coincide con el catálogo de Balance General. Usa el autocompletado.'
+                        'El nombre de actividad no coincide con el catálogo de Balance General. Usa el autocompletado o deja vacío para registro normal.'
                     );
                 }
             }
@@ -562,7 +558,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
             cleanupExpiredCooldowns();
             consumeCommandCooldown({
-                commandName: 'registrar_actividad',
+                commandName: COMMAND_NAMES.registrar_suceso,
                 actorId: interaction.user.id
             });
 

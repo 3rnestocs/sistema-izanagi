@@ -3,10 +3,10 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { NpcService } from '../services/NpcService';
-import { assertStaffAccess } from '../utils/staffGuards';
-import { executeWithErrorHandling } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { NpcService } from '../../services/NpcService';
+import { assertStaffAccess } from '../../utils/staffGuards';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
 
 const npcService = new NpcService(prisma);
 

@@ -25,7 +25,7 @@ DATABASE_URL="postgresql://user:password@localhost:5432/izanagi"
 DISCORD_TOKEN="your-bot-token"
 CLIENT_ID="your-discord-app-id"
 GUILD_ID="your-test-server-id"
-ACTIVITY_FORUM_MENTION="#🎯-registro-actividades"
+REGISTRO_SUCESOS_FORUM_ID="#🎯-registro-actividades"
 ```
 
 Optional advanced channel routing:
@@ -35,7 +35,8 @@ Optional advanced channel routing:
 PLAYER_FORUM_CHANNEL_IDS="123456789012345678,234567890123456789"
 
 # Command-specific forum map: commandName:forumId|forumId;otherCommand:forumId
-PLAYER_COMMAND_FORUM_MAP="registrar_actividad:123456789012345678;registro:234567890123456789"
+# Forums: gestion-de-fichas, registro-de-sucesos, tienda
+PLAYER_COMMAND_FORUM_MAP="registro:GESTION_FORUM_ID;ficha:GESTION_FORUM_ID;invertir_sp:GESTION_FORUM_ID;otorgar_habilidad:GESTION_FORUM_ID;retirar_habilidad:GESTION_FORUM_ID;otorgar_rasgo:GESTION_FORUM_ID;ascender:GESTION_FORUM_ID;validar_ascenso:GESTION_FORUM_ID;rechazar_registro:GESTION_FORUM_ID;catalogo:GESTION_FORUM_ID;listar:GESTION_FORUM_ID;registrar_suceso:REGISTRO_SUCESOS_FORUM_ID;comprar:TIENDA_FORUM_ID;vender:TIENDA_FORUM_ID;transferir:TIENDA_FORUM_ID;cobrar_sueldo:TIENDA_FORUM_ID;tienda:TIENDA_FORUM_ID;listar_tienda:TIENDA_FORUM_ID;npc:GESTION_FORUM_ID;ajustar_recursos:GESTION_FORUM_ID"
 ```
 
 ### 3. Prepare database
@@ -70,11 +71,37 @@ npm run dev
 
 ## Main Command Groups
 
-- Player: `/registro`, `/ficha`, `/registrar_actividad`, `/comprar`, `/vender`, `/tienda`, `/transferir`, `/cobrar_sueldo`.
-- Staff/Admin: `/ascender`, `/validar_ascenso`, `/rechazar_registro`, `/ajustar_recursos`, `/otorgar_rasgo`, `/otorgar_habilidad`, `/retirar_habilidad`, `/listar_tienda`, `/npc`.
+### Gestion de Fichas (#gestion-de-fichas)
+- `/registro` — Create character
+- `/ficha` — View character
+- `/invertir_sp` — Spend SP
+- `/otorgar_habilidad` — Grant ability (staff)
+- `/retirar_habilidad` — Revoke ability (staff)
+- `/otorgar_rasgo` — Grant trait (staff)
+- `/ascender` — Promote (staff)
+- `/validar_ascenso` — Validate promotion (staff)
+- `/rechazar_registro` — Reject registration (staff)
+- `/catalogo` — Browse catalog
+- `/listar` — List characters (staff)
+
+### Registro de Sucesos (#registro-de-sucesos)
+- `/registrar_suceso` — Register activity/event
+
+### Tienda (#tienda)
+- `/comprar` — Buy items
+- `/vender` — Sell items
+- `/transferir` — Transfer items/ryou
+- `/cobrar_sueldo` — Claim weekly salary
+- `/tienda` — View store inventory
+- `/listar_tienda` — List store (staff)
+
+### Staff Commands
+- `/npc` — NPC management
+- `/ajustar_recursos` — Adjust character resources
 
 ## Notes
 
 - `src/events/` is currently empty; command flow is handled by interaction routing in `src/index.ts`.
 - Seed data is JSON-based under `prisma/seed-data/`.
-- High-risk player commands include in-memory anti-spam cooldowns: `/registrar_actividad`, `/comprar`, `/vender`, `/transferir`, `/cobrar_sueldo`.
+- High-risk player commands include in-memory anti-spam cooldowns: `/registrar_suceso`, `/comprar`, `/vender`, `/transferir`, `/cobrar_sueldo`.
+- Commands are organized in subfolders under `src/commands/`: `gestion-fichas/`, `registro-sucesos/`, `tienda/`, `staff/`.

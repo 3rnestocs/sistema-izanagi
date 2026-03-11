@@ -33,7 +33,7 @@ prisma/
 Player commands:
 - `/registro`
 - `/ficha`
-- `/registrar_actividad`
+- `/registrar_suceso`
 - `/comprar`
 - `/vender`
 - `/tienda`

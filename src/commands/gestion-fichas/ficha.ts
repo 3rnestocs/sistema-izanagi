@@ -7,10 +7,10 @@ import {
   ButtonStyle,
   EmbedBuilder
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { assertForumPostContext } from '../utils/channelGuards';
-import { StatValidatorService } from '../services/StatValidatorService';
-import { handleCommandError } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { StatValidatorService } from '../../services/StatValidatorService';
+import { handleCommandError } from '../../utils/errorHandler';
 
 const statValidatorService = new StatValidatorService();
 const ZERO_WIDTH_SPACE = '\u200B';

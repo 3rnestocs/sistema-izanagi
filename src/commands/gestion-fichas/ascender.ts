@@ -3,9 +3,9 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { PromotionService } from '../services/PromotionService';
-import { executeWithErrorHandling } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { PromotionService } from '../../services/PromotionService';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
 
 const promotionService = new PromotionService(prisma);
 

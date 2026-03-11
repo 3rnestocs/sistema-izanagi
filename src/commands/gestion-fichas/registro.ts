@@ -7,21 +7,21 @@ import {
     ComponentType
 } from 'discord.js';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../lib/prisma';
-import { CharacterService } from '../services/CharacterService';
-import { PlazaService } from '../services/PlazaService';
-import { resolvePlazaInheritance } from '../services/PlazaInheritanceResolver';
+import { prisma } from '../../lib/prisma';
+import { CharacterService } from '../../services/CharacterService';
+import { PlazaService } from '../../services/PlazaService';
+import { resolvePlazaInheritance } from '../../services/PlazaInheritanceResolver';
 import {
     RESTRICTED_TRAIT_CATEGORIES,
     getCategoryLabel,
     normalizeCategory,
     normalizeRestrictedCategory,
     type RestrictedTraitCategory
-} from '../services/TraitRuleService';
-import { assertForumPostContext } from '../utils/channelGuards';
-import { formatChannelReference } from '../utils/channelRefs';
-import { BuildApprovalService } from '../services/BuildApprovalService';
-import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandError } from '../utils/errorHandler';
+} from '../../services/TraitRuleService';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { formatChannelReference } from '../../utils/channelRefs';
+import { BuildApprovalService } from '../../services/BuildApprovalService';
+import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandError } from '../../utils/errorHandler';
 
 const characterService = new CharacterService(prisma);
 const plazaService = new PlazaService(prisma);

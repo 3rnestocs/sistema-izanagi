@@ -1,9 +1,9 @@
 import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
-import { prisma } from '../lib/prisma';
+import { prisma } from '../../lib/prisma';
 import { Prisma } from '@prisma/client';
-import { StatValidatorService, StatInvestmentDTO } from '../services/StatValidatorService';
-import { assertForumPostContext } from '../utils/channelGuards';
-import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
+import { StatValidatorService, StatInvestmentDTO } from '../../services/StatValidatorService';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 
 // Instanciamos el Pilar Matemático
 const statValidator = new StatValidatorService();

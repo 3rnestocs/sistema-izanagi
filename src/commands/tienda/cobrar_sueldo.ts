@@ -3,11 +3,12 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { SalaryService } from '../services/SalaryService';
-import { assertForumPostContext } from '../utils/channelGuards';
-import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../utils/commandThrottle';
-import { executeWithErrorHandling, validationError } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { SalaryService } from '../../services/SalaryService';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
+import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
+import { COMMAND_NAMES } from '../../config/commandNames';
 
 const salaryService = new SalaryService(prisma);
 
@@ -28,7 +29,7 @@ export const data = new SlashCommandBuilder()
 export async function execute(interaction: ChatInputCommandInteraction) {
   await executeWithErrorHandling(
     interaction,
-    'cobrar_sueldo',
+    COMMAND_NAMES.cobrar_sueldo,
     async (interaction) => {
     assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
@@ -43,7 +44,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     cleanupExpiredCooldowns();
     consumeCommandCooldown({
-      commandName: 'cobrar_sueldo',
+      commandName: COMMAND_NAMES.cobrar_sueldo,
       actorId: interaction.user.id
     });
 

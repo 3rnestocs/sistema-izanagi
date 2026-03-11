@@ -3,8 +3,8 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { executeWithErrorHandling } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
 
 const PLAZA_CATEGORIES = [
   'Elementos',

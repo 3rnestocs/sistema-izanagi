@@ -3,9 +3,9 @@ import {
   ChatInputCommandInteraction,
   PermissionFlagsBits
 } from 'discord.js';
-import { prisma } from '../lib/prisma';
-import { CharacterService } from '../services/CharacterService';
-import { executeWithErrorHandling } from '../utils/errorHandler';
+import { prisma } from '../../lib/prisma';
+import { CharacterService } from '../../services/CharacterService';
+import { executeWithErrorHandling } from '../../utils/errorHandler';
 
 const characterService = new CharacterService(prisma);
 
