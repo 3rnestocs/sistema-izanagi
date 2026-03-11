@@ -71,7 +71,7 @@ npm run dev
 ## Main Command Groups
 
 - Player: `/registro`, `/ficha`, `/registrar_actividad`, `/comprar`, `/vender`, `/tienda`, `/transferir`, `/cobrar_sueldo`.
-- Staff/Admin: `/ascender`, `/validar_ascenso`, `/aprobar_registro`, `/rechazar_registro`, `/otorgar_rasgo`, `/otorgar_habilidad`, `/retirar_habilidad`, `/listar_tienda`, `/npc`.
+- Staff/Admin: `/ascender`, `/validar_ascenso`, `/rechazar_registro`, `/ajustar_recursos`, `/otorgar_rasgo`, `/otorgar_habilidad`, `/retirar_habilidad`, `/listar_tienda`, `/npc`.
 
 ## Notes
 

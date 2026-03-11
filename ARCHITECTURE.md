@@ -88,7 +88,7 @@ sistema-izanagi/
 ├── src/
 │   ├── index.ts                   # Entry point: Discord client + Prisma init + command routing
 │   ├── commands/                   # 19 slash commands
-│   │   ├── aprobar_registro.ts    # Staff: approve activity records
+│   │   ├── ajustar_recursos.ts    # Staff: add/remove resources (otorgar/retirar)
 │   │   ├── ascender.ts            # Staff: apply rank/level promotion
 │   │   ├── cobrar_sueldo.ts       # Player: claim weekly salary
 │   │   ├── comprar.ts             # Player: buy items from market
@@ -223,7 +223,7 @@ Character ──┬── CharacterTrait ──── Trait
 | Sell items | `GestorTransacciones.js` → Vender (50% refund) | **Not implemented** | ❌ Missing |
 | Transfer items/Ryou | `GestorTransacciones.js` → Transferir | `TransactionService.transferItems()` + `/transferir` | ✅ Migrated |
 | Activity registration | `GenerarRegistros.js` → `registrarAccion()` | `/registrar_actividad` | ✅ Migrated |
-| Activity approval + rewards | Manual (staff computed rewards) | `/aprobar_registro` + `RewardCalculatorService` | ✅ Improved |
+| Activity approval + rewards | Staff reacts ✅ on message, or `/ajustar_recursos otorgar` for edge cases | `ActivityApprovalService` + `RewardCalculatorService` | ✅ Improved |
 | Ascension (rank/level) | `GestorAscensos.js` → `registrarAscenso()` | `LevelUpService` + `/ascender` + `/validar_ascenso` | ✅ Migrated |
 | Weekly salary | `Utilidades.js` → `iniciarProcesoSueldos()` | `LevelUpService.claimWeeklySalary()` | ⚠️ Logic exists, no command |
 | Mirror mode (dual-target activities) | `GenerarRegistros.js` (Curación/Enfrentamiento) | **Not implemented** | ❌ Missing |
@@ -363,7 +363,7 @@ Current concerns:
 |---|---|---|
 | `Config.js` | Cell coordinates, constants, vocabulary | `schema.prisma` + service-level constants |
 | `GenerarFicha.js` | Character creation | `CharacterService` + `/registro` |
-| `GenerarRegistros.js` | Activity registration with rewards | `/registrar_actividad` + `/aprobar_registro` + `RewardCalculatorService` |
+| `GenerarRegistros.js` | Activity registration with rewards | `/registrar_actividad` + `ActivityApprovalService` (reaction-based) + `RewardCalculatorService` |
 | `GestorAscensos.js` | Rank/level promotions | `PromotionService` + `/ascender` + `/validar_ascenso` |
 | `GestorHabilidades.js` | Skill assign/remove | `PlazaService` + `/otorgar_habilidad` + `/retirar_habilidad` |
 | `GestorRasgos.js` | Trait assign/remove | `CharacterService` + `/otorgar_rasgo` |

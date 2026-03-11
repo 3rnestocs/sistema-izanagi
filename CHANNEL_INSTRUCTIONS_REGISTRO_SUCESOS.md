@@ -23,16 +23,30 @@ Usa el comando `/registrar_actividad` con los detalles correspondientes. El sist
 
 ---
 
-## 🎯 Campos del Comando `/registrar_actividad`
+## 🎯 Estructura del Comando `/registrar_actividad`
 
-| Campo | Descripción | Requerido | Notas |
-|-------|-------------|-----------|-------|
-| `tipo` | Tipo de actividad realizada | Sí | Misión, Combate, Crónica, Evento, Escena, Curación, Logros, etc. |
-| `evidencia` | Link o prueba de la actividad | Sí | URL a foro, mensaje, o prueba verificable |
-| `rango` | Rango de la actividad | Depende del tipo | D, C, B, A, S (para Misión/Combate/Experimento) |
-| `severidad` | Severidad de herida | Depende del tipo | Herido Leve, Grave, Crítico, Coma, Letal (solo para Curación) |
-| `resultado` | Resultado de la actividad | Depende del tipo | Exitosa, Fallida, Destacado, Participación, Victoria, Derrota, etc. |
-| `nombre_actividad` | Nombre de la Crónica/Evento | Opcional | Para Crónicas/Eventos históricos, permite aplicar recompensas precisas |
+El comando usa **grupos** y **subcomandos**. Primero elige el grupo, luego el tipo concreto:
+
+### Grupo **combate** (Misión o Combate)
+- `mision` — evidencia, rango (D/C/B/A/S), resultado (Exitosa/Fallida)
+- `combate` — evidencia, rango (D/C/B/A/S), resultado (Victoria/Derrota/Empate)
+
+### Grupo **narrativa** (Crónica, Evento o Escena)
+- `cronica` — evidencia, nombre_actividad (opcional, autocompletado), resultado (Destacado/Participación)
+- `evento` — evidencia, nombre_actividad (opcional, autocompletado), resultado (Destacado/Participación)
+- `escena` — evidencia, exp (obligatorio), pr y ryou (opcionales)
+
+### Grupo **logros**
+- `logro_general` — evidencia, nombre_logro (autocompletado), exp/pr/ryou (si el logro es manual)
+- `logro_saga` — evidencia, exp (obligatorio), pr y ryou (opcionales)
+- `logro_reputacion` — evidencia, nombre_logro (autocompletado), exp/pr/ryou (si el logro es manual)
+
+### Grupo **otros**
+- `balance_general` — evidencia, nombre_actividad (autocompletado, obligatorio)
+- `experimento` — evidencia, rango, resultado (Exitosa/Fallida), exp
+- `curacion` — evidencia, severidad (Herido Leve/Grave/Crítico/Coma/Letal)
+- `desarrollo_personal` — evidencia
+- `timeskip` — evidencia, exp (obligatorio), pr y ryou (opcionales)
 
 ---
 
@@ -69,13 +83,17 @@ Las siguientes actividades reciben recompensas **automáticamente** y son aproba
 - **Ryou**: 0
 
 ### Crónica y Evento (Recompensas Históricas/Estándar)
-- Crónicas y Eventos conocidos usan recompensas históricas exactas (catálogo actual: 11 actividades)
-- Si es una Crónica/Evento histórica, proporciona el `nombre_actividad` para aplicar recompensas precisas
-- Si es una Crónica/Evento nueva (no en el sistema):
+- **Obligatorio**: Debes seleccionar `resultado` (**Destacado** si fuiste destacado, o **Participación** si no).
+- Crónicas y Eventos usan el campo `nombre_actividad` con **autocompletado** filtrado por tipo (solo verás opciones de Cronica vieja o Evento viejo según el tipo seleccionado).
+- Si es una Crónica/Evento **histórica** (en el catálogo): requiere revisión de Staff y aprobación por reacción ✅.
+- Si es una Crónica/Evento **estándar** (sin nombre o no en catálogo): se auto-aprueban.
   - **Crónica normal**: 15 EXP, 20 PR | **Destacado**: +5 EXP, +5 PR
   - **Evento normal**: 15 EXP, 15 PR | **Destacado**: +5 EXP, +5 PR
-- **Nota**: Crónicas/Eventos (incluyendo resultado "Destacado") se auto-aprueban.
-- **Nota de migración**: El catálogo histórico se usa durante la migración de actividades pasadas y podrá retirarse cuando el proceso finalice.
+
+### Balance General
+- Recompensas especiales por participación en balances (ej. "Todos los personajes con ficha", "Recompensa por 4 participaciones").
+- **Obligatorio**: Selecciona una opción en `nombre_actividad` del catálogo (autocompletado filtrado).
+- Requiere revisión de Staff y aprobación por reacción ✅.
 
 ---
 
@@ -90,7 +108,7 @@ Las siguientes actividades proyectan recompensas pero requieren aprobación manu
 - **Experimento**: Staff valida el contexto
 - **Timeskip**: Staff define recompensas per-caso
 
-Para estas actividades, el comando `/registrar_actividad` las guarda como **PENDIENTE** y staff las aprueba con `/aprobar_registro` asignando recompensas manuales.
+Para estas actividades, el comando `/registrar_actividad` las guarda como **PENDIENTE**. El usuario indica la EXP (y opcionalmente PR/Ryou) que reclama. Staff aprueba **reaccionando con ✅** en el mensaje del registro. Si el mensaje fue borrado, Staff puede usar `/ajustar_recursos otorgar` para acreditar los recursos manualmente.
 
 ---
 
@@ -124,9 +142,10 @@ Para estas actividades, el comando `/registrar_actividad` las guarda como **PEND
 | Combate | ✅ | Por rango enemigo | Rango + Resultado obligatorios; Cap 5/semana |
 | Curación | ✅ | Por severidad | `severidad` obligatorio; Cap 10/semana |
 | Desarrollo Personal | ✅ | Por nivel | Automático según tu nivel |
-| Crónica (normal) | ✅ | Histórico o estándar | Opcionalmente `nombre_actividad` |
-| Evento (normal) | ✅ | Histórico o estándar | Opcionalmente `nombre_actividad` |
-| Crónica/Evento Destacado | ✅ | Histórico o estándar + bono Destacado | Auto-aprobado; opcionalmente `nombre_actividad` |
+| Crónica (estándar) | ✅ | Tabla estándar | Sin `nombre_actividad` |
+| Evento (estándar) | ✅ | Tabla estándar | Sin `nombre_actividad` |
+| Crónica/Evento histórica | ❌ | Catálogo histórico | Requiere `resultado` (Destacado/Participación) + `nombre_actividad` (autocompletado) + aprobación Staff por reacción ✅ |
+| Balance General | ❌ | Catálogo histórico | Requiere `nombre_actividad` (autocompletado) + aprobación Staff por reacción ✅ |
 | Escena | ❌ | Staff decide | Staff aprueba y asigna recompensas |
 | Logro General | ❌ | Staff decide | Staff verifica condición y asigna |
 | Logro de Saga | ❌ | Staff decide | Staff verifica y asigna |
@@ -140,8 +159,7 @@ Para estas actividades, el comando `/registrar_actividad` las guarda como **PEND
 
 ### Escenario 1: Misión Auto-Aprobada
 ```
-/registrar_actividad
-  tipo: Misión
+/registrar_actividad combate mision
   evidencia: https://discord.com/...
   rango: B
   resultado: Exitosa
@@ -150,22 +168,21 @@ Para estas actividades, el comando `/registrar_actividad` las guarda como **PEND
 
 ### Escenario 2: Crónica Histórica
 ```
-/registrar_actividad
-  tipo: Crónica
+/registrar_actividad narrativa cronica
   evidencia: https://forum-link
-  resultado: Participacion
-  nombre_actividad: El sueño del sabio - capitulo I. Clase de Indra
+  resultado: Participación
+  nombre_actividad: Cronica vieja: El sueño del sabio I - Recuento
 ```
-**Resultado**: ✅ Auto-aprobada. Recibes +10 EXP, +20 PR **de inmediato** (recompensa histórica exacta).
+**Resultado**: ⏳ **PENDIENTE**. Crónicas/Eventos históricas requieren revisión de Staff. Staff reacciona con ✅ para aprobar. (Si fuiste Destacado, selecciona `resultado: Destacado`.)
 
 ### Escenario 3: Logro Manual
 ```
-/registrar_actividad
-  tipo: Logro General
+/registrar_actividad logros logro_general
   evidencia: https://evidence
-  resultado: Participacion
+  nombre_logro: [selecciona del autocompletado]
+  exp: [si el logro requiere revisión manual]
 ```
-**Resultado**: ⏳ **PENDIENTE**. Staff revisa que cumpliste el logro y aprueba con `/aprobar_registro exp:X pr:Y ryou:Z`.
+**Resultado**: ⏳ **PENDIENTE**. Indica la EXP que reclamas si aplica; Staff revisa y reacciona con ✅ para aprobar.
 
 ---
 
@@ -183,7 +200,7 @@ Para estas actividades, el comando `/registrar_actividad` las guarda como **PEND
 R: Sí, pero debes proporcionar evidencia verificable (link al foro, screenshot, etc.).
 
 **P: ¿Qué pasa si no tengo "Destacado"?**  
-R: Registra la actividad con `resultado: Participacion` (o deja en blanco). El bot automáticamente aplica la recompensa estándar.
+R: Para Crónicas y Eventos, selecciona `resultado: Participación Normal`. Si fuiste destacado, selecciona `resultado: Destacado` para el bono extra. El campo resultado es obligatorio en Crónicas/Eventos.
 
 **P: ¿Puedo cambiar mi registro después de enviarlo?**  
 R: No, el registro es inmutable. Si necesitas corrección, contacta a Staff.

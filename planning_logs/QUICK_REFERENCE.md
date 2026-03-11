@@ -43,7 +43,7 @@ Player commands:
 
 Staff/Admin commands:
 - `/ascender`
-- `/aprobar_registro`
+- `/ajustar_recursos` (retirar/otorgar recursos)
 - `/rechazar_registro`
 - `/otorgar_rasgo`
 - `/otorgar_habilidad`
@@ -63,7 +63,8 @@ Staff/Admin commands:
 - `RewardCalculatorService`: Activity reward calculations with multipliers.
 - `StatValidatorService`: SP investment and stat caps/rules.
 - `SkillRankValidator`: Skill rank progression constraints.
-- `BuildApprovalService`: Approval flow support.
+- `BuildApprovalService`: Build approval flow support.
+- `ActivityApprovalService`: Activity approval by staff reaction (checkmark).
 - `NpcService`: NPC lifecycle (create/list/retire with soft-retire).
 
 ## Useful Commands

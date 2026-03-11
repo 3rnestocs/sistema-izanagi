@@ -63,6 +63,7 @@ interface HandleCommandErrorOptions {
   commandName: string;
   fallbackMessage?: string;
   ephemeral?: boolean;
+  deferWasEphemeral?: boolean;
   errorStyle?: CommandErrorStyle;
   styleOptions?: ErrorStyleOptions;
   customFormatter?: (error: AppCommandError) => string;
@@ -223,9 +224,16 @@ function formatErrorByStyle(error: AppCommandError, style: CommandErrorStyle, st
 async function sendErrorResponse(
   interaction: ChatInputCommandInteraction,
   message: string,
-  ephemeral: boolean
+  ephemeral: boolean,
+  deferWasEphemeral?: boolean
 ): Promise<void> {
   if (interaction.deferred) {
+    // When we want ephemeral errors but deferred publicly, we must delete the reply and followUp ephemerally
+    if (ephemeral && deferWasEphemeral === false) {
+      await interaction.deleteReply();
+      await interaction.followUp({ content: message, ephemeral: true });
+      return;
+    }
     await interaction.editReply({ content: message });
     return;
   }
@@ -263,7 +271,12 @@ export async function handleCommandError(
   );
 
   try {
-    await sendErrorResponse(interaction, finalMessage, options.ephemeral ?? true);
+    await sendErrorResponse(
+      interaction,
+      finalMessage,
+      options.ephemeral ?? true,
+      options.deferWasEphemeral
+    );
   } catch (replyError) {
     console.error('Failed to send error response:', replyError);
   }
@@ -337,10 +350,12 @@ export async function executeWithErrorHandling(
 
     await executor(interaction);
   } catch (error) {
+    const deferEphemeral = options?.defer !== false ? (options?.defer?.ephemeral ?? true) : undefined;
     await handleCommandError(error, interaction, {
       commandName,
       ...(options?.fallbackMessage ? { fallbackMessage: options.fallbackMessage } : {}),
       ...(typeof options?.errorEphemeral === 'boolean' ? { ephemeral: options.errorEphemeral } : {}),
+      ...(deferEphemeral !== undefined ? { deferWasEphemeral: deferEphemeral } : {}),
       ...(options?.errorStyle ? { errorStyle: options.errorStyle } : {}),
       ...(options?.styleOptions ? { styleOptions: options.styleOptions } : {}),
       ...(options?.customFormatter ? { customFormatter: options.customFormatter } : {})

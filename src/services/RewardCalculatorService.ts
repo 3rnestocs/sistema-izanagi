@@ -54,6 +54,8 @@ export class RewardCalculatorService {
       baseRewards = this.calculateLogroGeneralRewards(activity.narrationKey);
     } else if (normalizedType === ActivityType.LOGRO_REPUTACION) {
       baseRewards = this.calculateLogroReputacionRewards(activity.narrationKey);
+    } else if (normalizedType === ActivityType.BALANCE_GENERAL) {
+      baseRewards = this.calculateBalanceGeneralRewards(activity.narrationKey);
     } else {
       // MANUAL tier types (Escena, Logro de Saga, Experimento, Timeskip)
       return { exp: 0, pr: 0, ryou: 0 };
@@ -257,6 +259,21 @@ export class RewardCalculatorService {
     }
 
     return logro.rewards;
+  }
+
+  /**
+   * Calculate rewards for Balance General activity.
+   * Only uses historical catalog (Balance General: entries); no standard table.
+   */
+  private calculateBalanceGeneralRewards(narrationKey: string | null | undefined): RewardBreakdown {
+    if (!narrationKey) {
+      return { exp: 0, pr: 0, ryou: 0 };
+    }
+    const historical = getHistoricalNarrationRewards(narrationKey);
+    if (!historical) {
+      return { exp: 0, pr: 0, ryou: 0 };
+    }
+    return historical.participant;
   }
 
   /**

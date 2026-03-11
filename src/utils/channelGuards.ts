@@ -26,7 +26,7 @@ function getAllowedRoleIds(): string[] {
   return parseIdList(process.env.PLAYER_ALLOWED_ROLE_IDS);
 }
 
-function getCommandForumMap(): Map<string, string[]> {
+export function getCommandForumMap(): Map<string, string[]> {
   const raw = process.env.PLAYER_COMMAND_FORUM_MAP;
   if (!raw) return new Map<string, string[]>();
 
@@ -47,6 +47,12 @@ function getCommandForumMap(): Map<string, string[]> {
   }
 
   return map;
+}
+
+const REGISTRAR_ACTIVIDAD_COMMAND = 'registrar_actividad';
+
+export function getRegistrarActividadForumIds(): string[] {
+  return getCommandForumMap().get(REGISTRAR_ACTIVIDAD_COMMAND) ?? [];
 }
 
 function getMemberRoleIds(interaction: ChatInputCommandInteraction): string[] {

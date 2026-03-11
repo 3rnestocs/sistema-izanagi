@@ -288,12 +288,21 @@ model ActivityRecord {
   // Nombre canónico de la Crónica/Evento para lookup en catálogo histórico (usado para auto-approve)
   narrationKey String?
 
+  // Recompensas reclamadas por el usuario (para actividades manuales; staff aprueba con reacción)
+  claimedExp   Int?
+  claimedPr    Int?
+  claimedRyou  Int?
+
+  // ID del mensaje de Discord que muestra el embed PENDIENTE (para aprobación por reacción)
+  approvalMessageId String?
+
   // Estado: PENDIENTE (no procesada), AUTO_APROBADO (automáticamente aprobada), APROBADO (aprobada por staff), RECHAZADO
   status String @default("PENDIENTE")
 
   createdAt   DateTime @default(now())
 
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
-  
-  @@index([characterId, type]) // Índice para búsquedas rápidas al subir de rango
+
+  @@index([characterId, type])
+  @@index([approvalMessageId])
 }

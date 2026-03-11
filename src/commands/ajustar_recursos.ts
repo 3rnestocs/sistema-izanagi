@@ -76,6 +76,53 @@ export const data = new SlashCommandBuilder()
       );
 
     return subcommand;
+  })
+  .addSubcommand((subcommand) => {
+    subcommand
+      .setName('otorgar')
+      .setDescription('Otorga recursos a un personaje con auditoría (ej. aprobación manual de actividad).')
+      .addUserOption((option) =>
+        option
+          .setName('usuario')
+          .setDescription('Usuario objetivo del otorgamiento')
+          .setRequired(true)
+      )
+      .addStringOption((option) => {
+        option
+          .setName('recurso')
+          .setDescription('Recurso a otorgar')
+          .setRequired(true);
+
+        for (const resource of ADJUSTABLE_RESOURCES) {
+          option.addChoices({
+            name: RESOURCE_CHOICE_LABELS[resource],
+            value: resource
+          });
+        }
+
+        return option;
+      })
+      .addIntegerOption((option) =>
+        option
+          .setName('cantidad')
+          .setDescription('Cantidad a otorgar')
+          .setRequired(true)
+          .setMinValue(1)
+      )
+      .addStringOption((option) =>
+        option
+          .setName('motivo')
+          .setDescription('Motivo del otorgamiento (ej. aprobación de registro de actividad)')
+          .setRequired(true)
+      )
+      .addStringOption((option) =>
+        option
+          .setName('evidencia')
+          .setDescription('URL o referencia opcional para auditoría')
+          .setRequired(false)
+      );
+
+    return subcommand;
   });
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -86,80 +133,142 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       await assertStaffAccess(interaction);
 
       const subcommand = interaction.options.getSubcommand(true);
-      if (subcommand !== 'retirar') {
-        throw new Error('⛔ Subcomando no soportado.');
-      }
-
       const targetUser = interaction.options.getUser('usuario', true);
       const resource = interaction.options.getString('recurso', true) as AdjustableResource;
       const amount = interaction.options.getInteger('cantidad', true);
       const reason = interaction.options.getString('motivo', true);
       const evidence = interaction.options.getString('evidencia') ?? undefined;
 
-      const result = await resourceAdjustmentService.removeResource({
-        targetDiscordId: targetUser.id,
-        resource,
-        requestedAmount: amount,
-        reason,
-        actorDiscordTag: interaction.user.tag,
-        ...(evidence ? { evidence } : {})
-      });
+      if (subcommand === 'retirar') {
+        const result = await resourceAdjustmentService.removeResource({
+          targetDiscordId: targetUser.id,
+          resource,
+          requestedAmount: amount,
+          reason,
+          actorDiscordTag: interaction.user.tag,
+          ...(evidence ? { evidence } : {})
+        });
 
-      const resourceLabel = resourceAdjustmentService.getResourceLabel(result.resource);
-      const clampNote = result.appliedAmount < result.requestedAmount
-        ? 'Sí (saldo insuficiente, aplicado hasta 0)'
-        : 'No';
+        const resourceLabel = resourceAdjustmentService.getResourceLabel(result.resource);
+        const clampNote = result.appliedAmount < result.requestedAmount
+          ? 'Sí (saldo insuficiente, aplicado hasta 0)'
+          : 'No';
 
-      const embed = new EmbedBuilder()
-        .setColor(0xe67e22)
-        .setTitle('🛡️ Ajuste Staff de Recursos')
-        .setDescription(`Se registró un ajuste sobre **${result.characterName}** (<@${targetUser.id}>).`)
-        .addFields(
-          {
-            name: 'Recurso',
-            value: resourceLabel,
-            inline: true
-          },
-          {
-            name: 'Solicitado',
-            value: `${result.requestedAmount}`,
-            inline: true
-          },
-          {
-            name: 'Aplicado',
-            value: `${result.appliedAmount}`,
-            inline: true
-          },
-          {
-            name: 'Saldo Previo',
-            value: `${result.previousValue}`,
-            inline: true
-          },
-          {
-            name: 'Saldo Final',
-            value: `${result.finalValue}`,
-            inline: true
-          },
-          {
-            name: 'Clamp a Cero',
-            value: clampNote,
-            inline: true
-          },
-          {
-            name: 'Motivo',
-            value: reason,
-            inline: false
-          },
-          {
-            name: 'Evidencia',
-            value: evidence ?? 'Sin evidencia adjunta',
-            inline: false
-          }
-        )
-        .setFooter({ text: `Staff executor: ${interaction.user.tag}` })
-        .setTimestamp();
+        const embed = new EmbedBuilder()
+          .setColor(0xe67e22)
+          .setTitle('🛡️ Ajuste Staff de Recursos')
+          .setDescription(`Se registró un ajuste sobre **${result.characterName}** (<@${targetUser.id}>).`)
+          .addFields(
+            {
+              name: 'Acción',
+              value: 'Retirar',
+              inline: true
+            },
+            {
+              name: 'Recurso',
+              value: resourceLabel,
+              inline: true
+            },
+            {
+              name: 'Solicitado',
+              value: `${result.requestedAmount}`,
+              inline: true
+            },
+            {
+              name: 'Aplicado',
+              value: `${result.appliedAmount}`,
+              inline: true
+            },
+            {
+              name: 'Saldo Previo',
+              value: `${result.previousValue}`,
+              inline: true
+            },
+            {
+              name: 'Saldo Final',
+              value: `${result.finalValue}`,
+              inline: true
+            },
+            {
+              name: 'Clamp a Cero',
+              value: clampNote,
+              inline: true
+            },
+            {
+              name: 'Motivo',
+              value: reason,
+              inline: false
+            },
+            {
+              name: 'Evidencia',
+              value: evidence ?? 'Sin evidencia adjunta',
+              inline: false
+            }
+          )
+          .setFooter({ text: `Staff executor: ${interaction.user.tag}` })
+          .setTimestamp();
 
-      await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
+      } else if (subcommand === 'otorgar') {
+        const result = await resourceAdjustmentService.addResource({
+          targetDiscordId: targetUser.id,
+          resource,
+          amount,
+          reason,
+          actorDiscordTag: interaction.user.tag,
+          ...(evidence ? { evidence } : {})
+        });
+
+        const resourceLabel = resourceAdjustmentService.getResourceLabel(result.resource);
+
+        const embed = new EmbedBuilder()
+          .setColor(0x27ae60)
+          .setTitle('🛡️ Ajuste Staff de Recursos')
+          .setDescription(`Se otorgaron recursos a **${result.characterName}** (<@${targetUser.id}>).`)
+          .addFields(
+            {
+              name: 'Acción',
+              value: 'Otorgar',
+              inline: true
+            },
+            {
+              name: 'Recurso',
+              value: resourceLabel,
+              inline: true
+            },
+            {
+              name: 'Cantidad',
+              value: `${result.appliedAmount}`,
+              inline: true
+            },
+            {
+              name: 'Saldo Previo',
+              value: `${result.previousValue}`,
+              inline: true
+            },
+            {
+              name: 'Saldo Final',
+              value: `${result.finalValue}`,
+              inline: true
+            },
+            {
+              name: 'Motivo',
+              value: reason,
+              inline: false
+            },
+            {
+              name: 'Evidencia',
+              value: evidence ?? 'Sin evidencia adjunta',
+              inline: false
+            }
+          )
+          .setFooter({ text: `Staff executor: ${interaction.user.tag}` })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+      } else {
+        throw new Error('⛔ Subcomando no soportado.');
+      }
     },
     {
       defer: { ephemeral: true },

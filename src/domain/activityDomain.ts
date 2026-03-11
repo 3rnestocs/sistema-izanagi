@@ -10,7 +10,8 @@ export const ActivityType = {
   LOGRO_SAGA: 'Logro de Saga',
   LOGRO_REPUTACION: 'Logro de Reputación',
   DESARROLLO_PERSONAL: 'Desarrollo Personal',
-  TIMESKIP: 'Timeskip'
+  TIMESKIP: 'Timeskip',
+  BALANCE_GENERAL: 'Balance General'
 } as const;
 
 export type ActivityTypeValue = (typeof ActivityType)[keyof typeof ActivityType];
@@ -53,7 +54,8 @@ const ACTIVITY_TYPE_NORMALIZED_MAP: Readonly<Record<string, ActivityTypeValue>> 
   'LOGRO DE REPUTACION': ActivityType.LOGRO_REPUTACION,
   'LOGROS DE REPUTACION': ActivityType.LOGRO_REPUTACION,
   'DESARROLLO PERSONAL': ActivityType.DESARROLLO_PERSONAL,
-  TIMESKIP: ActivityType.TIMESKIP
+  TIMESKIP: ActivityType.TIMESKIP,
+  'BALANCE GENERAL': ActivityType.BALANCE_GENERAL
 };
 
 const ACTIVITY_STATUS_NORMALIZED_MAP: Readonly<Record<string, ActivityStatusValue>> = {
@@ -83,10 +85,15 @@ const AUTO_APPROVABLE_TYPES = new Set<ActivityTypeValue>([
   ActivityType.CRONICA,
   ActivityType.EVENTO,
   ActivityType.LOGRO_GENERAL,
-  ActivityType.LOGRO_REPUTACION
+  ActivityType.LOGRO_REPUTACION,
+  ActivityType.BALANCE_GENERAL
 ]);
 
-const NARRATION_TYPES = new Set<ActivityTypeValue>([ActivityType.CRONICA, ActivityType.EVENTO]);
+const NARRATION_TYPES = new Set<ActivityTypeValue>([
+  ActivityType.CRONICA,
+  ActivityType.EVENTO,
+  ActivityType.BALANCE_GENERAL
+]);
 
 function toAsciiComparable(value: string): string {
   return value
