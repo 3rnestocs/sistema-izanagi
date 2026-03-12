@@ -103,7 +103,7 @@
   {"name": "Rokubi", "category": "Bijuu", "costCupos": 5, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 4, "extras": ["Suiton"], "traitGrants": []},
   {"name": "Nanabi", "category": "Bijuu", "costCupos": 5, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 4, "extras": [], "traitGrants": []},
   {"name": "Hachibi", "category": "Bijuu", "costCupos": 5, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 4, "extras": [], "traitGrants": []},
-  {"name": "Kyuubi", "category": "Bijuu", "costCupos": 7, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 4, "extras": [], "traitGrants": []},
+  {"name": "Kyuubi", "category": "Bijuu", "costCupos": 7, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 4, "extras": ["Fuuton", "Katon"], "traitGrants": []},
   {"name": "Kyuubi Oscuro", "category": "Bijuu", "costCupos": 7, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 4, "extras": [], "traitGrants": []},
   {"name": "Jinchuurikimodoki", "category": "Bijuu", "costCupos": 3, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 3, "extras": [], "traitGrants": []},
   {"name": "Humano Sintético", "category": "Potenciadores", "costCupos": 5, "maxHolders": 1, "bonusStatName": "Chakra", "bonusStatValue": 1, "extras": [], "traitGrants": []},

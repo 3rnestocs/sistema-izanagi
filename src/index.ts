@@ -108,12 +108,13 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         const ownerId = interaction.customId.split(':')[1];
-        const isOwner = interaction.user.id === ownerId;
+        const isCommandAuthor = interaction.user.id === ownerId;
         const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+        const isThreadOwner = interaction.channel?.isThread?.() && interaction.channel.ownerId === interaction.user.id;
 
-        if (!isOwner && !isAdmin) {
+        if (!isCommandAuthor && !isAdmin && !isThreadOwner) {
             await interaction.reply({
-                content: '⛔ Solo el autor de la ficha (o staff) puede eliminar este mensaje.',
+                content: '⛔ Solo el autor de la ficha, el dueño del post o staff puede eliminar este mensaje.',
                 ephemeral: true
             });
             return;
