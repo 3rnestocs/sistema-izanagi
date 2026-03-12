@@ -29,21 +29,20 @@ const rewardCalculatorService = new RewardCalculatorService();
 const activityCapService = new ActivityCapService(prisma);
 const REGISTRO_SUCESOS_FORUM_ID = formatChannelReference(process.env.REGISTRO_SUCESOS_FORUM_ID, '#canal-correcto');
 
-const TIPO_BY_SUBCOMMAND: Record<string, Record<string, string>> = {
-    combate: { mision: ActivityType.MISION, combate: ActivityType.COMBATE },
-    narrativa: { cronica: ActivityType.CRONICA, evento: ActivityType.EVENTO, escena: ActivityType.ESCENA },
-    logros: {
-        logro_general: ActivityType.LOGRO_GENERAL,
-        logro_saga: ActivityType.LOGRO_SAGA,
-        logro_reputacion: ActivityType.LOGRO_REPUTACION
-    },
-    otros: {
-        balance_general: ActivityType.BALANCE_GENERAL,
-        experimento: ActivityType.EXPERIMENTO,
-        curacion: ActivityType.CURACION,
-        desarrollo_personal: ActivityType.DESARROLLO_PERSONAL,
-        timeskip: ActivityType.TIMESKIP
-    }
+const TIPO_BY_SUBCOMMAND: Record<string, string> = {
+    mision: ActivityType.MISION,
+    combate: ActivityType.COMBATE,
+    cronica: ActivityType.CRONICA,
+    evento: ActivityType.EVENTO,
+    escena: ActivityType.ESCENA,
+    logro_general: ActivityType.LOGRO_GENERAL,
+    logro_saga: ActivityType.LOGRO_SAGA,
+    logro_reputacion: ActivityType.LOGRO_REPUTACION,
+    balance_general: ActivityType.BALANCE_GENERAL,
+    experimento: ActivityType.EXPERIMENTO,
+    curacion: ActivityType.CURACION,
+    desarrollo_personal: ActivityType.DESARROLLO_PERSONAL,
+    timeskip: ActivityType.TIMESKIP
 };
 
 const RANGO_CHOICES = [
@@ -99,338 +98,319 @@ const evidenciaDesc = 'Link al foro, pantallazo o mensaje de Discord que prueba 
 export const data = new SlashCommandBuilder()
     .setName(COMMAND_NAMES.registrar_suceso)
     .setDescription('Registra una actividad on-rol (Misiones, Combates, Tramas) para tu historial.')
-    .addSubcommandGroup((group) =>
-        group
+    .addSubcommand((sc) =>
+        sc
+            .setName('mision')
+            .setDescription('Registrar una misión')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('rango')
+                    .setDescription('Nivel de la misión')
+                    .setRequired(true)
+                    .addChoices(...RANGO_CHOICES)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('resultado')
+                    .setDescription('Exitosa o Fallida')
+                    .setRequired(true)
+                    .addChoices(...RESULTADO_MISION_CHOICES)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
             .setName('combate')
-            .setDescription('Misión o Combate (rango + resultado)')
-            .addSubcommand((sc) =>
-                sc
-                    .setName('mision')
-                    .setDescription('Registrar una misión')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('rango')
-                            .setDescription('Nivel de la misión')
-                            .setRequired(true)
-                            .addChoices(...RANGO_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('resultado')
-                            .setDescription('Exitosa o Fallida')
-                            .setRequired(true)
-                            .addChoices(...RESULTADO_MISION_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .setDescription('Registrar un combate')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('combate')
-                    .setDescription('Registrar un combate')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('rango')
-                            .setDescription('Nivel del combate')
-                            .setRequired(true)
-                            .addChoices(...RANGO_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('resultado')
-                            .setDescription('Victoria, Derrota o Empate')
-                            .setRequired(true)
-                            .addChoices(...RESULTADO_COMBATE_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('rango')
+                    .setDescription('Nivel del combate')
+                    .setRequired(true)
+                    .addChoices(...RANGO_CHOICES)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('resultado')
+                    .setDescription('Victoria, Derrota o Empate')
+                    .setRequired(true)
+                    .addChoices(...RESULTADO_COMBATE_CHOICES)
             )
     )
-    .addSubcommandGroup((group) =>
-        group
-            .setName('narrativa')
-            .setDescription('Crónica, Evento o Escena')
-            .addSubcommand((sc) =>
-                sc
-                    .setName('cronica')
-                    .setDescription('Registrar una crónica')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('resultado')
-                            .setDescription('Destacado o Participación')
-                            .setRequired(true)
-                            .addChoices(...RESULTADO_CRONICA_EVENTO_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('nombre_actividad')
-                            .setDescription('Crónica del catálogo histórico (opcional)')
-                            .setAutocomplete(true)
-                            .setRequired(false)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('cronica')
+            .setDescription('Registrar una crónica')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('evento')
-                    .setDescription('Registrar un evento')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('resultado')
-                            .setDescription('Destacado o Participación')
-                            .setRequired(true)
-                            .addChoices(...RESULTADO_CRONICA_EVENTO_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('nombre_actividad')
-                            .setDescription('Evento del catálogo histórico (opcional)')
-                            .setAutocomplete(true)
-                            .setRequired(false)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('escena')
-                    .setDescription('Registrar una escena')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addIntegerOption((o) =>
-                        o
-                            .setName('exp')
-                            .setDescription('EXP reclamada')
-                            .setRequired(true)
-                            .setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('pr').setDescription('PR reclamado (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('ryou').setDescription('Ryou reclamado (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addStringOption((o) =>
+                o
+                    .setName('resultado')
+                    .setDescription('Destacado o Participación')
+                    .setRequired(true)
+                    .addChoices(...RESULTADO_CRONICA_EVENTO_CHOICES)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('nombre_actividad')
+                    .setDescription('Crónica del catálogo histórico (opcional)')
+                    .setAutocomplete(true)
+                    .setRequired(false)
             )
     )
-    .addSubcommandGroup((group) =>
-        group
-            .setName('logros')
-            .setDescription('Logro General, Logro de Saga o Logro de Reputación')
-            .addSubcommand((sc) =>
-                sc
-                    .setName('logro_general')
-                    .setDescription('Registrar un logro general')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('nombre_logro')
-                            .setDescription('Nombre del logro del catálogo')
-                            .setAutocomplete(true)
-                            .setRequired(true)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('exp').setDescription('EXP (si el logro es manual)').setRequired(false).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('evento')
+            .setDescription('Registrar un evento')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('logro_saga')
-                    .setDescription('Registrar un logro de saga')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('logro_reputacion')
-                    .setDescription('Registrar un logro de reputación')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('nombre_logro')
-                            .setDescription('Nombre del logro del catálogo')
-                            .setAutocomplete(true)
-                            .setRequired(true)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('exp').setDescription('EXP (si el logro es manual)').setRequired(false).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addStringOption((o) =>
+                o
+                    .setName('resultado')
+                    .setDescription('Destacado o Participación')
+                    .setRequired(true)
+                    .addChoices(...RESULTADO_CRONICA_EVENTO_CHOICES)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('nombre_actividad')
+                    .setDescription('Evento del catálogo histórico (opcional)')
+                    .setAutocomplete(true)
+                    .setRequired(false)
             )
     )
-    .addSubcommandGroup((group) =>
-        group
-            .setName('otros')
-            .setDescription('Balance General, Experimento, Curación, Desarrollo Personal, Timeskip')
-            .addSubcommand((sc) =>
-                sc
-                    .setName('balance_general')
-                    .setDescription('Registrar un balance general')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('nombre_actividad')
-                            .setDescription('Balance General del catálogo (opcional)')
-                            .setAutocomplete(true)
-                            .setRequired(false)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('escena')
+            .setDescription('Registrar una escena')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('experimento')
-                    .setDescription('Registrar un experimento')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('rango')
-                            .setDescription('Nivel del experimento')
-                            .setRequired(true)
-                            .addChoices(...RANGO_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('resultado')
-                            .setDescription('Exitosa o Fallida')
-                            .setRequired(true)
-                            .addChoices(...RESULTADO_MISION_CHOICES)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('curacion')
-                    .setDescription('Registrar una curación')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o
-                            .setName('severidad')
-                            .setDescription('Severidad de la herida')
-                            .setRequired(true)
-                            .addChoices(...SEVERIDAD_CHOICES)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addIntegerOption((o) =>
+                o
+                    .setName('exp')
+                    .setDescription('EXP reclamada')
+                    .setRequired(true)
+                    .setMinValue(0)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('desarrollo_personal')
-                    .setDescription('Registrar desarrollo personal')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addIntegerOption((o) =>
+                o.setName('pr').setDescription('PR reclamado (opcional)').setRequired(false).setMinValue(0)
             )
-            .addSubcommand((sc) =>
-                sc
-                    .setName('timeskip')
-                    .setDescription('Registrar un timeskip')
-                    .addStringOption((o) =>
-                        o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addIntegerOption((o) =>
-                        o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
-                    )
-                    .addStringOption((o) =>
-                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
-                    )
+            .addIntegerOption((o) =>
+                o.setName('ryou').setDescription('Ryou reclamado (opcional)').setRequired(false).setMinValue(0)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('logro_general')
+            .setDescription('Registrar un logro general')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('nombre_logro')
+                    .setDescription('Nombre del logro del catálogo')
+                    .setAutocomplete(true)
+                    .setRequired(true)
+            )
+            .addIntegerOption((o) =>
+                o.setName('exp').setDescription('EXP (si el logro es manual)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('logro_saga')
+            .setDescription('Registrar un logro de saga')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addIntegerOption((o) =>
+                o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('logro_reputacion')
+            .setDescription('Registrar un logro de reputación')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('nombre_logro')
+                    .setDescription('Nombre del logro del catálogo')
+                    .setAutocomplete(true)
+                    .setRequired(true)
+            )
+            .addIntegerOption((o) =>
+                o.setName('exp').setDescription('EXP (si el logro es manual)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('balance_general')
+            .setDescription('Registrar un balance general')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('nombre_actividad')
+                    .setDescription('Balance General del catálogo (opcional)')
+                    .setAutocomplete(true)
+                    .setRequired(false)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('experimento')
+            .setDescription('Registrar un experimento')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('rango')
+                    .setDescription('Nivel del experimento')
+                    .setRequired(true)
+                    .addChoices(...RANGO_CHOICES)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('resultado')
+                    .setDescription('Exitosa o Fallida')
+                    .setRequired(true)
+                    .addChoices(...RESULTADO_MISION_CHOICES)
+            )
+            .addIntegerOption((o) =>
+                o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('curacion')
+            .setDescription('Registrar una curación')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addStringOption((o) =>
+                o
+                    .setName('severidad')
+                    .setDescription('Severidad de la herida')
+                    .setRequired(true)
+                    .addChoices(...SEVERIDAD_CHOICES)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('desarrollo_personal')
+            .setDescription('Registrar desarrollo personal')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+    )
+    .addSubcommand((sc) =>
+        sc
+            .setName('timeskip')
+            .setDescription('Registrar un timeskip')
+            .addStringOption((o) =>
+                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+            )
+            .addStringOption((o) =>
+                o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+            )
+            .addIntegerOption((o) =>
+                o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
             )
     );
 
 export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
     const focused = interaction.options.getFocused(true);
-    const grupo = interaction.options.getSubcommandGroup(false);
     const sub = interaction.options.getSubcommand(false);
     const query = normalizeForMatch(focused.value);
 
-    if (!grupo || !sub) {
+    if (!sub) {
         await interaction.respond([]);
         return;
     }
 
     if (focused.name === 'nombre_actividad') {
         const tipoParaNombre =
-            (grupo === 'narrativa' && (sub === 'cronica' || sub === 'evento'))
-                ? (sub === 'cronica' ? ActivityType.CRONICA : ActivityType.EVENTO)
-                : grupo === 'otros' && sub === 'balance_general'
-                  ? ActivityType.BALANCE_GENERAL
-                  : null;
+            sub === 'cronica'
+                ? ActivityType.CRONICA
+                : sub === 'evento'
+                  ? ActivityType.EVENTO
+                  : sub === 'balance_general'
+                    ? ActivityType.BALANCE_GENERAL
+                    : null;
 
         if (!tipoParaNombre) {
             await interaction.respond([]);
@@ -449,9 +429,9 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
 
     if (focused.name === 'nombre_logro') {
         const tipoLogro =
-            grupo === 'logros' && sub === 'logro_general'
+            sub === 'logro_general'
                 ? ActivityType.LOGRO_GENERAL
-                : grupo === 'logros' && sub === 'logro_reputacion'
+                : sub === 'logro_reputacion'
                   ? ActivityType.LOGRO_REPUTACION
                   : null;
 
@@ -505,9 +485,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 throw validationError('No tienes ninguna ficha registrada. Usa `/registro` primero.');
             }
 
-            const grupo = interaction.options.getSubcommandGroup(true);
             const sub = interaction.options.getSubcommand(true);
-            const tipo = TIPO_BY_SUBCOMMAND[grupo]?.[sub];
+            const tipo = TIPO_BY_SUBCOMMAND[sub];
             if (!tipo) {
                 throw validationError('Tipo de actividad no reconocido. Por favor, usa el comando de nuevo.');
             }

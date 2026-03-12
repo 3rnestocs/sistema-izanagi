@@ -45,7 +45,7 @@ interface TraitRecordInput {
 }
 
 const INPUT_NAME_NOTE = '💡 Nota: Cada nombre de rasgo o habilidad debe coincidir exactamente. Usa /catalogo para verificar nombres antes de enviar.';
-const RECOVERY_NOTE = '↩️ Tip: Si estabas escribiendo en Discord, presiona Ctrl+Z en la caja de chat para recuperar tu ultimo mensaje.';
+const RECOVERY_NOTE = '↩️ TIP: Si estabas escribiendo en Discord, presiona Ctrl+Z en la caja de chat para recuperar tu ultimo mensaje. También puedes seleccionar el comando resaltado encima de la respuesta del bot y copiar el texto desde ahí.';
 const AUTO_TRAIT_TOKEN = 'auto';
 
 interface CategoryTraitEntry {
@@ -177,6 +177,12 @@ export const data = new SlashCommandBuilder()
     .setName('registro')
     .setDescription('Crea tu ficha inicial en el Sistema IZANAGI')
     .addStringOption((option) =>
+        option
+            .setName('fecha')
+            .setDescription('Fecha de creación de la ficha (DD/MM/YYYY).')
+            .setRequired(true)
+    )
+    .addStringOption((option) =>
         option.setName('keko').setDescription('Tu usuario de Hobba (sin @).').setRequired(true)
     )
     .addStringOption((option) =>
@@ -230,12 +236,6 @@ export const data = new SlashCommandBuilder()
         option
             .setName('habilidades')
             .setDescription('Solo habilidades iniciales: Elementos, Clanes, Especiales o Bijuu (opcional)')
-            .setRequired(false)
-    )
-    .addStringOption((option) =>
-        option
-            .setName('fecha')
-            .setDescription('Fecha de creación de la ficha (DD/MM/YYYY). Opcional, para migración.')
             .setRequired(false)
     );
 

@@ -66,6 +66,13 @@ export class ActivityApprovalService {
         data: { status: ActivityStatus.APROBADO }
       });
 
+      const rewardParts: string[] = [];
+      if (rewards.exp > 0) rewardParts.push(`EXP:${rewards.exp}`);
+      if (rewards.pr > 0) rewardParts.push(`PR:${rewards.pr}`);
+      if (rewards.ryou > 0) rewardParts.push(`RYOU:${rewards.ryou}`);
+      if ((rewards.rc ?? 0) > 0) rewardParts.push(`RC:${rewards.rc}`);
+      if ((rewards.cupos ?? 0) > 0) rewardParts.push(`Cupos:${rewards.cupos}`);
+
       const auditData: Record<string, number> = {
         deltaExp: rewards.exp,
         deltaPr: rewards.pr,
@@ -74,13 +81,13 @@ export class ActivityApprovalService {
       if (rewards.rc && rewards.rc > 0) auditData.deltaRc = rewards.rc;
       if (rewards.cupos && rewards.cupos > 0) auditData.deltaCupos = rewards.cupos;
 
+      const rewardsText = rewardParts.length > 0 ? rewardParts.join(', ') : 'ninguna';
+
       await tx.auditLog.create({
         data: {
           characterId: activityRecord.characterId,
           category: 'Aprobación de Actividad',
-          detail: `Registro ${activityRecord.id} (${activityRecord.type}) aprobado por reacción de ${staffUserTag}. Recompensas => EXP:${rewards.exp}, PR:${rewards.pr}, RYOU:${rewards.ryou}` +
-            (rewards.rc ? `, RC:${rewards.rc}` : '') +
-            (rewards.cupos ? `, Cupos:${rewards.cupos}` : ''),
+          detail: `Registro ${activityRecord.id} (${activityRecord.type}) aprobado por reacción de ${staffUserTag}. Recompensas => ${rewardsText}`,
           evidence: activityRecord.evidenceUrl,
           ...auditData
         }

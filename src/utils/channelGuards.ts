@@ -55,6 +55,24 @@ export function getRegistrarSucesoForumIds(): string[] {
   return getCommandForumMap().get(REGISTRAR_SUCESO_COMMAND) ?? [];
 }
 
+/**
+ * Returns forum channel IDs where the bot restricts thread writes (only owner + staff).
+ * Excludes BUILD_APPROVAL_FORUM_ID: that is a text channel (not a forum) where all users
+ * upload builds; the bot never restricts or overwrites permissions there.
+ */
+export function getAllBotForumIds(): string[] {
+  const ids = new Set<string>();
+  const add = (id: string | undefined) => id && ids.add(id.trim());
+  add(process.env.GESTION_FORUM_ID);
+  add(process.env.REGISTRO_SUCESOS_FORUM_ID);
+  add(process.env.TIENDA_FORUM_ID);
+  getAllowedForumChannelIds().forEach((id) => ids.add(id));
+  for (const forumIds of getCommandForumMap().values()) {
+    forumIds.forEach((id) => ids.add(id));
+  }
+  return Array.from(ids);
+}
+
 function getMemberRoleIds(interaction: ChatInputCommandInteraction): string[] {
   const member = interaction.member;
   if (!member || !("roles" in member)) return [];

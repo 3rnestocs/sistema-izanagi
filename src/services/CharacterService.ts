@@ -34,7 +34,7 @@ export class CharacterService {
     traitToAdd: { name: string; category: string }
   ): void {
     assertRestrictedCategoryAvailable(existingTraits, traitToAdd, (category, existingName, incomingName) =>
-      `⛔ CONFLICTO DE CATEGORIA: '${incomingName}' no puede asignarse porque ya tienes '${existingName}' en '${getCategoryLabel(category)}'.`
+      `⛔ ACCIÓN PROHIBIDA: '${incomingName}' no puede asignarse porque ya tienes '${existingName}' en '${getCategoryLabel(category)}'.`
     );
   }
 
@@ -55,7 +55,7 @@ export class CharacterService {
         }
       });
       if (existingChar) {
-        throw new Error(`⛔ ERROR DE CAPA 8: El Keko '${data.name}' o el usuario de Discord ya posee una ficha registrada.`);
+        throw new Error(`⛔ ACCIÓN PROHIBIDA: El Keko '${data.name}' o el usuario de Discord ya posee una ficha registrada.`);
       }
 
       // 2. LECTURA DE RASGOS (SSOT)
@@ -66,7 +66,7 @@ export class CharacterService {
       });
 
       if (traits.length !== data.traitNames.length) {
-        throw new Error(`⛔ ERROR DB: Uno o más rasgos proporcionados no existen en el sistema IZANAGI.`);
+        throw new Error(`⛔ CONFLICTO: Uno o más rasgos proporcionados no existen en el sistema IZANAGI.`);
       }
 
       this.assertRestrictedCategoryUniqueness(
@@ -90,7 +90,7 @@ export class CharacterService {
           if (traitIds.includes(conflictingTraitId)) {
             const conflictingTrait = traits.find((candidate: any) => candidate.id === conflictingTraitId);
             const conflictingName = conflictingTrait?.name ?? 'otro rasgo seleccionado';
-            throw new Error(`⛔ El rasgo ${trait.name} es incompatible con el rasgo ${conflictingName}. Elimina uno de los dos.`);
+            throw new Error(`⛔ CONFLICTO: El rasgo ${trait.name} es incompatible con el rasgo ${conflictingName}. Elimina uno de los dos.`);
           }
         }
 
@@ -121,7 +121,7 @@ export class CharacterService {
       const finalRcAtCreation = CharacterService.BASE_INITIAL_RC + totalRcCost;
 
       if (finalRcAtCreation < 0) {
-        throw new Error(`⛔ RC inválido al crear la ficha: ${finalRcAtCreation}. Ajusta la selección de rasgos.`);
+        throw new Error(`⛔ CONFLICTO: RC inválido al crear la ficha: ${finalRcAtCreation}. Ajusta la selección de rasgos.`);
       }
 
      // 4. CREACIÓN DE LA FICHA Y RELACIONES
@@ -197,7 +197,7 @@ export class CharacterService {
       });
 
       if (!character) {
-        throw new Error('⛔ Personaje no encontrado.');
+        throw new Error('⛔ ACCIÓN PROHIBIDA: Personaje no encontrado.');
       }
 
       const traitToAdd = await tx.trait.findUnique({
@@ -206,12 +206,12 @@ export class CharacterService {
       });
 
       if (!traitToAdd) {
-        throw new Error(`⛔ El rasgo '${traitName}' no existe en el sistema.`);
+        throw new Error(`⛔ CONFLICTO: El rasgo '${traitName}' no existe en el sistema.`);
       }
 
       // 2. Verificar si ya tiene el rasgo
       if (character.traits.some((ct) => ct.trait.id === traitToAdd.id)) {
-        throw new Error(`⛔ El personaje ya posee el rasgo '${traitName}'.`);
+        throw new Error(`⛔ CONFLICTO: El personaje ya posee el rasgo '${traitName}'.`);
       }
 
       // 3. Validar incompatibilidades
@@ -287,7 +287,7 @@ export class CharacterService {
       });
 
       if (!character) {
-        throw new Error('⛔ Personaje no encontrado.');
+        throw new Error('⛔ ACCIÓN PROHIBIDA: Personaje no encontrado.');
       }
 
       const traitToRemove = await tx.trait.findUnique({
@@ -295,13 +295,13 @@ export class CharacterService {
       });
 
       if (!traitToRemove) {
-        throw new Error(`⛔ El rasgo '${traitName}' no existe en el sistema.`);
+        throw new Error(`⛔ CONFLICTO: El rasgo '${traitName}' no existe en el sistema.`);
       }
 
       // 2. Verificar si el personaje tiene el rasgo
       const hasTraitRecord = character.traits.find((ct) => ct.trait.id === traitToRemove.id);
       if (!hasTraitRecord) {
-        throw new Error(`⛔ El personaje no posee el rasgo '${traitName}'.`);
+        throw new Error(`⛔ CONFLICTO: El personaje no posee el rasgo '${traitName}'.`);
       }
 
       // 3. Revertir bonificaciones

@@ -12,15 +12,15 @@ const transactionService = new TransactionService(prisma);
 export const data = new SlashCommandBuilder()
     .setName('comprar')
     .setDescription('Compra objetos del mercado de IZANAGI.')
+    .addStringOption(opt =>
+        opt.setName('fecha')
+           .setDescription('Fecha de la compra (DD/MM/YYYY).')
+           .setRequired(true)
+    )
     .addStringOption(opt => 
         opt.setName('items')
            .setDescription('Nombres de los objetos separados por comas (Ej: Kunai, Shuriken, Píldora)')
            .setRequired(true)
-    )
-    .addStringOption(opt =>
-        opt.setName('fecha')
-           .setDescription('Fecha de la compra (DD/MM/YYYY). Opcional.')
-           .setRequired(false)
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {

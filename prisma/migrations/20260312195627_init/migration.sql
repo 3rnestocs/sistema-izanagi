@@ -13,6 +13,8 @@ CREATE TABLE "Character" (
     "isNpc" BOOLEAN NOT NULL DEFAULT false,
     "isRetired" BOOLEAN NOT NULL DEFAULT false,
     "retiredAt" TIMESTAMP(3),
+    "isExiled" BOOLEAN NOT NULL DEFAULT false,
+    "imageUrl" TEXT,
     "title" TEXT,
     "lastSalaryClaim" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "ryou" INTEGER NOT NULL DEFAULT 0,
@@ -178,6 +180,11 @@ CREATE TABLE "ActivityRecord" (
     "rank" TEXT,
     "result" TEXT,
     "evidenceUrl" TEXT NOT NULL,
+    "narrationKey" TEXT,
+    "claimedExp" INTEGER,
+    "claimedPr" INTEGER,
+    "claimedRyou" INTEGER,
+    "approvalMessageId" TEXT,
     "status" TEXT NOT NULL DEFAULT 'PENDIENTE',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -243,6 +250,9 @@ CREATE UNIQUE INDEX "InventoryItem_characterId_itemId_key" ON "InventoryItem"("c
 
 -- CreateIndex
 CREATE INDEX "ActivityRecord_characterId_type_idx" ON "ActivityRecord"("characterId", "type");
+
+-- CreateIndex
+CREATE INDEX "ActivityRecord_approvalMessageId_idx" ON "ActivityRecord"("approvalMessageId");
 
 -- AddForeignKey
 ALTER TABLE "Character" ADD CONSTRAINT "Character_approvalId_fkey" FOREIGN KEY ("approvalId") REFERENCES "CharacterBuildApproval"("id") ON DELETE SET NULL ON UPDATE CASCADE;

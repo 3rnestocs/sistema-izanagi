@@ -28,15 +28,15 @@ export const data = new SlashCommandBuilder()
   .setDescription('Vende ítems de tu inventario por Ryou (50% del valor base)')
   .addStringOption((option) =>
     option
-      .setName('items')
-      .setDescription('Ítems a vender, separados por comas (ej: "Kunai, Shuriken, Kunai")')
+      .setName('fecha')
+      .setDescription('Fecha de la venta (DD/MM/YYYY).')
       .setRequired(true)
   )
   .addStringOption((option) =>
     option
-      .setName('fecha')
-      .setDescription('Fecha de la venta (DD/MM/YYYY). Opcional.')
-      .setRequired(false)
+      .setName('items')
+      .setDescription('Ítems a vender, separados por comas (ej: "Kunai, Shuriken, Kunai")')
+      .setRequired(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {

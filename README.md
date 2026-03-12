@@ -27,23 +27,24 @@ CLIENT_ID="your-discord-app-id"
 GUILD_ID="your-test-server-id"
 ```
 
-**Forum IDs** (use actual Discord channel IDs, not names):
+**Forum / Channel IDs** (use actual Discord channel IDs, not names):
 
 ```env
-# Where /registro, /ficha, /invertir_sp, etc. run (gestion-de-fichas)
+# Where /registro, /ficha, /invertir_sp, etc. run (gestion-de-fichas) — forum channel
 GESTION_FORUM_ID="1234567890123456789"
 
-# Where users upload character builds for staff approval (e.g. #🛠️-registro-builds). Staff reacts with ✅ to approve.
+# Text channel where users upload character builds for staff approval (e.g. #🛠️-registro-builds).
+# Staff reacts with ✅ to approve. NOT a forum — all users can write; bot never restricts or overwrites permissions.
 BUILD_APPROVAL_FORUM_ID="1234567890123456790"
 
-# Where /registrar_suceso runs (registro-de-sucesos)
+# Where /registrar_suceso runs (registro-de-sucesos) — forum channel
 REGISTRO_SUCESOS_FORUM_ID="1234567890123456791"
 
-# Where /comprar, /vender, /transferir, /cobrar_sueldo run (tienda)
+# Where /comprar, /vender, /transferir, /cobrar_sueldo run (tienda) — forum channel
 TIENDA_FORUM_ID="1234567890123456792"
 ```
 
-**Note:** `GESTION_FORUM_ID` and `BUILD_APPROVAL_FORUM_ID` are different: the first is for running ficha commands; the second is where players post their builds for approval before using `/registro`.
+**Note:** `GESTION_FORUM_ID` and `BUILD_APPROVAL_FORUM_ID` are different: the first is a forum for ficha commands; the second is a text channel where players post their builds for approval before using `/registro`. Discord role/channel permissions you set are never overwritten by the bot.
 
 Optional advanced channel routing:
 
@@ -54,6 +55,13 @@ PLAYER_FORUM_CHANNEL_IDS="1234567890123456789,1234567890123456791"
 # Command-specific forum map: commandName:forumId|forumId;otherCommand:forumId
 # Use actual numeric IDs (same as GESTION_FORUM_ID, REGISTRO_SUCESOS_FORUM_ID, TIENDA_FORUM_ID)
 PLAYER_COMMAND_FORUM_MAP="registro:1234567890123456789;ficha:1234567890123456789;..."
+```
+
+Optional feature flags:
+
+```env
+# Mission rank limits by character cargo (Genin→D, Chuunin→C, etc.). Set to false if your rol uses different rank names and you want any character to register any mission rank.
+ENABLE_MISSION_RANK_LIMITS="true"
 ```
 
 ### 3. Prepare database

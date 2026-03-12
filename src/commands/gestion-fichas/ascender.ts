@@ -42,6 +42,12 @@ const TARGET_CHOICES: Array<{ name: string; value: string }> = [
 export const data = new SlashCommandBuilder()
   .setName('ascender')
   .setDescription('Aplica un ascenso de nivel o cargo cuando los requisitos automáticos se cumplen.')
+  .addStringOption((option) =>
+    option
+      .setName('fecha')
+      .setDescription('Fecha del ascenso (DD/MM/YYYY).')
+      .setRequired(true)
+  )
   .addUserOption((option) =>
     option
       .setName('usuario')
@@ -54,12 +60,6 @@ export const data = new SlashCommandBuilder()
       .setDescription('Nivel o cargo de destino')
       .setRequired(true)
       .addChoices(...TARGET_CHOICES)
-  )
-  .addStringOption((option) =>
-    option
-      .setName('fecha')
-      .setDescription('Fecha del ascenso (DD/MM/YYYY). Opcional.')
-      .setRequired(false)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {

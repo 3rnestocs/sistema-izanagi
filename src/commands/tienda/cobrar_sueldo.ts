@@ -27,7 +27,7 @@ export const data = new SlashCommandBuilder()
   .setName('cobrar_sueldo')
   .setDescription('Cobra tu sueldo semanal como personaje')
   .addStringOption((o) =>
-    o.setName('fecha').setDescription('Fecha del cobro (DD/MM/YYYY). Opcional, para migración.').setRequired(false)
+    o.setName('fecha').setDescription('Fecha del cobro (DD/MM/YYYY).').setRequired(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {

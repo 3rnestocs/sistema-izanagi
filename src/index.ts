@@ -15,7 +15,7 @@ import { prisma, disconnectPrisma } from './lib/prisma';
 import { loadCommands, Command } from './lib/commandLoader';
 import { BuildApprovalService } from './services/BuildApprovalService';
 import { ActivityApprovalService } from './services/ActivityApprovalService';
-import { getRegistrarSucesoForumIds } from './utils/channelGuards';
+import { getRegistrarSucesoForumIds, getAllBotForumIds } from './utils/channelGuards';
 
 // Commands will be loaded dynamically
 let commands: Collection<string, Command>;
@@ -47,7 +47,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         const member = await reaction.message.guild.members.fetch(user.id);
         if (!member.permissions.has(PermissionFlagsBits.Administrator)) return;
 
-        // Build approval: forum where users upload character builds (threads) or standalone channel
+        // Build approval: text channel where users upload their builds. Staff reacts with ✅ to approve.
         const channel = reaction.message.channel;
         const isBuildApprovalChannel =
             BUILD_APPROVAL_FORUM_ID &&
@@ -109,6 +109,30 @@ client.on(Events.MessageReactionRemove, async (reaction, user) => {
         await buildApprovalService.setApprovalActiveStateByMessageId(reaction.message.id, hasAdminApprover);
     } catch (error) {
         console.error('❌ Error procesando remoción de aprobación por reacción:', error);
+    }
+});
+
+// 🔒 Restrict thread posts: only owner + staff (Administrator) can write in bot forum threads.
+// Threads inherit parent permissions so we can't use overwrites; we delete messages from non-owners.
+client.on(Events.MessageCreate, async (message) => {
+    if (message.author.bot) return;
+    if (!message.inGuild() || !message.channel.isThread()) return;
+
+    const thread = message.channel;
+    const parentId = thread.parentId ?? thread.parent?.id;
+    if (!parentId) return;
+
+    const botForumIds = getAllBotForumIds();
+    if (botForumIds.length === 0 || !botForumIds.includes(parentId)) return;
+
+    const isStaff = message.member?.permissions?.has(PermissionFlagsBits.Administrator) ?? false;
+    const isOwner = thread.ownerId === message.author.id;
+    if (isStaff || isOwner) return;
+
+    try {
+        await message.delete();
+    } catch (error) {
+        console.error('❌ Error eliminando mensaje de no-dueño en thread:', error);
     }
 });
 

@@ -26,6 +26,11 @@ async function publishPublicTransferEmbed(
 export const data = new SlashCommandBuilder()
     .setName('transferir')
     .setDescription('Transfiere Ryou y/o objetos a otro personaje.')
+    .addStringOption(opt =>
+        opt.setName('fecha')
+           .setDescription('Fecha de la transferencia (DD/MM/YYYY).')
+           .setRequired(true)
+    )
     .addUserOption(opt => 
         opt.setName('destinatario')
            .setDescription('El usuario de Discord al que le enviarás las cosas')
@@ -40,11 +45,6 @@ export const data = new SlashCommandBuilder()
     .addStringOption(opt => 
         opt.setName('items')
            .setDescription('Objetos a enviar, separados por comas (Opcional)')
-           .setRequired(false)
-    )
-    .addStringOption(opt =>
-        opt.setName('fecha')
-           .setDescription('Fecha de la transferencia (DD/MM/YYYY). Opcional.')
            .setRequired(false)
     );
 

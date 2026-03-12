@@ -12,6 +12,7 @@ const statValidator = new StatValidatorService();
 export const data = new SlashCommandBuilder()
     .setName('invertir_sp')
     .setDescription('Distribuye tus Skill Points (SP) en tus estadísticas.')
+    .addStringOption(opt => opt.setName('fecha').setDescription('Fecha de la inversión (DD/MM/YYYY).').setRequired(true))
     // Definimos los 7 stats. Todos son opcionales y con un mínimo de 1 para evitar trolleos numéricos.
     .addIntegerOption(opt => opt.setName('fuerza').setDescription('SP a invertir en Fuerza').setMinValue(1))
     .addIntegerOption(opt => opt.setName('resistencia').setDescription('SP a invertir en Resistencia').setMinValue(1))
@@ -19,8 +20,7 @@ export const data = new SlashCommandBuilder()
     .addIntegerOption(opt => opt.setName('percepcion').setDescription('SP a invertir en Percepción').setMinValue(1))
     .addIntegerOption(opt => opt.setName('inteligencia').setDescription('SP a invertir en Inteligencia').setMinValue(1))
     .addIntegerOption(opt => opt.setName('armas').setDescription('SP a invertir en Armas').setMinValue(1))
-    .addIntegerOption(opt => opt.setName('chakra').setDescription('SP a invertir en Chakra (1 SP = +2 Puntos)').setMinValue(1))
-    .addStringOption(opt => opt.setName('fecha').setDescription('Fecha de la inversión (DD/MM/YYYY). Opcional.').setRequired(false));
+    .addIntegerOption(opt => opt.setName('chakra').setDescription('SP a invertir en Chakra (1 SP = +2 Puntos)').setMinValue(1));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
     await executeWithErrorHandling(

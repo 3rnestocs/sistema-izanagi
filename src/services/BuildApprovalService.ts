@@ -70,7 +70,7 @@ export class BuildApprovalService {
     const channelId = message.channelId;
 
     if (!guildId) {
-      throw new Error('El mensaje de aprobación no pertenece a un servidor.');
+      throw new Error('⛔ El mensaje de aprobación no pertenece a un servidor.');
     }
 
     const knownPlazas = await this.prisma.plaza.findMany({
@@ -83,7 +83,7 @@ export class BuildApprovalService {
     );
 
     if (!parsed.keko) {
-      throw new Error('No se pudo extraer "Nombre del Keko" del mensaje aprobado.');
+      throw new Error('⛔ No se pudo extraer "Nombre del Keko" del mensaje aprobado.');
     }
 
     const existing = await this.prisma.characterBuildApproval.findUnique({

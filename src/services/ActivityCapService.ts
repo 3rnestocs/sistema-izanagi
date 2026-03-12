@@ -98,14 +98,14 @@ export class ActivityCapService {
     // Check combat cap
     if (normalizedRequestedType === ActivityType.COMBATE && combatCount >= WEEKLY_CAPS[ActivityType.COMBATE]) {
       throw new Error(
-        `⛔ Ya realizaste el máximo de ${WEEKLY_CAPS[ActivityType.COMBATE]} combates esta semana. Intenta de nuevo el próximo lunes.`
+        `⛔ Alcanzaste el límite de ${WEEKLY_CAPS[ActivityType.COMBATE]} combates esta semana. Intenta de nuevo el próximo lunes.`
       );
     }
 
     // Check curacion cap
     if (normalizedRequestedType === ActivityType.CURACION && curacionCount >= WEEKLY_CAPS[ActivityType.CURACION]) {
       throw new Error(
-        `⛔ Ya realizaste el máximo de ${WEEKLY_CAPS[ActivityType.CURACION]} curaciones esta semana. Intenta de nuevo el próximo lunes.`
+        `⛔ Alcanzaste el límite de ${WEEKLY_CAPS[ActivityType.CURACION]} curaciones esta semana. Intenta de nuevo el próximo lunes.`
       );
     }
 
@@ -124,44 +124,48 @@ export class ActivityCapService {
       }
     }
 
-    // Mission caps: weekly slots, daily limit, rank-gated access
+    // Mission caps: weekly slots, daily limit, rank-gated access (optional via env)
     if (normalizedRequestedType === ActivityType.MISION) {
       const missionRank = options?.missionRank;
       if (!missionRank || !['D', 'C', 'B', 'A', 'S'].includes(missionRank)) {
         throw new Error('⛔ Rango de misión inválido.');
       }
 
-      let character = options?.character;
-      if (!character) {
-        const c = await this.prisma.character.findUnique({
-          where: { id: characterId }
-        });
-        if (!c) throw new Error('⛔ Personaje no encontrado.');
-        character = { rank: c.rank, isExiled: c.isExiled };
-      }
-
-      const maxRankForCargo = MISSION_MAX_RANK_BY_CARGO[character.rank];
-      if (!maxRankForCargo) {
-        throw new Error(`⛔ Tu cargo (${character.rank}) no tiene misiones asignadas. Contacta al staff.`);
-      }
-
-      // Rank-gated: normal = mission rank <= max; exiled = mission rank >= min (inverted)
-      const missionRankIdx = RANK_ORDER.indexOf(missionRank);
-      const maxRankIdx = RANK_ORDER.indexOf(maxRankForCargo);
-      if (missionRankIdx === -1 || maxRankIdx === -1) {
-        throw new Error('⛔ Rango no reconocido.');
-      }
-      if (character.isExiled) {
-        if (missionRankIdx < maxRankIdx) {
-          throw new Error(
-            `⛔ Como exiliado, solo puedes registrar misiones de rango ${maxRankForCargo} o superior. Rango ${missionRank} no permitido.`
-          );
+      const rankLimitsEnabled = (process.env.ENABLE_MISSION_RANK_LIMITS ?? 'true').toLowerCase() === 'true';
+      if (rankLimitsEnabled) {
+        let character = options?.character;
+        if (!character) {
+          const c = await this.prisma.character.findUnique({
+            where: { id: characterId },
+            select: { rank: true, isExiled: true }
+          });
+          if (!c) throw new Error('⛔ Personaje no encontrado.');
+          character = { rank: c.rank, isExiled: c.isExiled };
         }
-      } else {
-        if (missionRankIdx > maxRankIdx) {
-          throw new Error(
-            `⛔ Tu cargo (${character.rank}) solo permite misiones hasta rango ${maxRankForCargo}. No puedes registrar misiones ${missionRank}.`
-          );
+
+        const maxRankForCargo = MISSION_MAX_RANK_BY_CARGO[character.rank];
+        if (!maxRankForCargo) {
+          throw new Error(`⛔ Tu cargo (${character.rank}) no tiene misiones asignadas. Contacta al staff.`);
+        }
+
+        // Rank-gated: normal = mission rank <= max; exiled = mission rank >= min (inverted)
+        const missionRankIdx = RANK_ORDER.indexOf(missionRank);
+        const maxRankIdx = RANK_ORDER.indexOf(maxRankForCargo);
+        if (missionRankIdx === -1 || maxRankIdx === -1) {
+          throw new Error('⛔ Rango no reconocido.');
+        }
+        if (character.isExiled) {
+          if (missionRankIdx < maxRankIdx) {
+            throw new Error(
+              `⛔ Como exiliado, solo puedes registrar misiones de rango ${maxRankForCargo} o superior. Las de rango ${missionRank} no son permitidas.`
+            );
+          }
+        } else {
+          if (missionRankIdx > maxRankIdx) {
+            throw new Error(
+              `⛔ Tu cargo (${character.rank}) solo permite misiones hasta rango ${maxRankForCargo}. No puedes registrar misiones de rango ${missionRank}.`
+            );
+          }
         }
       }
 
@@ -189,7 +193,7 @@ export class ActivityCapService {
       const slotCost = MISSION_SLOT_COST[missionRank] ?? 1;
       if (usedSlots + slotCost > MISSION_WEEKLY_SLOTS) {
         throw new Error(
-          `⛔ No tienes suficientes cupos de misión esta semana. Usados: ${usedSlots}/${MISSION_WEEKLY_SLOTS}. Esta misión requiere ${slotCost} cupo(s).`
+          `⛔ Esta semana ya has gastado ${usedSlots}/${MISSION_WEEKLY_SLOTS} cupos de misión, y esta misión requiere ${slotCost} cupo(s). Intenta de nuevo el próximo lunes.`
         );
       }
 

@@ -301,7 +301,7 @@ export class StatValidatorService {
       // E. Validar Caps Normales (D, C, A, S)
       else {
         if (projectedIndex > rankCapNormal) {
-          throw new Error(`⛔ LÍMITE DE RANGO: Tu tope para Rango ${rankLetter} es la escala índice ${rankCapNormal}. Fallo en ${statName.toUpperCase()}.`);
+          throw new Error(`⛔ ACCIÓN PROHIBIDA: Tu tope para Rango ${rankLetter} es la escala índice ${rankCapNormal}. Fallo en ${statName.toUpperCase()}.`);
         }
       }
     }
