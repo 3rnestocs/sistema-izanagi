@@ -9,6 +9,7 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { businessRuleError, executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { getFechaFromOption } from '../../utils/dateParser';
 
 const transactionService = new TransactionService(prisma);
 
@@ -39,6 +40,11 @@ export const data = new SlashCommandBuilder()
     .addStringOption(opt => 
         opt.setName('items')
            .setDescription('Objetos a enviar, separados por comas (Opcional)')
+           .setRequired(false)
+    )
+    .addStringOption(opt =>
+        opt.setName('fecha')
+           .setDescription('Fecha de la transferencia (DD/MM/YYYY). Opcional.')
            .setRequired(false)
     );
 
@@ -71,6 +77,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         // 2. Preparar los ítems
         const itemNames = rawItems ? rawItems.split(',').map(item => item.trim()).filter(Boolean) : [];
 
+        const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+        if (fechaResult && 'error' in fechaResult) {
+            throw validationError(fechaResult.error);
+        }
+
         cleanupExpiredCooldowns();
         consumeCommandCooldown({
             commandName: COMMAND_NAMES.transferir,
@@ -83,7 +94,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             senderId: sender.id,
             receiverId: receiver.id,
             itemNames: itemNames,
-            ryouAmount: ryouAmount
+            ryouAmount: ryouAmount,
+            ...(fechaResult && 'date' in fechaResult ? { createdAt: fechaResult.date } : {})
         });
 
         // 4. Reporte de éxito

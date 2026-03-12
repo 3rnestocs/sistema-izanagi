@@ -77,11 +77,11 @@ export const HISTORICAL_NARRATIONS: Record<string, NarrationRewards> = {
 
   // Saga milestones
   'Balance General: Recompensa por 4 participaciones': {
-    participant: { exp: 50, pr: 100, ryou: 0 },
+    participant: { exp: 50, pr: 100, ryou: 0, rc: 2, cupos: 2 },
     destacado: { exp: 0, pr: 0, ryou: 0 } // participant only
   },
   'Balance General: Recompensa por 3 participaciones': {
-    participant: { exp: 30, pr: 50, ryou: 0 },
+    participant: { exp: 30, pr: 50, ryou: 0, cupos: 2 },
     destacado: { exp: 0, pr: 0, ryou: 0 } // participant only
   }
 };

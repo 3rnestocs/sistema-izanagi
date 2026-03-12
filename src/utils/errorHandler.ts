@@ -78,7 +78,7 @@ export interface ErrorStyleOptions {
   inputNameTip?: string;
 }
 
-const DEFAULT_RECOVERY_TIP = '↩️ Tip: Si estabas escribiendo en Discord, presiona Ctrl+Z en la caja de chat para recuperar tu ultimo mensaje.';
+const DEFAULT_RECOVERY_TIP = '↩️ Tip: Presiona Ctrl+Z en la caja de chat para recuperar tu mensaje. También puedes seleccionar el comando resaltado encima de la respuesta del bot y copiar el texto desde ahí.';
 
 function sanitizeUserMessage(message: string): string {
   return message.replace(/^[⛔❌🚫\s]+/, '').trim();

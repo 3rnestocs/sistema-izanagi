@@ -3,6 +3,7 @@ import { prisma } from '../../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { StatValidatorService, StatInvestmentDTO } from '../../services/StatValidatorService';
 import { assertForumPostContext } from '../../utils/channelGuards';
+import { getFechaFromOption } from '../../utils/dateParser';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 
 // Instanciamos el Pilar Matemático
@@ -18,7 +19,8 @@ export const data = new SlashCommandBuilder()
     .addIntegerOption(opt => opt.setName('percepcion').setDescription('SP a invertir en Percepción').setMinValue(1))
     .addIntegerOption(opt => opt.setName('inteligencia').setDescription('SP a invertir en Inteligencia').setMinValue(1))
     .addIntegerOption(opt => opt.setName('armas').setDescription('SP a invertir en Armas').setMinValue(1))
-    .addIntegerOption(opt => opt.setName('chakra').setDescription('SP a invertir en Chakra (1 SP = +2 Puntos)').setMinValue(1));
+    .addIntegerOption(opt => opt.setName('chakra').setDescription('SP a invertir en Chakra (1 SP = +2 Puntos)').setMinValue(1))
+    .addStringOption(opt => opt.setName('fecha').setDescription('Fecha de la inversión (DD/MM/YYYY). Opcional.').setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction) {
     await executeWithErrorHandling(
@@ -56,6 +58,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         if (!hasInvestment) {
             throw validationError('Debes indicar al menos un stat para invertir tus SP.');
         }
+
+        const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+        if (fechaResult && 'error' in fechaResult) {
+            throw validationError(fechaResult.error);
+        }
+        const createdAtOverride = fechaResult && 'date' in fechaResult ? fechaResult.date : undefined;
 
         // 3. 🧠 EL MOTOR MATEMÁTICO (Fail-Fast)
         // Extraemos los objetos 'Trait' puros de la tabla intermedia para pasarlos al servicio
@@ -95,7 +103,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                     category: "Distribución de Stats",
                     detail: `Inversión: ${detallesInversion}`,
                     evidence: "Comando /invertir_sp",
-                    deltaSp: -validationResult.spSpent
+                    deltaSp: -validationResult.spSpent,
+                    ...(createdAtOverride && { createdAt: createdAtOverride })
                 }
             });
         });

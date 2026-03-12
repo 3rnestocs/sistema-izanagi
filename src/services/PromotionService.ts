@@ -182,15 +182,25 @@ export class PromotionService {
     };
   }
 
-  async applyPromotion(characterId: string, targetType: 'rank' | 'level', target: string): Promise<void> {
+  async applyPromotion(
+    characterId: string,
+    targetType: 'rank' | 'level',
+    target: string,
+    promotedAt?: Date
+  ): Promise<{ spGranted?: number }> {
+    let spGranted: number | undefined;
     await this.prisma.$transaction(async (tx) => {
       const character = await tx.character.findUnique({ where: { id: characterId } });
       if (!character) throw new Error('Personaje no encontrado.');
 
       if (targetType === 'level') {
+        spGranted = StatValidatorService.getInitialSpForLevel(target);
         await tx.character.update({
           where: { id: characterId },
-          data: { level: target }
+          data: {
+            level: target,
+            sp: { increment: spGranted }
+          }
         });
       } else {
         const displayName = this.RANK_DISPLAY_NAMES[this.normalizeTarget(target)];
@@ -207,10 +217,13 @@ export class PromotionService {
           characterId,
           category: 'Ascenso',
           detail: `${targetType === 'rank' ? 'Ascenso de rango' : 'Ascenso de nivel'}: ${target}`,
-          evidence: 'Comando /ascender'
+          evidence: 'Comando /ascender',
+          ...(spGranted !== undefined ? { deltaSp: spGranted } : {}),
+          ...(promotedAt && { createdAt: promotedAt })
         }
       });
     });
+    return spGranted !== undefined ? { spGranted } : {};
   }
 
   private applySanninDiscount(character: any, pr: number): number {

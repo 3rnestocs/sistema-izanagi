@@ -9,6 +9,7 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { getFechaFromOption } from '../../utils/dateParser';
 
 const transactionService = new TransactionService(prisma);
 
@@ -30,6 +31,12 @@ export const data = new SlashCommandBuilder()
       .setName('items')
       .setDescription('Ítems a vender, separados por comas (ej: "Kunai, Shuriken, Kunai")')
       .setRequired(true)
+  )
+  .addStringOption((option) =>
+    option
+      .setName('fecha')
+      .setDescription('Fecha de la venta (DD/MM/YYYY). Opcional.')
+      .setRequired(false)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -58,6 +65,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       throw validationError('Debes especificar al menos un ítem para vender.');
     }
 
+    const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+    if (fechaResult && 'error' in fechaResult) {
+      throw validationError(fechaResult.error);
+    }
+
     cleanupExpiredCooldowns();
     consumeCommandCooldown({
       commandName: COMMAND_NAMES.vender,
@@ -66,7 +78,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
     const result = await transactionService.sellItems({
       characterId: character.id,
-      itemNames
+      itemNames,
+      ...(fechaResult && 'date' in fechaResult ? { createdAt: fechaResult.date } : {})
     });
 
     const itemDetails = result.itemsSold

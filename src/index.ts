@@ -1,4 +1,15 @@
-import { Client, GatewayIntentBits, Events, Collection, PermissionFlagsBits, Partials } from 'discord.js';
+import {
+  Client,
+  GatewayIntentBits,
+  Events,
+  Collection,
+  PermissionFlagsBits,
+  Partials,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  ActionRowBuilder
+} from 'discord.js';
 import 'dotenv/config';
 import { prisma, disconnectPrisma } from './lib/prisma';
 import { loadCommands, Command } from './lib/commandLoader';
@@ -112,34 +123,110 @@ client.once(Events.ClientReady, async (c) => {
 // 🧠 MANEJADOR DE COMANDOS (Dynamic)
 client.on(Events.InteractionCreate, async interaction => {
     if (interaction.isButton()) {
-        if (!interaction.customId.startsWith('ficha_delete:')) {
+        if (interaction.customId.startsWith('ficha_delete:')) {
+            const ownerId = interaction.customId.split(':')[1];
+            const isCommandAuthor = interaction.user.id === ownerId;
+            const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+            const isThreadOwner = interaction.channel?.isThread?.() && interaction.channel.ownerId === interaction.user.id;
+
+            if (!isCommandAuthor && !isAdmin && !isThreadOwner) {
+                await interaction.reply({
+                    content: '⛔ Solo el autor de la ficha, el dueño del post o staff puede eliminar este mensaje.',
+                    ephemeral: true
+                });
+                return;
+            }
+
+            try {
+                await interaction.message.delete();
+            } catch (error) {
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({
+                        content: '❌ No se pudo eliminar el mensaje de ficha.',
+                        ephemeral: true
+                    });
+                }
+            }
             return;
         }
 
-        const ownerId = interaction.customId.split(':')[1];
-        const isCommandAuthor = interaction.user.id === ownerId;
-        const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
-        const isThreadOwner = interaction.channel?.isThread?.() && interaction.channel.ownerId === interaction.user.id;
+        if (interaction.customId.startsWith('ficha_change_image:')) {
+            const characterId = interaction.customId.split(':')[1];
+            if (!characterId) return;
+            const character = await prisma.character.findUnique({
+                where: { id: characterId }
+            });
+            if (!character || character.discordId !== interaction.user.id) {
+                await interaction.reply({
+                    content: '⛔ Solo puedes cambiar la imagen de tu propio personaje.',
+                    ephemeral: true
+                });
+                return;
+            }
+            const modal = new ModalBuilder()
+                .setCustomId(`ficha_set_image:${characterId}`)
+                .setTitle('Cambiar imagen del personaje')
+                .addComponents(
+                    new ActionRowBuilder<TextInputBuilder>().addComponents(
+                        new TextInputBuilder()
+                            .setCustomId('image_url')
+                            .setLabel('URL de la imagen')
+                            .setPlaceholder('https://ejemplo.com/imagen.png')
+                            .setStyle(TextInputStyle.Short)
+                            .setRequired(true)
+                    )
+                );
+            await interaction.showModal(modal);
+            return;
+        }
+    }
 
-        if (!isCommandAuthor && !isAdmin && !isThreadOwner) {
+    if (interaction.isModalSubmit()) {
+        if (interaction.customId.startsWith('ficha_set_image:')) {
+            const characterId = interaction.customId.split(':')[1];
+            if (!characterId) {
+                await interaction.reply({ content: '⛔ Error interno.', ephemeral: true });
+                return;
+            }
+            const urlInput = interaction.fields.getTextInputValue('image_url').trim();
+            const character = await prisma.character.findUnique({
+                where: { id: characterId }
+            });
+            if (!character || character.discordId !== interaction.user.id) {
+                await interaction.reply({
+                    content: '⛔ Solo puedes cambiar la imagen de tu propio personaje.',
+                    ephemeral: true
+                });
+                return;
+            }
+            const validExtensions = /\.(jpg|jpeg|png|gif|webp|bmp)(\?|$)/i;
+            const knownHosts = ['imgur.com', 'i.imgur.com', 'cdn.discordapp.com', 'discordapp.com', 'media.discordapp.net'];
+            const isExtension = validExtensions.test(urlInput);
+            const isKnownHost = knownHosts.some((h) => urlInput.includes(h));
+            if (!urlInput.startsWith('https://') && !urlInput.startsWith('http://')) {
+                await interaction.reply({
+                    content: '⛔ La URL debe comenzar con https:// o http://',
+                    ephemeral: true
+                });
+                return;
+            }
+            if (!isExtension && !isKnownHost) {
+                await interaction.reply({
+                    content: '⛔ La URL debe ser de una imagen (jpg, png, gif, webp) o de un host conocido (imgur, Discord CDN).',
+                    ephemeral: true
+                });
+                return;
+            }
+            await prisma.character.update({
+                where: { id: characterId as string },
+                data: { imageUrl: urlInput }
+            });
             await interaction.reply({
-                content: '⛔ Solo el autor de la ficha, el dueño del post o staff puede eliminar este mensaje.',
+                content: '✅ Imagen del personaje actualizada. Usa `/ficha` para ver el cambio.',
                 ephemeral: true
             });
             return;
         }
-
-        try {
-            await interaction.message.delete();
-        } catch (error) {
-            if (!interaction.replied && !interaction.deferred) {
-                await interaction.reply({
-                    content: '❌ No se pudo eliminar el mensaje de ficha.',
-                    ephemeral: true
-                });
-            }
-        }
-        return;
     }
 
     if (interaction.isAutocomplete()) {

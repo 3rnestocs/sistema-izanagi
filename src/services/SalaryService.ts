@@ -19,8 +19,9 @@ export class SalaryService {
 
   /**
    * Claim weekly salary with trait bonuses and multipliers.
+   * @param claimedAt Optional backdate for migration (skips cooldown check).
    */
-  async claimWeeklySalary(characterId: string) {
+  async claimWeeklySalary(characterId: string, claimedAt?: Date) {
     return this.prisma.$transaction(async (tx) => {
       const character = await tx.character.findUnique({
         where: { id: characterId },
@@ -31,13 +32,14 @@ export class SalaryService {
         throw new Error('Personaje no encontrado.');
       }
 
-      const now = new Date();
-      const elapsedMs = now.getTime() - character.lastSalaryClaim.getTime();
-      const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-      
-      if (elapsedDays < this.DAYS_BETWEEN_SALARY) {
-        const daysLeft = Math.ceil(this.DAYS_BETWEEN_SALARY - elapsedDays);
-        throw new Error(`⛔ Ya cobraste el sueldo semanal. Intenta nuevamente en ${daysLeft} día(s).`);
+      const effectiveDate = claimedAt ?? new Date();
+      if (!claimedAt) {
+        const elapsedMs = effectiveDate.getTime() - character.lastSalaryClaim.getTime();
+        const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
+        if (elapsedDays < this.DAYS_BETWEEN_SALARY) {
+          const daysLeft = Math.ceil(this.DAYS_BETWEEN_SALARY - elapsedDays);
+          throw new Error(`⛔ Ya cobraste el sueldo semanal. Intenta nuevamente en ${daysLeft} día(s).`);
+        }
       }
 
       const baseSalary = this.BASE_SALARIES[character.rank] ?? 0;
@@ -76,7 +78,7 @@ export class SalaryService {
         data: {
           ryou: finalRyou,
           exp: { increment: weeklyExpBonus },
-          lastSalaryClaim: now
+          lastSalaryClaim: effectiveDate
         }
       });
 
@@ -92,7 +94,8 @@ export class SalaryService {
           detail: statusDetail,
           evidence: 'Sistema Automatizado',
           deltaRyou: netDeltaRyou,
-          deltaExp: weeklyExpBonus
+          deltaExp: weeklyExpBonus,
+          ...(claimedAt && { createdAt: claimedAt })
         }
       });
 

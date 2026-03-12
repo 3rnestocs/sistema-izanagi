@@ -24,7 +24,7 @@ export class ActivityApprovalService {
       return false;
     }
 
-    let rewards: { exp: number; pr: number; ryou: number };
+    let rewards: { exp: number; pr: number; ryou: number; rc?: number; cupos?: number };
 
     if (
       activityRecord.claimedExp !== null ||
@@ -43,18 +43,22 @@ export class ActivityApprovalService {
       );
     }
 
-    if (rewards.exp === 0 && rewards.pr === 0 && rewards.ryou === 0) {
+    if (rewards.exp === 0 && rewards.pr === 0 && rewards.ryou === 0 && (rewards.rc ?? 0) === 0 && (rewards.cupos ?? 0) === 0) {
       return false;
     }
 
     await this.prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+      const updateData: Record<string, { increment: number }> = {
+        exp: { increment: rewards.exp },
+        pr: { increment: rewards.pr },
+        ryou: { increment: rewards.ryou }
+      };
+      if (rewards.rc && rewards.rc > 0) updateData.rc = { increment: rewards.rc };
+      if (rewards.cupos && rewards.cupos > 0) updateData.cupos = { increment: rewards.cupos };
+
       await tx.character.update({
         where: { id: activityRecord.characterId },
-        data: {
-          exp: { increment: rewards.exp },
-          pr: { increment: rewards.pr },
-          ryou: { increment: rewards.ryou }
-        }
+        data: updateData
       });
 
       await tx.activityRecord.update({
@@ -62,15 +66,23 @@ export class ActivityApprovalService {
         data: { status: ActivityStatus.APROBADO }
       });
 
+      const auditData: Record<string, number> = {
+        deltaExp: rewards.exp,
+        deltaPr: rewards.pr,
+        deltaRyou: rewards.ryou
+      };
+      if (rewards.rc && rewards.rc > 0) auditData.deltaRc = rewards.rc;
+      if (rewards.cupos && rewards.cupos > 0) auditData.deltaCupos = rewards.cupos;
+
       await tx.auditLog.create({
         data: {
           characterId: activityRecord.characterId,
           category: 'Aprobación de Actividad',
-          detail: `Registro ${activityRecord.id} (${activityRecord.type}) aprobado por reacción de ${staffUserTag}. Recompensas => EXP:${rewards.exp}, PR:${rewards.pr}, RYOU:${rewards.ryou}`,
+          detail: `Registro ${activityRecord.id} (${activityRecord.type}) aprobado por reacción de ${staffUserTag}. Recompensas => EXP:${rewards.exp}, PR:${rewards.pr}, RYOU:${rewards.ryou}` +
+            (rewards.rc ? `, RC:${rewards.rc}` : '') +
+            (rewards.cupos ? `, Cupos:${rewards.cupos}` : ''),
           evidence: activityRecord.evidenceUrl,
-          deltaExp: rewards.exp,
-          deltaPr: rewards.pr,
-          deltaRyou: rewards.ryou
+          ...auditData
         }
       });
     });

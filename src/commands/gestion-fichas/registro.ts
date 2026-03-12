@@ -20,6 +20,7 @@ import {
 } from '../../services/TraitRuleService';
 import { assertForumPostContext } from '../../utils/channelGuards';
 import { formatChannelReference } from '../../utils/channelRefs';
+import { getFechaFromOption } from '../../utils/dateParser';
 import { BuildApprovalService } from '../../services/BuildApprovalService';
 import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandError } from '../../utils/errorHandler';
 
@@ -230,6 +231,12 @@ export const data = new SlashCommandBuilder()
             .setName('habilidades')
             .setDescription('Solo habilidades iniciales: Elementos, Clanes, Especiales o Bijuu (opcional)')
             .setRequired(false)
+    )
+    .addStringOption((option) =>
+        option
+            .setName('fecha')
+            .setDescription('Fecha de creación de la ficha (DD/MM/YYYY). Opcional, para migración.')
+            .setRequired(false)
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -313,6 +320,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         if (existe) {
             throw new Error(`⛔ El keko ${keko} ya esta registrado en la base de datos.`);
         }
+
+        const registroFechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+        if (registroFechaResult && 'error' in registroFechaResult) {
+            throw new Error(`⛔ ${registroFechaResult.error}`);
+        }
+        const createdAtOverride = registroFechaResult && 'date' in registroFechaResult ? registroFechaResult.date : undefined;
 
         const traitRecords = await prisma.trait.findMany({
             where: { name: { in: uniqueManualTraitNames } },
@@ -556,7 +569,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 fullName: nombre,
                 age: edad,
                 moral: resolvedMoralTrait,
-                traitNames: uniqueManualTraitNames
+                traitNames: uniqueManualTraitNames,
+                ...(createdAtOverride && { createdAt: createdAtOverride })
             }, tx as any);
 
             for (const plazaName of plazaNames) {

@@ -15,6 +15,7 @@ export interface CreateCharacterDTO {
   moral?: string;
   level?: string;
   traitNames: string[]; // Array de nombres de rasgos (Origen, Nacimiento, Extras)
+  createdAt?: Date;  // Optional backdate for migration (DD/MM/YYYY from user)
 }
 
 export class CharacterService {
@@ -130,17 +131,17 @@ export class CharacterService {
           name: data.name,
           level: initialLevel,
           // 🚀 SOLUCIÓN: Convertimos undefined a null para satisfacer a Prisma
-          fullName: data.fullName ?? null, 
-          age: data.age ?? null,           
-          moral: data.moral ?? null,       
-          
-          ryou: totalRyouBonus, 
+          fullName: data.fullName ?? null,
+          age: data.age ?? null,
+          moral: data.moral ?? null,
+
+          ryou: totalRyouBonus,
           rc: finalRcAtCreation,
           exp: totalExpBonus,
           sp: initialSp + totalSpBonus,
           // Base de cupos iniciales (15) + bonos de rasgos que otorguen cupos.
           cupos: CharacterService.BASE_INITIAL_CUPOS + totalCuposBonus,
-          
+
           // Apply direct stat bonuses from traits
           fuerza: statBonuses['fuerza'] || 0,
           resistencia: statBonuses['resistencia'] || 0,
@@ -149,7 +150,9 @@ export class CharacterService {
           chakra: statBonuses['chakra'] || 0,
           armas: statBonuses['armas'] || 0,
           inteligencia: statBonuses['inteligencia'] || 0,
-          
+
+          ...(data.createdAt ? { createdAt: data.createdAt } : {}),
+
           traits: {
             create: traits.map((t: any) => ({
               trait: { connect: { id: t.id } }

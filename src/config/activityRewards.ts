@@ -9,6 +9,8 @@ export interface RewardBreakdown {
   exp: number;
   pr: number;
   ryou: number;
+  rc?: number;
+  cupos?: number;
 }
 
 // Activity tier classification: AUTO = deterministic rewards, MANUAL = staff-set rewards
@@ -83,6 +85,24 @@ export const WEEKLY_CAPS = {
 
 // Combat and Curacion are mutually exclusive per week
 export const COMBAT_CURACION_EXCLUSIVE = true;
+
+// Mission caps (Feature 0)
+export const MISSION_WEEKLY_SLOTS = 5;
+export const MISSION_DAILY_LIMIT = 1;
+export const MISSION_SLOT_COST: Record<string, number> = {
+  D: 1, C: 1, B: 2, A: 3, S: 5
+};
+export const MISSION_MAX_RANK_BY_CARGO: Record<string, string> = {
+  Genin: 'D',
+  Chuunin: 'C',
+  'Tokubetsu Jounin': 'B',
+  Jounin: 'B',
+  ANBU: 'B',
+  Buntaichoo: 'A',
+  'Jounin Hanchou': 'A',
+  'Go-Ikenban': 'A',
+  Kage: 'S'
+};
 
 export interface LogroGeneralEntry {
   key: string;

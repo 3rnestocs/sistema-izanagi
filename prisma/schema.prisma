@@ -28,6 +28,8 @@ model Character {
   isNpc         Boolean   @default(false)
   isRetired     Boolean   @default(false)
   retiredAt     DateTime?
+  isExiled      Boolean   @default(false)    // Exiliados: acceso a misiones de su cargo o superior
+  imageUrl      String?                     // URL de imagen del personaje (para ficha)
   title         String?                     // Kage, Líder de Clan, Sannin (Coexisten con el Rank)
 
   // 💰 SISTEMA DE SUELDOS

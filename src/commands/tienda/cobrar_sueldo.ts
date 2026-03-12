@@ -9,6 +9,7 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { getFechaFromOption } from '../../utils/dateParser';
 
 const salaryService = new SalaryService(prisma);
 
@@ -24,7 +25,10 @@ async function publishPublicSalaryEmbed(
 
 export const data = new SlashCommandBuilder()
   .setName('cobrar_sueldo')
-  .setDescription('Cobra tu sueldo semanal como personaje');
+  .setDescription('Cobra tu sueldo semanal como personaje')
+  .addStringOption((o) =>
+    o.setName('fecha').setDescription('Fecha del cobro (DD/MM/YYYY). Opcional, para migración.').setRequired(false)
+  );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await executeWithErrorHandling(
@@ -42,13 +46,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       throw validationError('No tienes un personaje registrado. Usa `/registro` para crear uno.');
     }
 
+    const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+    if (fechaResult && 'error' in fechaResult) {
+      throw validationError(fechaResult.error);
+    }
+
     cleanupExpiredCooldowns();
     consumeCommandCooldown({
       commandName: COMMAND_NAMES.cobrar_sueldo,
       actorId: interaction.user.id
     });
 
-    const result = await salaryService.claimWeeklySalary(character.id);
+    const claimedAt = fechaResult && 'date' in fechaResult ? fechaResult.date : undefined;
+    const result = await salaryService.claimWeeklySalary(character.id, claimedAt);
 
     const embed = new EmbedBuilder()
       .setColor(0x00AA00)

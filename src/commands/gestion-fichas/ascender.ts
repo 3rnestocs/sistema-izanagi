@@ -6,8 +6,13 @@ import {
 import { prisma } from '../../lib/prisma';
 import { PromotionService } from '../../services/PromotionService';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
+import { getFechaFromOption } from '../../utils/dateParser';
 
 const promotionService = new PromotionService(prisma);
+
+function isInternalLevel(objective: string): boolean {
+  return /^[DCBAS][123]$/.test(objective) || objective === 'S2';
+}
 
 const TARGET_CHOICES: Array<{ name: string; value: string }> = [
   { name: 'Nivel D2', value: 'D2' },
@@ -37,7 +42,6 @@ const TARGET_CHOICES: Array<{ name: string; value: string }> = [
 export const data = new SlashCommandBuilder()
   .setName('ascender')
   .setDescription('Aplica un ascenso de nivel o cargo cuando los requisitos automáticos se cumplen.')
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
   .addUserOption((option) =>
     option
       .setName('usuario')
@@ -50,6 +54,12 @@ export const data = new SlashCommandBuilder()
       .setDescription('Nivel o cargo de destino')
       .setRequired(true)
       .addChoices(...TARGET_CHOICES)
+  )
+  .addStringOption((option) =>
+    option
+      .setName('fecha')
+      .setDescription('Fecha del ascenso (DD/MM/YYYY). Opcional.')
+      .setRequired(false)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -57,12 +67,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     interaction,
     'ascender',
     async (interaction) => {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-      throw new Error('⛔ Este comando es exclusivo de Staff.');
-    }
-
+    const isStaff = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
     const targetUser = interaction.options.getUser('usuario', true);
     const objective = interaction.options.getString('objetivo', true);
+
+    if (!isStaff && targetUser.id !== interaction.user.id) {
+      throw new Error('⛔ Solo puedes ascendarte a ti mismo. El staff puede ascender a otros.');
+    }
 
     const character = await prisma.character.findUnique({
       where: { discordId: targetUser.id },
@@ -73,17 +84,40 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       throw new Error(`⛔ ${targetUser.username} no tiene ficha registrada.`);
     }
 
-    const result = await promotionService.applyPromotion(character.id, 'level', objective);
+    const targetType = isInternalLevel(objective) ? 'level' : 'rank';
 
-    const response = [
+    if (targetType === 'level') {
+      const check = await promotionService.checkLevelRequirements(character.id, objective);
+      if (!check.passed) {
+        throw new Error(`⛔ No cumples los requisitos: ${check.reason ?? 'Revisa con /validar_ascenso.'}`);
+      }
+    } else {
+      const check = await promotionService.checkRankRequirements(character.id, objective);
+      if (!check.passed) {
+        throw new Error(`⛔ No cumples los requisitos para este cargo: ${check.reason ?? 'Revisa con /validar_ascenso.'}`);
+      }
+    }
+
+    const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+    if (fechaResult && 'error' in fechaResult) {
+      throw new Error(`⛔ ${fechaResult.error}`);
+    }
+    const promotedAt = fechaResult && 'date' in fechaResult ? fechaResult.date : undefined;
+
+    const result = await promotionService.applyPromotion(character.id, targetType, objective, promotedAt);
+
+    const responseLines = [
       '✅ Ascenso aplicado correctamente.',
       `👤 Personaje: **${character.name}**`,
       `🎯 Objetivo: **${objective}**`,
       `📈 Nivel Anterior: **${character.level}**`,
       `🏷️ Cargo Anterior: **${character.rank}**`
-    ].join('\n');
+    ];
+    if (result.spGranted !== undefined) {
+      responseLines.push(`✨ SP otorgados: **+${result.spGranted}**`);
+    }
 
-    return interaction.editReply(response);
+    return interaction.editReply(responseLines.join('\n'));
     },
     {
       defer: { ephemeral: true },

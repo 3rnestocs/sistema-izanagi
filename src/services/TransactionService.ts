@@ -3,11 +3,13 @@ import { PrismaClient, Prisma } from '@prisma/client';
 export interface BuyDTO {
   characterId: string;
   itemNames: string[]; // Ej: ["Kunai", "Shuriken", "Kunai"] (Se apilarán)
+  createdAt?: Date; // Optional backdate for migration
 }
 
 export interface SellDTO {
   characterId: string;
   itemNames: string[]; // Lo que desea vender
+  createdAt?: Date; // Optional backdate for migration
 }
 
 export interface SellResult {
@@ -21,6 +23,7 @@ export interface TransferDTO {
   receiverId: string;
   itemNames: string[];
   ryouAmount?: number | undefined; // 🚀 Agregamos '| undefined' para satisfacer al compilador
+  createdAt?: Date; // Optional backdate for migration
 }
 
 export class TransactionService {
@@ -111,7 +114,8 @@ export class TransactionService {
           evidence: "Sistema de Transacciones",
           deltaRyou: -costs.RYOU,
           deltaExp: -costs.EXP,
-          deltaPr: -costs.PR
+          deltaPr: -costs.PR,
+          ...(data.createdAt && { createdAt: data.createdAt })
         }
       });
 
@@ -205,7 +209,8 @@ export class TransactionService {
           category: 'Venta (Mercado)',
           detail: `Vendió: ${itemNames}. Ganancia: ${totalRyouGained} Ryou.`,
           evidence: 'Sistema de Transacciones',
-          deltaRyou: totalRyouGained
+          deltaRyou: totalRyouGained,
+          ...(data.createdAt && { createdAt: data.createdAt })
         }
       });
 
@@ -282,6 +287,7 @@ export class TransactionService {
       // 4. Logs Cruzados
       const itemsLog = (data.itemNames && data.itemNames.length > 0) ? data.itemNames.join(", ") : "Ningún objeto";
       const moneyLog = transferAmount > 0 ? ` y ${transferAmount} Ryou` : "";
+      const auditBase = data.createdAt ? { createdAt: data.createdAt } : {};
 
       await tx.auditLog.create({
         data: {
@@ -289,7 +295,8 @@ export class TransactionService {
           category: "Intercambio",
           detail: `Transfirió a [${data.receiverId}]: ${itemsLog}${moneyLog}`,
           evidence: "Sistema de Transacciones",
-          deltaRyou: -transferAmount
+          deltaRyou: -transferAmount,
+          ...auditBase
         }
       });
 
@@ -299,7 +306,8 @@ export class TransactionService {
           category: "Intercambio",
           detail: `Recibió de [${sender.id}]: ${itemsLog}${moneyLog}`,
           evidence: "Sistema de Transacciones",
-          deltaRyou: transferAmount
+          deltaRyou: transferAmount,
+          ...auditBase
         }
       });
 

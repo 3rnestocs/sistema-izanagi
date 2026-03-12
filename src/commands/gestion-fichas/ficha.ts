@@ -252,7 +252,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const statsEmbed = new EmbedBuilder()
       .setColor(0x0099FF)
       .setTitle(`📋 Ficha de ${character.name}`)
-      .setDescription(`${character.fullName ?? 'Nombre completo no especificado'} (${ageText})`)
+      .setDescription(`${character.fullName ?? 'Nombre completo no especificado'} (${ageText})`);
+    if (character.imageUrl) {
+      statsEmbed.setThumbnail(character.imageUrl);
+    }
+    statsEmbed
       .addFields(
         {
           name: '🎖️ Rango y Cargo',
@@ -310,14 +314,24 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       })
       .setTimestamp();
 
-    const deleteButton = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    const isOwner = targetUser.id === interaction.user.id;
+    const buttons: ButtonBuilder[] = [
       new ButtonBuilder()
         .setCustomId(`ficha_delete:${interaction.user.id}`)
         .setLabel('Eliminar mensaje')
         .setStyle(ButtonStyle.Secondary)
-    );
+    ];
+    if (isOwner) {
+      buttons.push(
+        new ButtonBuilder()
+          .setCustomId(`ficha_change_image:${character.id}`)
+          .setLabel('Cambiar imagen')
+          .setStyle(ButtonStyle.Secondary)
+      );
+    }
+    const row = new ActionRowBuilder<ButtonBuilder>().addComponents(buttons);
 
-    return interaction.reply({ embeds: [statsEmbed], components: [deleteButton], ephemeral: false });
+    return interaction.reply({ embeds: [statsEmbed], components: [row], ephemeral: false });
   } catch (error: unknown) {
     await handleCommandError(error, interaction, {
       commandName: 'ficha',

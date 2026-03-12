@@ -16,6 +16,7 @@ import { formatChannelReference } from '../../utils/channelRefs';
 import { ActivityStatus, ActivityType } from '../../domain/activityDomain';
 import { getHistoricalNarrationRewards, HISTORICAL_NARRATIONS, NARRATION_PREFIX_BY_TYPE } from '../../config/historicalNarrations';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { getFechaFromOption } from '../../utils/dateParser';
 import {
     ACTIVITY_TIER,
     LOGRO_GENERAL_CATALOG,
@@ -123,6 +124,9 @@ export const data = new SlashCommandBuilder()
                             .setRequired(true)
                             .addChoices(...RESULTADO_MISION_CHOICES)
                     )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
+                    )
             )
             .addSubcommand((sc) =>
                 sc
@@ -144,6 +148,9 @@ export const data = new SlashCommandBuilder()
                             .setDescription('Victoria, Derrota o Empate')
                             .setRequired(true)
                             .addChoices(...RESULTADO_COMBATE_CHOICES)
+                    )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
                     )
             )
     )
@@ -172,6 +179,9 @@ export const data = new SlashCommandBuilder()
                             .setAutocomplete(true)
                             .setRequired(false)
                     )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
+                    )
             )
             .addSubcommand((sc) =>
                 sc
@@ -194,6 +204,9 @@ export const data = new SlashCommandBuilder()
                             .setAutocomplete(true)
                             .setRequired(false)
                     )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
+                    )
             )
             .addSubcommand((sc) =>
                 sc
@@ -214,6 +227,9 @@ export const data = new SlashCommandBuilder()
                     )
                     .addIntegerOption((o) =>
                         o.setName('ryou').setDescription('Ryou reclamado (opcional)').setRequired(false).setMinValue(0)
+                    )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
                     )
             )
     )
@@ -244,6 +260,9 @@ export const data = new SlashCommandBuilder()
                     .addIntegerOption((o) =>
                         o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
                     )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
+                    )
             )
             .addSubcommand((sc) =>
                 sc
@@ -260,6 +279,9 @@ export const data = new SlashCommandBuilder()
                     )
                     .addIntegerOption((o) =>
                         o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+                    )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
                     )
             )
             .addSubcommand((sc) =>
@@ -285,6 +307,9 @@ export const data = new SlashCommandBuilder()
                     .addIntegerOption((o) =>
                         o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
                     )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
+                    )
             )
     )
     .addSubcommandGroup((group) =>
@@ -304,6 +329,9 @@ export const data = new SlashCommandBuilder()
                             .setDescription('Balance General del catálogo (opcional)')
                             .setAutocomplete(true)
                             .setRequired(false)
+                    )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
                     )
             )
             .addSubcommand((sc) =>
@@ -330,6 +358,9 @@ export const data = new SlashCommandBuilder()
                     .addIntegerOption((o) =>
                         o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)
                     )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
+                    )
             )
             .addSubcommand((sc) =>
                 sc
@@ -345,6 +376,9 @@ export const data = new SlashCommandBuilder()
                             .setRequired(true)
                             .addChoices(...SEVERIDAD_CHOICES)
                     )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
+                    )
             )
             .addSubcommand((sc) =>
                 sc
@@ -352,6 +386,9 @@ export const data = new SlashCommandBuilder()
                     .setDescription('Registrar desarrollo personal')
                     .addStringOption((o) =>
                         o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
+                    )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
                     )
             )
             .addSubcommand((sc) =>
@@ -369,6 +406,9 @@ export const data = new SlashCommandBuilder()
                     )
                     .addIntegerOption((o) =>
                         o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+                    )
+                    .addStringOption((o) =>
+                        o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY). Opcional.').setRequired(false)
                     )
             )
     );
@@ -481,6 +521,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             const claimedExp = interaction.options.getInteger('exp');
             const claimedPr = interaction.options.getInteger('pr');
             const claimedRyou = interaction.options.getInteger('ryou');
+            const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+            if (fechaResult && 'error' in fechaResult) {
+                throw validationError(fechaResult.error);
+            }
+            const createdAtOverride = fechaResult && 'date' in fechaResult ? fechaResult.date : undefined;
 
             const valorRangoPersistido = tipo === ActivityType.CURACION ? severidad : rango;
             const isNarration =
@@ -554,7 +599,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 }
             }
 
-            await activityCapService.enforceWeeklyCaps(character.id, tipo);
+            const capOptions =
+                tipo === ActivityType.MISION && rango
+                    ? {
+                          character: { rank: character.rank, isExiled: character.isExiled },
+                          missionRank: rango,
+                          ...(createdAtOverride !== undefined ? { createdAtOverride } : {})
+                      }
+                    : undefined;
+            const capResult = await activityCapService.enforceWeeklyCaps(
+                character.id,
+                tipo,
+                capOptions
+            );
 
             cleanupExpiredCooldowns();
             consumeCommandCooldown({
@@ -570,6 +627,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 rank: valorRangoPersistido,
                 result: resultado,
                 evidenceUrl: evidencia,
+                ...(createdAtOverride ? { createdAt: createdAtOverride } : {}),
                 ...(selectedCatalogKey ? { narrationKey: selectedCatalogKey } : {}),
                 ...(isManualType && claimedExp !== null && claimedExp !== undefined
                     ? {
@@ -596,13 +654,17 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 );
 
                 await prisma.$transaction(async (tx: any) => {
+                    const updateData: Record<string, { increment: number }> = {
+                        exp: { increment: rewards.exp },
+                        pr: { increment: rewards.pr },
+                        ryou: { increment: rewards.ryou }
+                    };
+                    if (rewards.rc && rewards.rc > 0) updateData.rc = { increment: rewards.rc };
+                    if (rewards.cupos && rewards.cupos > 0) updateData.cupos = { increment: rewards.cupos };
+
                     await tx.character.update({
                         where: { id: character.id },
-                        data: {
-                            exp: { increment: rewards.exp },
-                            pr: { increment: rewards.pr },
-                            ryou: { increment: rewards.ryou }
-                        }
+                        data: updateData
                     });
 
                     await tx.activityRecord.update({
@@ -610,15 +672,23 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                         data: { status: ActivityStatus.AUTO_APROBADO }
                     });
 
+                    const auditData: Record<string, number> = {
+                        deltaExp: rewards.exp,
+                        deltaPr: rewards.pr,
+                        deltaRyou: rewards.ryou
+                    };
+                    if (rewards.rc && rewards.rc > 0) auditData.deltaRc = rewards.rc;
+                    if (rewards.cupos && rewards.cupos > 0) auditData.deltaCupos = rewards.cupos;
+
                     await tx.auditLog.create({
                         data: {
                             characterId: character.id,
                             category: 'Registro Automático de Actividad',
-                            detail: `Actividad ${tipo} auto-aprobada. Recompensas: EXP=${rewards.exp}, PR=${rewards.pr}, Ryou=${rewards.ryou}`,
+                            detail: `Actividad ${tipo} auto-aprobada. Recompensas: EXP=${rewards.exp}, PR=${rewards.pr}, Ryou=${rewards.ryou}` +
+                                (rewards.rc ? `, RC=${rewards.rc}` : '') +
+                                (rewards.cupos ? `, Cupos=${rewards.cupos}` : ''),
                             evidence: evidencia,
-                            deltaExp: rewards.exp,
-                            deltaPr: rewards.pr,
-                            deltaRyou: rewards.ryou
+                            ...auditData
                         }
                     });
                 });
@@ -626,7 +696,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 const rewardLines = [
                     `✨ EXP: +${rewards.exp}`,
                     `🏆 PR: +${rewards.pr}`,
-                    `🪙 Ryou: +${rewards.ryou}`
+                    `🪙 Ryou: +${rewards.ryou}`,
+                    ...(rewards.rc && rewards.rc > 0 ? [`📜 RC: +${rewards.rc}`] : []),
+                    ...(rewards.cupos && rewards.cupos > 0 ? [`📋 Cupos: +${rewards.cupos}`] : [])
                 ].join('\n');
 
                 const activitySummary = [
@@ -657,7 +729,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                         },
                         {
                             name: 'CONCLUSIÓN',
-                            value: 'Los recursos han sido acreditados a tu ficha de manera inmediata.',
+                            value: 'Los recursos han sido acreditados a tu ficha de manera inmediata.' +
+                                (capResult?.slotsRemaining !== undefined
+                                    ? `\n📋 Cupos de misión restantes esta semana: ${capResult.slotsRemaining}`
+                                    : ''),
                             inline: false
                         }
                     )
@@ -678,7 +753,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             const projectedRewardLines = [
                 `✨ EXP: +${projectedRewards.exp}`,
                 `🏆 PR: +${projectedRewards.pr}`,
-                `🪙 Ryou: +${projectedRewards.ryou}`
+                `🪙 Ryou: +${projectedRewards.ryou}`,
+                ...(projectedRewards.rc && projectedRewards.rc > 0 ? [`📜 RC: +${projectedRewards.rc}`] : []),
+                ...(projectedRewards.cupos && projectedRewards.cupos > 0 ? [`📋 Cupos: +${projectedRewards.cupos}`] : [])
             ].join('\n');
 
             const pendingSummary = [

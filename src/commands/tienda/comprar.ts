@@ -5,6 +5,7 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { getFechaFromOption } from '../../utils/dateParser';
 
 const transactionService = new TransactionService(prisma);
 
@@ -15,6 +16,11 @@ export const data = new SlashCommandBuilder()
         opt.setName('items')
            .setDescription('Nombres de los objetos separados por comas (Ej: Kunai, Shuriken, Píldora)')
            .setRequired(true)
+    )
+    .addStringOption(opt =>
+        opt.setName('fecha')
+           .setDescription('Fecha de la compra (DD/MM/YYYY). Opcional.')
+           .setRequired(false)
     );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -41,6 +47,11 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             throw validationError('Debes escribir al menos un objeto válido.');
         }
 
+        const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+        if (fechaResult && 'error' in fechaResult) {
+            throw validationError(fechaResult.error);
+        }
+
         cleanupExpiredCooldowns();
         consumeCommandCooldown({
             commandName: COMMAND_NAMES.comprar,
@@ -50,7 +61,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         // 3. Ejecutar la transacción atómica
         const resultado = await transactionService.buyItems({
             characterId: character.id,
-            itemNames: itemNames
+            itemNames: itemNames,
+            ...(fechaResult && 'date' in fechaResult ? { createdAt: fechaResult.date } : {})
         });
 
         // 4. Reporte de éxito

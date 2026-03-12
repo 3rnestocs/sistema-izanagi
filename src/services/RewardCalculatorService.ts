@@ -315,7 +315,9 @@ export class RewardCalculatorService {
     return {
       exp: Math.floor(rewards.exp * expMultiplier),
       pr: Math.floor(rewards.pr * prMultiplier),
-      ryou: Math.floor(rewards.ryou * ryouMultiplier)
+      ryou: Math.floor(rewards.ryou * ryouMultiplier),
+      ...(rewards.rc !== undefined && rewards.rc > 0 ? { rc: rewards.rc } : {}),
+      ...(rewards.cupos !== undefined && rewards.cupos > 0 ? { cupos: rewards.cupos } : {})
     };
   }
 }
