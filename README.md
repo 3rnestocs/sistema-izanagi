@@ -25,18 +25,35 @@ DATABASE_URL="postgresql://user:password@localhost:5432/izanagi"
 DISCORD_TOKEN="your-bot-token"
 CLIENT_ID="your-discord-app-id"
 GUILD_ID="your-test-server-id"
-REGISTRO_SUCESOS_FORUM_ID="#🎯-registro-actividades"
 ```
+
+**Forum IDs** (use actual Discord channel IDs, not names):
+
+```env
+# Where /registro, /ficha, /invertir_sp, etc. run (gestion-de-fichas)
+GESTION_FORUM_ID="1234567890123456789"
+
+# Where users upload character builds for staff approval (e.g. #🛠️-registro-builds). Staff reacts with ✅ to approve.
+BUILD_APPROVAL_FORUM_ID="1234567890123456790"
+
+# Where /registrar_suceso runs (registro-de-sucesos)
+REGISTRO_SUCESOS_FORUM_ID="1234567890123456791"
+
+# Where /comprar, /vender, /transferir, /cobrar_sueldo run (tienda)
+TIENDA_FORUM_ID="1234567890123456792"
+```
+
+**Note:** `GESTION_FORUM_ID` and `BUILD_APPROVAL_FORUM_ID` are different: the first is for running ficha commands; the second is where players post their builds for approval before using `/registro`.
 
 Optional advanced channel routing:
 
 ```env
 # Comma-separated forum IDs used as fallback for player commands
-PLAYER_FORUM_CHANNEL_IDS="123456789012345678,234567890123456789"
+PLAYER_FORUM_CHANNEL_IDS="1234567890123456789,1234567890123456791"
 
 # Command-specific forum map: commandName:forumId|forumId;otherCommand:forumId
-# Forums: gestion-de-fichas, registro-de-sucesos, tienda
-PLAYER_COMMAND_FORUM_MAP="registro:GESTION_FORUM_ID;ficha:GESTION_FORUM_ID;invertir_sp:GESTION_FORUM_ID;otorgar_habilidad:GESTION_FORUM_ID;retirar_habilidad:GESTION_FORUM_ID;otorgar_rasgo:GESTION_FORUM_ID;ascender:GESTION_FORUM_ID;validar_ascenso:GESTION_FORUM_ID;rechazar_registro:GESTION_FORUM_ID;catalogo:GESTION_FORUM_ID;listar:GESTION_FORUM_ID;registrar_suceso:REGISTRO_SUCESOS_FORUM_ID;comprar:TIENDA_FORUM_ID;vender:TIENDA_FORUM_ID;transferir:TIENDA_FORUM_ID;cobrar_sueldo:TIENDA_FORUM_ID;tienda:TIENDA_FORUM_ID;listar_tienda:TIENDA_FORUM_ID;npc:GESTION_FORUM_ID;ajustar_recursos:GESTION_FORUM_ID"
+# Use actual numeric IDs (same as GESTION_FORUM_ID, REGISTRO_SUCESOS_FORUM_ID, TIENDA_FORUM_ID)
+PLAYER_COMMAND_FORUM_MAP="registro:1234567890123456789;ficha:1234567890123456789;..."
 ```
 
 ### 3. Prepare database
@@ -96,6 +113,7 @@ npm run dev
 - `/listar_tienda` — List store (staff)
 
 ### Staff Commands
+- `/bienvenida` — Send the welcome embed message to the current channel
 - `/npc` — NPC management
 - `/ajustar_recursos` — Adjust character resources
 

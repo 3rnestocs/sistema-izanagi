@@ -26,7 +26,7 @@ import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandErro
 const characterService = new CharacterService(prisma);
 const plazaService = new PlazaService(prisma);
 const buildApprovalService = new BuildApprovalService(prisma);
-const APPROVAL_CHANNEL_REFERENCE = formatChannelReference(process.env.GESTION_FORUM_ID, '#🛠️-registro-builds');
+const APPROVAL_CHANNEL_REFERENCE = formatChannelReference(process.env.BUILD_APPROVAL_FORUM_ID, '#🛠️-registro-builds');
 
 const CLAN_TRAIT_RC_BONUSES: Array<{ plazaName: string; traitName: string; bonusRc: number }> = [
     { plazaName: 'Akimichi Ichizoku', traitName: 'Lento', bonusRc: 2 },

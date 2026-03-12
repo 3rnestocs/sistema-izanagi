@@ -10,7 +10,7 @@ import { getRegistrarSucesoForumIds } from './utils/channelGuards';
 let commands: Collection<string, Command>;
 const buildApprovalService = new BuildApprovalService(prisma);
 const activityApprovalService = new ActivityApprovalService(prisma);
-const GESTION_FORUM_ID = process.env.GESTION_FORUM_ID;
+const BUILD_APPROVAL_FORUM_ID = process.env.BUILD_APPROVAL_FORUM_ID;
 
 const client = new Client({
     intents: [
@@ -36,8 +36,13 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         const member = await reaction.message.guild.members.fetch(user.id);
         if (!member.permissions.has(PermissionFlagsBits.Administrator)) return;
 
-        // Build approval: specific channel
-        if (GESTION_FORUM_ID && reaction.message.channelId === GESTION_FORUM_ID) {
+        // Build approval: forum where users upload character builds (threads) or standalone channel
+        const channel = reaction.message.channel;
+        const isBuildApprovalChannel =
+            BUILD_APPROVAL_FORUM_ID &&
+            (reaction.message.channelId === BUILD_APPROVAL_FORUM_ID ||
+                (channel?.isThread?.() && channel.parentId === BUILD_APPROVAL_FORUM_ID));
+        if (isBuildApprovalChannel) {
             const fullMessage = await reaction.message.fetch();
             await buildApprovalService.upsertApprovalFromMessage(fullMessage, user.id);
             console.log(`✅ Build aprobado desde reacción en mensaje ${reaction.message.id}`);
@@ -45,7 +50,6 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         }
 
         // Activity approval: forum threads for registrar_suceso
-        const channel = reaction.message.channel;
         if (channel?.isThread?.() && channel.parentId) {
             const activityForumIds = getRegistrarSucesoForumIds();
             if (activityForumIds.includes(channel.parentId)) {
@@ -71,8 +75,13 @@ client.on(Events.MessageReactionRemove, async (reaction, user) => {
         if (reaction.message.partial) await reaction.message.fetch();
 
         if (reaction.emoji.name !== '✅') return;
-        if (!GESTION_FORUM_ID) return;
-        if (reaction.message.channelId !== GESTION_FORUM_ID) return;
+        if (!BUILD_APPROVAL_FORUM_ID) return;
+
+        const ch = reaction.message.channel;
+        const isBuildApproval =
+            reaction.message.channelId === BUILD_APPROVAL_FORUM_ID ||
+            (ch?.isThread?.() && ch.parentId === BUILD_APPROVAL_FORUM_ID);
+        if (!isBuildApproval) return;
         if (!reaction.message.guild) return;
 
         const users = await reaction.users.fetch();
