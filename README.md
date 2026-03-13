@@ -117,7 +117,6 @@ npm run dev
 - `/retirar_habilidad` — Revoke ability (staff)
 - `/otorgar_rasgo` — Grant trait (staff)
 - `/ascender` — Promote (staff)
-- `/validar_ascenso` — Validate promotion (staff)
 - `/rechazar_registro` — Reject registration (staff)
 - `/catalogo` — Browse catalog
 - `/listar` — List characters (staff)

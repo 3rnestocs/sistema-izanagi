@@ -42,7 +42,6 @@ Player commands:
 - `/tienda`
 - `/transferir`
 - `/cobrar_sueldo`
-- `/validar_ascenso`
 
 Staff/Admin commands:
 - `/ascender`

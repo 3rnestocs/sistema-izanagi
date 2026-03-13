@@ -22,7 +22,6 @@ export const COMMAND_NAMES = {
   retirar_habilidad: 'retirar_habilidad',
   tienda: 'tienda',
   transferir: 'transferir',
-  validar_ascenso: 'validar_ascenso',
   vender: 'vender'
 } as const;
 

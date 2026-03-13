@@ -87,7 +87,6 @@ sistema-izanagi/
 │   │   │   ├── retirar_habilidad.ts   # Staff: revoke skill
 │   │   │   ├── otorgar_rasgo.ts   # Staff: assign/remove traits
 │   │   │   ├── ascender.ts        # Staff: promote character
-│   │   │   ├── validar_ascenso.ts # Staff: validate promotion
 │   │   │   ├── rechazar_registro.ts   # Staff: reject registration
 │   │   │   ├── catalogo.ts        # Player: browse catalog
 │   │   │   ├── listar.ts          # Staff: list characters
