@@ -693,6 +693,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                           ]
                         : []),
                     ...(resultado ? [`**Resultado:** ${resultado}`] : []),
+                    `**Fecha:** ${interaction.options.getString('fecha', true)}`,
                     `**Evidencia:** [Ver Prueba](${evidencia})`
                 ].join('\n');
 
@@ -752,6 +753,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                       ]
                     : []),
                 ...(resultado ? [`**Resultado:** ${resultado}`] : []),
+                `**Fecha:** ${interaction.options.getString('fecha', true)}`,
                 `**Evidencia:** [Ver Prueba](${evidencia})`
             ].join('\n');
 
