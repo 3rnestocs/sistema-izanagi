@@ -13,9 +13,11 @@ Last updated: March 9, 2026
 ```text
 src/
   commands/      Slash commands (player + staff)
+  config/        Static rules, rewards, and command name mappings
+  database/      Seed scripts and migration backfills
+  domain/        Domain logic and types (e.g., activity models)
   services/      Business rules and transactional logic
-  lib/           Prisma client and command loader
-  utils/         Error handling and channel guards
+  utils/         Guards, throttles, date parsing, and error handling
 prisma/
   schema.prisma
   seed-data/     JSON seed sources
@@ -33,6 +35,7 @@ prisma/
 Player commands:
 - `/registro`
 - `/ficha`
+- `/historial`
 - `/registrar_suceso`
 - `/comprar`
 - `/vender`
@@ -52,19 +55,27 @@ Staff/Admin commands:
 - `/catalogo`
 - `/listar`
 - `/npc` (crear/listar/retirar)
+- `/bienvenida`
 
 ## Service Map
 
+Core Services:
 - `CharacterService`: Character creation and trait management.
 - `PlazaService`: Plaza assignment/removal and inheritance handling.
+- `PlazaInheritanceResolver`: Dedicated service for recursive child-plaza logic.
 - `PromotionService`: Rank/level validation and promotions.
 - `SalaryService`: Weekly salary, cooldown, and modifiers.
 - `TransactionService`: Buy/sell/transfer economy operations.
-- `RewardCalculatorService`: Activity reward calculations with multipliers.
 - `StatValidatorService`: SP investment and stat caps/rules.
 - `SkillRankValidator`: Skill rank progression constraints.
-- `BuildApprovalService`: Build approval flow support.
+- `TraitRuleService`: Specialized trait mechanics validation.
+
+Activity & Admin Services:
 - `ActivityApprovalService`: Activity approval by staff reaction (checkmark).
+- `ActivityCapService`: Enforces weekly limits (e.g., combats vs. curations).
+- `RewardCalculatorService`: Activity reward calculations with multipliers.
+- `BuildApprovalService`: Build approval flow support.
+- `ResourceAdjustmentService`: Manual adjustments by staff.
 - `NpcService`: NPC lifecycle (create/list/retire with soft-retire).
 
 ## Useful Commands

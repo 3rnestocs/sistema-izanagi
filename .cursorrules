@@ -1,0 +1,32 @@
+# Sistema IZANAGI - AI Assistant Guidelines
+
+## 1. Project Context & Tech Stack
+- **Domain:** Discord bot managing a roleplay community (stats, economy, inventory, progression).
+- **Language:** TypeScript (Strict mode enabled).
+- **Framework:** discord.js (^14.25.1) using Slash Commands.
+- **Database:** PostgreSQL via Prisma ORM (^7.4.1) utilizing `@prisma/adapter-pg`.
+
+## 2. Architectural Boundaries (Strict Enforcement)
+This project uses a Layered Monolith pattern. Do not mix responsibilities.
+- **Commands (`src/commands/`):** Responsible ONLY for parsing Discord interaction options into DTOs and formatting the final Discord embed/reply. NO business logic.
+- **Services (`src/services/`):** Responsible for ALL business logic, mathematical calculations, rule validation, and database interactions.
+- **Data Access (`src/lib/prisma.ts`):** The Prisma client is a module-level singleton. Services receive it via injection or direct import.
+
+## 3. Core Business & Database Rules
+- **ACID Transactions:** ANY mutation involving multiple records (e.g., economy transfers, item purchases, stat investments) MUST use Prisma `$transaction`. No partial updates allowed.
+- **Audit Trails:** Data mutations must seamlessly create an `AuditLog` record detailing resource deltas within the same transaction.
+- **Stat Calculations:** Respect the canonical mechanics. Chakra is formatted as `scale/cap (+external)`. Nacimiento traits apply as index `gradations`, not flat points. 
+- **Localization:** Code infrastructure, variables, and typings should default to English. User-facing outputs (embeds, error messages) and domain-specific RP terms (Ryou, PR, ficha, plazas, keko) MUST be in Spanish.
+
+## 4. AI Output & Optimization Directives
+- **Economy:** Be concise: minimal prose, targeted code, cite don't copy, one question = one focused answer.
+- **Zero Boilerplate:** Do not explain basic TypeScript, Prisma, or Discord.js concepts. Give me the code.
+- **Targeted Scope:** If asked to fix a calculation, modify only the relevant Service. Do not output the UI/Command layer unless requested.
+- **Template Mimicry:** When creating new commands, use existing commands (like `comprar.ts` or `registro.ts`) as structural templates to maintain consistency.
+- **Brevity:** Prefer short, direct answers. Omit preamble ("Sure, I'll help…"), recaps of the request, and step-by-step narration unless teaching or debugging.
+- **Code Scope:** When editing, output only the changed regions (diffs/snippets). Do not reprint full files unless requested.
+- **Verify Before Answering:** For "how does X work?" or "where is Y?", search/grep the codebase first. Cite `path:line` when referencing code; do not speculate.
+- **No Redundant Confirmation:** Do not restate the full request before acting. Do not list "here's what I did" unless multiple files or non-obvious decisions.
+- **Single Focus:** Answer the one thing asked. Omit "you might also want to…" unless the user asks for suggestions.
+- **Point, Don't Repeat:** Prefer pointing to existing docs (`ARCHITECTURE.md`, `QUICK_REFERENCE.md`) or code locations instead of inlining long explanations.
+- **Narrow Tool Use:** Prefer targeted reads (file + line range) and grep/search over reading whole files when looking for a pattern.

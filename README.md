@@ -1,12 +1,12 @@
-# Sistema IZANAGI V2
+# Sistema IZANAGI
 
 Discord bot + PostgreSQL backend for Naruto RP character, economy, progression, and activity management.
 
 ## Current Canonical Docs
 
-- `ARCHITECTURE.md` - System architecture, domain model, migration context.
-- `planning_logs/QUICK_REFERENCE.md` - Operational command/service cheat sheet.
-- `planning_logs/CHAKRA_NACIMIENTO_RULES_UPDATE.md` - Chakra/Nacimiento rules specification.
+- `docs/ARCHITECTURE.md` — Architecture baseline, domain model, gaps/risks, and recommendations.
+- `docs/QUICK_REFERENCE.md` — Operational command/service cheat sheet.
+- `docs/CHAKRA_NACIMIENTO_RULES_UPDATE.md` — Chakra/Nacimiento rules specification.
 
 ## Setup
 
@@ -49,19 +49,31 @@ TIENDA_FORUM_ID="1234567890123456792"
 Optional advanced channel routing:
 
 ```env
-# Comma-separated forum IDs used as fallback for player commands
+# Comma-separated forum IDs where player commands are allowed (fallback if PLAYER_COMMAND_FORUM_MAP not set)
 PLAYER_FORUM_CHANNEL_IDS="1234567890123456789,1234567890123456791"
+
+# Comma-separated role IDs allowed to run commands in player channels
+PLAYER_ALLOWED_ROLE_IDS="1234567890123456789"
 
 # Command-specific forum map: commandName:forumId|forumId;otherCommand:forumId
 # Use actual numeric IDs (same as GESTION_FORUM_ID, REGISTRO_SUCESOS_FORUM_ID, TIENDA_FORUM_ID)
 PLAYER_COMMAND_FORUM_MAP="registro:1234567890123456789;ficha:1234567890123456789;..."
 ```
 
-Optional feature flags:
+Optional staff / feature flags:
 
 ```env
-# Mission rank limits by character cargo (Genin→D, Chuunin→C, etc.). Set to false if your rol uses different rank names and you want any character to register any mission rank.
+# Comma-separated role IDs allowed to run staff-only commands (e.g. /otorgar_habilidad, /ascender)
+STAFF_ALLOWED_ROLE_IDS="1234567890123456789"
+
+# Optional: single user ID allowed to run /bienvenida
+BIENVENIDA_ALLOWED_USER_ID="1234567890123456789"
+
+# Mission rank limits by character cargo (Genin→D, Chuunin→C, etc.). Set to false if your rol uses different rank names.
 ENABLE_MISSION_RANK_LIMITS="true"
+
+# Require character flag canCreateNPC to use NPC commands (default false)
+NPC_REQUIRE_CAN_CREATE="false"
 ```
 
 ### 3. Prepare database
@@ -99,6 +111,7 @@ npm run dev
 ### Gestion de Fichas (#gestion-de-fichas)
 - `/registro` — Create character
 - `/ficha` — View character
+- `/historial` — Character history
 - `/invertir_sp` — Spend SP
 - `/otorgar_habilidad` — Grant ability (staff)
 - `/retirar_habilidad` — Revoke ability (staff)
@@ -127,7 +140,6 @@ npm run dev
 
 ## Notes
 
-- `src/events/` is currently empty; command flow is handled by interaction routing in `src/index.ts`.
 - Seed data is JSON-based under `prisma/seed-data/`.
 - High-risk player commands include in-memory anti-spam cooldowns: `/registrar_suceso`, `/comprar`, `/vender`, `/transferir`, `/cobrar_sueldo`.
 - Commands are organized in subfolders under `src/commands/`: `gestion-fichas/`, `registro-sucesos/`, `tienda/`, `staff/`.
