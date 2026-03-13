@@ -240,13 +240,13 @@ export const data = new SlashCommandBuilder()
                     .setRequired(true)
             )
             .addIntegerOption((o) =>
-                o.setName('exp').setDescription('EXP (si el logro es manual)').setRequired(false).setMinValue(0)
+                o.setName('exp').setDescription('EXP (solo para logros de excepción manual)').setRequired(false).setMinValue(0)
             )
             .addIntegerOption((o) =>
-                o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
+                o.setName('pr').setDescription('PR (solo para logros de excepción manual)').setRequired(false).setMinValue(0)
             )
             .addIntegerOption((o) =>
-                o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+                o.setName('ryou').setDescription('Ryou (solo para logros de excepción manual)').setRequired(false).setMinValue(0)
             )
     )
     .addSubcommand((sc) =>
@@ -286,15 +286,6 @@ export const data = new SlashCommandBuilder()
                     .setAutocomplete(true)
                     .setRequired(true)
             )
-            .addIntegerOption((o) =>
-                o.setName('exp').setDescription('EXP (si el logro es manual)').setRequired(false).setMinValue(0)
-            )
-            .addIntegerOption((o) =>
-                o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
-            )
-            .addIntegerOption((o) =>
-                o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
-            )
     )
     .addSubcommand((sc) =>
         sc
@@ -312,6 +303,24 @@ export const data = new SlashCommandBuilder()
                     .setDescription('Balance General del catálogo (opcional)')
                     .setAutocomplete(true)
                     .setRequired(false)
+            )
+            .addIntegerOption((o) =>
+                o.setName('exp').setDescription('EXP (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('rc').setDescription('RC (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('cupos').setDescription('Cupos de habilidad (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('bts').setDescription('Bonos de Técnica Superior (opcional)').setRequired(false).setMinValue(0)
             )
     )
     .addSubcommand((sc) =>
@@ -389,6 +398,15 @@ export const data = new SlashCommandBuilder()
             )
             .addIntegerOption((o) =>
                 o.setName('ryou').setDescription('Ryou (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('rc').setDescription('RC (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('cupos').setDescription('Cupos de habilidad (opcional)').setRequired(false).setMinValue(0)
+            )
+            .addIntegerOption((o) =>
+                o.setName('bts').setDescription('Bonos de Técnica Superior (opcional)').setRequired(false).setMinValue(0)
             )
     );
 
@@ -500,6 +518,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             const claimedExp = interaction.options.getInteger('exp');
             const claimedPr = interaction.options.getInteger('pr');
             const claimedRyou = interaction.options.getInteger('ryou');
+            const claimedRc = interaction.options.getInteger('rc');
+            const claimedCupos = interaction.options.getInteger('cupos');
+            const claimedBts = interaction.options.getInteger('bts');
             const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
             if (fechaResult && 'error' in fechaResult) {
                 throw validationError(fechaResult.error);
@@ -528,6 +549,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
             const isManualLogroException = isLogroGeneral && Boolean(generalLogroEntry?.isManualException);
             const isManualType = ACTIVITY_TIER[tipo] === 'MANUAL' || isManualLogroException;
+            const isBalanceManualOverride =
+                tipo === ActivityType.BALANCE_GENERAL &&
+                (claimedExp != null ||
+                    claimedPr != null ||
+                    claimedRyou != null ||
+                    claimedRc != null ||
+                    claimedCupos != null ||
+                    claimedBts != null);
 
             // Validation: Balance General can use catalog name for special rewards, or be manual
             if (tipo === ActivityType.BALANCE_GENERAL) {
@@ -600,6 +629,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
             const isHistoricalNarration =
                 isNarration && Boolean(getHistoricalNarrationRewards(nombreActividad ?? undefined));
+            const shouldPersistClaimed =
+                (isManualType &&
+                    (claimedExp != null || claimedPr != null || claimedRyou != null || claimedRc != null || claimedCupos != null || claimedBts != null)) ||
+                isBalanceManualOverride;
             const activityCreateData: Prisma.ActivityRecordCreateInput = {
                 character: { connect: { id: character.id } },
                 type: tipo,
@@ -608,11 +641,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 evidenceUrl: evidencia,
                 ...(createdAtOverride ? { createdAt: createdAtOverride } : {}),
                 ...(selectedCatalogKey ? { narrationKey: selectedCatalogKey } : {}),
-                ...(isManualType && claimedExp !== null && claimedExp !== undefined
+                ...(shouldPersistClaimed
                     ? {
-                          claimedExp,
-                          ...(claimedPr !== null && claimedPr !== undefined ? { claimedPr } : {}),
-                          ...(claimedRyou !== null && claimedRyou !== undefined ? { claimedRyou } : {})
+                          ...(claimedExp != null ? { claimedExp } : {}),
+                          ...(claimedPr != null ? { claimedPr } : {}),
+                          ...(claimedRyou != null ? { claimedRyou } : {}),
+                          ...(claimedRc != null ? { claimedRc } : {}),
+                          ...(claimedCupos != null ? { claimedCupos } : {}),
+                          ...(claimedBts != null ? { claimedBts } : {})
                       }
                     : {})
             };
@@ -624,7 +660,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             const isAutoApprovable =
                 rewardCalculatorService.isAutoApprovable(tipo) &&
                 !isManualLogroException &&
-                !isHistoricalNarration;
+                !isHistoricalNarration &&
+                !isBalanceManualOverride;
 
             if (isAutoApprovable) {
                 const rewards = rewardCalculatorService.calculateRewards(
@@ -757,13 +794,16 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 `**Evidencia:** [Ver Prueba](${evidencia})`
             ].join('\n');
 
-            const hasClaimedRewards = isManualType && claimedExp !== null;
+            const hasClaimedRewards = (isManualType && claimedExp != null) || isBalanceManualOverride;
+            const claimedLines: string[] = [];
+            if ((claimedExp ?? 0) > 0) claimedLines.push(`✨ EXP: +${claimedExp}`);
+            if ((claimedPr ?? 0) > 0) claimedLines.push(`🏆 PR: +${claimedPr}`);
+            if ((claimedRyou ?? 0) > 0) claimedLines.push(`🪙 Ryou: +${claimedRyou}`);
+            if ((claimedRc ?? 0) > 0) claimedLines.push(`📜 RC: +${claimedRc}`);
+            if ((claimedCupos ?? 0) > 0) claimedLines.push(`📋 Cupos: +${claimedCupos}`);
+            if ((claimedBts ?? 0) > 0) claimedLines.push(`🔧 BTS: +${claimedBts}`);
             const rewardDisplayLines = hasClaimedRewards
-                ? [
-                      `✨ EXP: +${claimedExp ?? 0}`,
-                      `🏆 PR: +${claimedPr ?? 0}`,
-                      `🪙 Ryou: +${claimedRyou ?? 0}`
-                  ].join('\n')
+                ? (claimedLines.length > 0 ? claimedLines.join('\n') : '—')
                 : projectedRewardLines;
 
             const manualNotes = [

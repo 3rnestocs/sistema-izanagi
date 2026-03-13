@@ -24,17 +24,24 @@ export class ActivityApprovalService {
       return false;
     }
 
-    let rewards: { exp: number; pr: number; ryou: number; rc?: number; cupos?: number };
+    let rewards: { exp: number; pr: number; ryou: number; rc?: number; cupos?: number; bts?: number };
 
-    if (
+    const hasClaimed =
       activityRecord.claimedExp !== null ||
       activityRecord.claimedPr !== null ||
-      activityRecord.claimedRyou !== null
-    ) {
+      activityRecord.claimedRyou !== null ||
+      activityRecord.claimedRc !== null ||
+      activityRecord.claimedCupos !== null ||
+      activityRecord.claimedBts !== null;
+
+    if (hasClaimed) {
       rewards = {
         exp: activityRecord.claimedExp ?? 0,
         pr: activityRecord.claimedPr ?? 0,
-        ryou: activityRecord.claimedRyou ?? 0
+        ryou: activityRecord.claimedRyou ?? 0,
+        rc: activityRecord.claimedRc ?? 0,
+        cupos: activityRecord.claimedCupos ?? 0,
+        bts: activityRecord.claimedBts ?? 0
       };
     } else {
       rewards = rewardCalculatorService.calculateRewards(
@@ -43,7 +50,7 @@ export class ActivityApprovalService {
       );
     }
 
-    if (rewards.exp === 0 && rewards.pr === 0 && rewards.ryou === 0 && (rewards.rc ?? 0) === 0 && (rewards.cupos ?? 0) === 0) {
+    if (rewards.exp === 0 && rewards.pr === 0 && rewards.ryou === 0 && (rewards.rc ?? 0) === 0 && (rewards.cupos ?? 0) === 0 && (rewards.bts ?? 0) === 0) {
       return false;
     }
 
@@ -53,8 +60,9 @@ export class ActivityApprovalService {
         pr: { increment: rewards.pr },
         ryou: { increment: rewards.ryou }
       };
-      if (rewards.rc && rewards.rc > 0) updateData.rc = { increment: rewards.rc };
-      if (rewards.cupos && rewards.cupos > 0) updateData.cupos = { increment: rewards.cupos };
+      if ((rewards.rc ?? 0) > 0) updateData.rc = { increment: rewards.rc! };
+      if ((rewards.cupos ?? 0) > 0) updateData.cupos = { increment: rewards.cupos! };
+      if ((rewards.bts ?? 0) > 0) updateData.bts = { increment: rewards.bts! };
 
       await tx.character.update({
         where: { id: activityRecord.characterId },
@@ -72,14 +80,16 @@ export class ActivityApprovalService {
       if (rewards.ryou > 0) rewardParts.push(`RYOU:${rewards.ryou}`);
       if ((rewards.rc ?? 0) > 0) rewardParts.push(`RC:${rewards.rc}`);
       if ((rewards.cupos ?? 0) > 0) rewardParts.push(`Cupos:${rewards.cupos}`);
+      if ((rewards.bts ?? 0) > 0) rewardParts.push(`BTS:${rewards.bts}`);
 
       const auditData: Record<string, number> = {
         deltaExp: rewards.exp,
         deltaPr: rewards.pr,
         deltaRyou: rewards.ryou
       };
-      if (rewards.rc && rewards.rc > 0) auditData.deltaRc = rewards.rc;
-      if (rewards.cupos && rewards.cupos > 0) auditData.deltaCupos = rewards.cupos;
+      if ((rewards.rc ?? 0) > 0) auditData.deltaRc = rewards.rc!;
+      if ((rewards.cupos ?? 0) > 0) auditData.deltaCupos = rewards.cupos!;
+      if ((rewards.bts ?? 0) > 0) auditData.deltaBts = rewards.bts!;
 
       const rewardsText = rewardParts.length > 0 ? rewardParts.join(', ') : 'ninguna';
 

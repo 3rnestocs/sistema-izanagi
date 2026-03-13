@@ -307,6 +307,9 @@ model ActivityRecord {
   claimedExp   Int?
   claimedPr    Int?
   claimedRyou  Int?
+  claimedRc    Int?
+  claimedCupos Int?
+  claimedBts   Int?
 
   // ID del mensaje de Discord que muestra el embed PENDIENTE (para aprobación por reacción)
   approvalMessageId String?

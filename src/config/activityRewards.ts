@@ -11,6 +11,7 @@ export interface RewardBreakdown {
   ryou: number;
   rc?: number;
   cupos?: number;
+  bts?: number;
 }
 
 // Activity tier classification: AUTO = deterministic rewards, MANUAL = staff-set rewards
