@@ -9,11 +9,20 @@ import {
   isSuccessResult
 } from '../domain/activityDomain';
 
-interface RequirementCheck {
+export interface OptionalRequirement {
+  description: string;
+  status: 'COMPLETADO' | 'PARCIAL' | 'SIN_PROGRESO';
+  current?: number;
+  required?: number;
+}
+
+export interface RequirementCheck {
   passed: boolean;
+  promotionState?: 'APPROVED' | 'PENDING_STAFF' | 'BLOCKED';
   reason?: string;
   missingRequirements?: string[];
   manualRequirements?: string[];
+  optionalRequirements?: OptionalRequirement[];
   snapshot: {
     exp: number;
     pr: number;
@@ -168,23 +177,29 @@ export class LevelUpService {
   private buildFailure(
     snapshot: RequirementCheck['snapshot'],
     missingRequirements: string[],
-    manualRequirements: string[]
+    manualRequirements: string[],
+    optionalRequirements: OptionalRequirement[] = []
   ): RequirementCheck {
+    const promotionState: 'BLOCKED' | 'PENDING_STAFF' = missingRequirements.length > 0 ? 'BLOCKED' : 'PENDING_STAFF';
     const firstMissing = missingRequirements[0];
     if (firstMissing) {
       return {
         passed: false,
+        promotionState,
         reason: firstMissing,
         missingRequirements,
         manualRequirements,
+        optionalRequirements,
         snapshot
       };
     }
 
     return {
       passed: false,
+      promotionState,
       reason: 'Cumple validaciones automáticas, pero faltan requisitos manuales.',
       manualRequirements,
+      optionalRequirements,
       snapshot
     };
   }
@@ -482,10 +497,10 @@ export class LevelUpService {
     }
 
     if (missingRequirements.length > 0 || manualRequirements.length > 0) {
-      return this.buildFailure(snapshot, missingRequirements, manualRequirements);
+      return this.buildFailure(snapshot, missingRequirements, manualRequirements, []);
     }
 
-    return { passed: true, snapshot };
+    return { passed: true, promotionState: 'APPROVED' as const, snapshot };
   }
 
   async checkLevelRequirements(characterId: string, targetLevel: string): Promise<RequirementCheck> {
@@ -524,10 +539,14 @@ export class LevelUpService {
 
     const missingRequirements: string[] = [];
     const manualRequirements: string[] = [];
+    let optionalRequirements: OptionalRequirement[] = [];
 
     if (character.exp < requiredExp) {
       missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
     }
+
+    const toStatus = (current: number, required: number): 'COMPLETADO' | 'PARCIAL' | 'SIN_PROGRESO' =>
+      current >= required ? 'COMPLETADO' : current > 0 ? 'PARCIAL' : 'SIN_PROGRESO';
 
     switch (normalizedTargetLevel) {
       case 'D2':
@@ -544,6 +563,13 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días como Rango D para C1 (requiere 5, actualmente ${daysSinceD}).`);
           }
         }
+
+        optionalRequirements = [
+          { description: '1 narración', status: toStatus(metrics.narrations, 1), current: metrics.narrations, required: 1 },
+          { description: '1 combate', status: toStatus(metrics.combats, 1), current: metrics.combats, required: 1 },
+          { description: '2 misiones D', status: toStatus(metrics.missionD, 2), current: metrics.missionD, required: 2 },
+          { description: '2 logros', status: toStatus(metrics.achievements, 2), current: metrics.achievements, required: 2 }
+        ];
 
         const optionalMet = [
           metrics.narrations >= 1,
@@ -571,6 +597,15 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredC2C3}, actualmente ${daysSince}).`);
           }
         }
+
+        optionalRequirements = [
+          { description: '1 narración', status: toStatus(metrics.narrations, 1), current: metrics.narrations, required: 1 },
+          { description: '1 destacado', status: toStatus(metrics.highlightedNarrations, 1), current: metrics.highlightedNarrations, required: 1 },
+          { description: '1 logro', status: toStatus(metrics.achievements, 1), current: metrics.achievements, required: 1 },
+          { description: '1 combate', status: toStatus(metrics.combats, 1), current: metrics.combats, required: 1 },
+          { description: '1 misión C', status: toStatus(metrics.missionC, 1), current: metrics.missionC, required: 1 },
+          { description: 'Curar a 2 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 2 }
+        ];
 
         const optionalMet = [
           metrics.narrations >= 1,
@@ -602,11 +637,19 @@ export class LevelUpService {
           missingRequirements.push(`PR insuficiente para B1 (${character.pr}/500).`);
         }
 
-        const missionEquivalent = metrics.missionC + (metrics.missionB * 2) + (metrics.missionA * 2) + (metrics.missionS * 2);
+        const missionEquivalentB1 = metrics.missionC + (metrics.missionB * 2) + (metrics.missionA * 2) + (metrics.missionS * 2);
+        optionalRequirements = [
+          { description: '3 narraciones', status: toStatus(metrics.narrations, 3), current: metrics.narrations, required: 3 },
+          { description: '2 destacados', status: toStatus(metrics.highlightedNarrations, 2), current: metrics.highlightedNarrations, required: 2 },
+          { description: 'Misiones C ≥ 4 (B cuenta como 2)', status: toStatus(missionEquivalentB1, 4), current: missionEquivalentB1, required: 4 },
+          { description: '2 combates vs C+', status: toStatus(metrics.combatsVsCOrHigher, 2), current: metrics.combatsVsCOrHigher, required: 2 },
+          { description: 'Curar a 5 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 5 }
+        ];
+
         const optionalMet = [
           metrics.narrations >= 3,
           metrics.highlightedNarrations >= 2,
-          missionEquivalent >= 4,
+          missionEquivalentB1 >= 4,
           metrics.combatsVsCOrHigher >= 2,
           false // Curar a 5 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
@@ -631,13 +674,22 @@ export class LevelUpService {
           }
         }
 
-        const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        const missionEquivalentB2B3 = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        optionalRequirements = [
+          { description: '1 narración', status: toStatus(metrics.narrations, 1), current: metrics.narrations, required: 1 },
+          { description: '1 destacado', status: toStatus(metrics.highlightedNarrations, 1), current: metrics.highlightedNarrations, required: 1 },
+          { description: '1 logro', status: toStatus(metrics.achievements, 1), current: metrics.achievements, required: 1 },
+          { description: '2 combates vs B+', status: toStatus(metrics.combatsVsBOrHigher, 2), current: metrics.combatsVsBOrHigher, required: 2 },
+          { description: '1 misión B/A', status: toStatus(missionEquivalentB2B3, 1), current: missionEquivalentB2B3, required: 1 },
+          { description: 'Curar a 2 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 2 }
+        ];
+
         const optionalMet = [
           metrics.narrations >= 1,
           metrics.highlightedNarrations >= 1,
           metrics.achievements >= 1,
           metrics.combatsVsBOrHigher >= 2,
-          missionEquivalent >= 1,
+          missionEquivalentB2B3 >= 1,
           false // Curar a 2 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
@@ -662,11 +714,20 @@ export class LevelUpService {
           missingRequirements.push(`PR insuficiente para A1 (${character.pr}/1000).`);
         }
 
-        const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        const missionEquivalentA1 = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        optionalRequirements = [
+          { description: '6 narraciones', status: toStatus(metrics.narrations, 6), current: metrics.narrations, required: 6 },
+          { description: '3 destacados', status: toStatus(metrics.highlightedNarrations, 3), current: metrics.highlightedNarrations, required: 3 },
+          { description: 'Misiones B/A ≥ 5', status: toStatus(missionEquivalentA1, 5), current: missionEquivalentA1, required: 5 },
+          { description: '3 victorias vs B+', status: toStatus(metrics.combatWinsVsBOrHigher, 3), current: metrics.combatWinsVsBOrHigher, required: 3 },
+          { description: '8 logros', status: toStatus(metrics.achievements, 8), current: metrics.achievements, required: 8 },
+          { description: 'Curar a 10 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 10 }
+        ];
+
         const optionalMet = [
           metrics.narrations >= 6,
           metrics.highlightedNarrations >= 3,
-          missionEquivalent >= 5,
+          missionEquivalentA1 >= 5,
           metrics.combatWinsVsBOrHigher >= 3,
           metrics.achievements >= 8,
           false // Curar a 10 personajes (no trazable automáticamente)
@@ -693,13 +754,22 @@ export class LevelUpService {
         }
         manualRequirements.push('Manual parcial: “obtener 300 PR durante la gradación anterior” no es trazable sin ledger temporal.');
 
-        const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        const missionEquivalentA2A3 = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
+        optionalRequirements = [
+          { description: '1 narración', status: toStatus(metrics.narrations, 1), current: metrics.narrations, required: 1 },
+          { description: '1 destacado', status: toStatus(metrics.highlightedNarrations, 1), current: metrics.highlightedNarrations, required: 1 },
+          { description: '2 logros', status: toStatus(metrics.achievements, 2), current: metrics.achievements, required: 2 },
+          { description: '1 combate vs A+', status: toStatus(metrics.combatsVsAOrHigher, 1), current: metrics.combatsVsAOrHigher, required: 1 },
+          { description: '2 misiones B/A', status: toStatus(missionEquivalentA2A3, 2), current: missionEquivalentA2A3, required: 2 },
+          { description: 'Curar a 2 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 2 }
+        ];
+
         const optionalMet = [
           metrics.narrations >= 1,
           metrics.highlightedNarrations >= 1,
           metrics.achievements >= 2,
           metrics.combatsVsAOrHigher >= 1,
-          missionEquivalent >= 2,
+          missionEquivalentA2A3 >= 2,
           false // Curar a 2 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
@@ -749,6 +819,14 @@ export class LevelUpService {
           }
         }
 
+        optionalRequirements = [
+          { description: '2 narraciones', status: toStatus(metrics.narrations, 2), current: metrics.narrations, required: 2 },
+          { description: '1 destacado', status: toStatus(metrics.highlightedNarrations, 1), current: metrics.highlightedNarrations, required: 1 },
+          { description: '1 misión S', status: toStatus(metrics.missionSAnyResult, 1), current: metrics.missionSAnyResult, required: 1 },
+          { description: '500 PR', status: character.pr >= 500 ? 'COMPLETADO' as const : character.pr > 0 ? 'PARCIAL' as const : 'SIN_PROGRESO', current: character.pr, required: 500 },
+          { description: 'Curar a 5 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 5 }
+        ];
+
         const optionalMet = [
           metrics.narrations >= 2,
           metrics.highlightedNarrations >= 1,
@@ -768,10 +846,10 @@ export class LevelUpService {
     }
 
     if (missingRequirements.length > 0 || manualRequirements.length > 0) {
-      return this.buildFailure(snapshot, missingRequirements, manualRequirements);
+      return this.buildFailure(snapshot, missingRequirements, manualRequirements, optionalRequirements);
     }
 
-    return { passed: true, snapshot };
+    return { passed: true, promotionState: 'APPROVED' as const, snapshot };
   }
 
   async applyPromotion(characterId: string, targetRankOrLevel: string, approvedBy: string) {

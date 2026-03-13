@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { StatValidatorService } from './StatValidatorService';
-import { LevelUpService } from './LevelUpService';
+import { LevelUpService, type RequirementCheck, type OptionalRequirement } from './LevelUpService';
 import {
   ActivityType,
   ActivityStatus,
@@ -10,36 +10,6 @@ import {
   canonicalizeActivityResult,
   isSuccessResult
 } from '../domain/activityDomain';
-
-interface RequirementCheck {
-  passed: boolean;
-  reason?: string;
-  missingRequirements?: string[];
-  manualRequirements?: string[];
-  snapshot: {
-    exp: number;
-    pr: number;
-    level: string;
-    rank: string;
-    missionD: number;
-    missionC: number;
-    missionB: number;
-    missionA: number;
-    missionS: number;
-    missionASuccess: number;
-    missionSSuccess: number;
-    missionSAnyResult: number;
-    narrations: number;
-    highlightedNarrations: number;
-    combats: number;
-    combatsVsCOrHigher: number;
-    combatsVsBOrHigher: number;
-    combatsVsAOrHigher: number;
-    combatWinsVsAOrHigher: number;
-    combatWinsVsBOrHigher: number;
-    achievements: number;
-  };
-}
 
 export class PromotionService {
   private levelUpService: LevelUpService;
