@@ -6,39 +6,23 @@ import {
 } from 'discord.js';
 import { prisma } from '../../lib/prisma';
 import { PromotionService } from '../../services/PromotionService';
+import { StatValidatorService } from '../../services/StatValidatorService';
 import { type OptionalRequirement } from '../../services/LevelUpService';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { getFechaFromOption } from '../../utils/dateParser';
 
 const promotionService = new PromotionService(prisma);
 
-function isInternalLevel(objective: string): boolean {
-  return /^[DCBAS][123]$/.test(objective) || objective === 'S2';
-}
-
-const TARGET_CHOICES: Array<{ name: string; value: string }> = [
-  { name: 'Nivel D2', value: 'D2' },
-  { name: 'Nivel D3', value: 'D3' },
-  { name: 'Nivel C1', value: 'C1' },
-  { name: 'Nivel C2', value: 'C2' },
-  { name: 'Nivel C3', value: 'C3' },
-  { name: 'Nivel B1', value: 'B1' },
-  { name: 'Nivel B2', value: 'B2' },
-  { name: 'Nivel B3', value: 'B3' },
-  { name: 'Nivel A1', value: 'A1' },
-  { name: 'Nivel A2', value: 'A2' },
-  { name: 'Nivel A3', value: 'A3' },
-  { name: 'Nivel S1', value: 'S1' },
-  { name: 'Nivel S2', value: 'S2' },
-  { name: 'Cargo Chuunin', value: 'Chuunin' },
-  { name: 'Cargo Tokubetsu Jounin', value: 'Tokubetsu Jounin' },
-  { name: 'Cargo Jounin', value: 'Jounin' },
-  { name: 'Cargo ANBU', value: 'ANBU' },
-  { name: 'Cargo Buntaichoo', value: 'Buntaichoo' },
-  { name: 'Cargo Jounin Hanchou', value: 'Jounin Hanchou' },
-  { name: 'Cargo Go-Ikenban', value: 'Go-Ikenban' },
-  { name: 'Cargo Líder de Clan', value: 'Lider de Clan' },
-  { name: 'Cargo Kage', value: 'Kage' }
+const CARGO_CHOICES: Array<{ name: string; value: string }> = [
+  { name: 'Chuunin', value: 'Chuunin' },
+  { name: 'Tokubetsu Jounin', value: 'Tokubetsu Jounin' },
+  { name: 'Jounin', value: 'Jounin' },
+  { name: 'ANBU', value: 'ANBU' },
+  { name: 'Buntaichoo', value: 'Buntaichoo' },
+  { name: 'Jounin Hanchou', value: 'Jounin Hanchou' },
+  { name: 'Go-Ikenban', value: 'Go-Ikenban' },
+  { name: 'Líder de Clan', value: 'Lider de Clan' },
+  { name: 'Kage', value: 'Kage' }
 ];
 
 function formatOptionalStatus(opt: OptionalRequirement): string {
@@ -97,10 +81,10 @@ export const data = new SlashCommandBuilder()
   )
   .addStringOption((option) =>
     option
-      .setName('objetivo')
-      .setDescription('Nivel o cargo de destino')
-      .setRequired(true)
-      .addChoices(...TARGET_CHOICES)
+      .setName('cargo')
+      .setDescription('Cargo de destino (opcional). Si no especificas, se aplica ascenso al siguiente nivel.')
+      .setRequired(false)
+      .addChoices(...CARGO_CHOICES)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -110,7 +94,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     async (interaction) => {
       const isStaff = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
       const targetUser = interaction.options.getUser('usuario', true);
-      const objective = interaction.options.getString('objetivo', true);
+      const cargo = interaction.options.getString('cargo');
 
       if (!isStaff && targetUser.id !== interaction.user.id) {
         throw new Error('⛔ Solo puedes ascendarte a ti mismo. El staff puede ascender a otros.');
@@ -125,7 +109,23 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         throw new Error(`⛔ ${targetUser.username} no tiene ficha registrada.`);
       }
 
-      const targetType = isInternalLevel(objective) ? 'level' : 'rank';
+      let targetType: 'level' | 'rank';
+      let objective: string;
+
+      if (cargo) {
+        targetType = 'rank';
+        objective = cargo;
+      } else {
+        const nextLevel = StatValidatorService.getNextLevel(character.level);
+        if (!nextLevel) {
+          throw new Error(
+            `⛔ Ya estás en el nivel máximo (S2). Usa la opción \`cargo\` para ascender de cargo.`
+          );
+        }
+        targetType = 'level';
+        objective = nextLevel;
+      }
+
       const check =
         targetType === 'level'
           ? await promotionService.checkLevelRequirements(character.id, objective)

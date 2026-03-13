@@ -113,6 +113,16 @@ export class StatValidatorService {
     return requirements;
   }
 
+  /** Returns the next level in the canonical progression, or null if already at S2 or invalid. */
+  public static getNextLevel(current: string): InternalLevel | null {
+    const normalized = current.trim().toUpperCase() as InternalLevel;
+    if (!(normalized in this.LEVEL_PROGRESSION)) return null;
+    const keys = Object.keys(this.LEVEL_PROGRESSION) as InternalLevel[];
+    const idx = keys.indexOf(normalized);
+    const next = idx >= 0 && idx < keys.length - 1 ? keys[idx + 1] : undefined;
+    return next ?? null;
+  }
+
   public static getInitialSpForLevel(level: string): number {
     return this.getLevelProgression(level).spGranted;
   }
