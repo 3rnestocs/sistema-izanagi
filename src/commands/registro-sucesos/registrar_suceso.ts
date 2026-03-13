@@ -103,7 +103,7 @@ export const data = new SlashCommandBuilder()
             .setName('mision')
             .setDescription('Registrar una misión')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -128,7 +128,7 @@ export const data = new SlashCommandBuilder()
             .setName('combate')
             .setDescription('Registrar un combate')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -153,7 +153,7 @@ export const data = new SlashCommandBuilder()
             .setName('cronica')
             .setDescription('Registrar una crónica')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -178,7 +178,7 @@ export const data = new SlashCommandBuilder()
             .setName('evento')
             .setDescription('Registrar un evento')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -203,7 +203,7 @@ export const data = new SlashCommandBuilder()
             .setName('escena')
             .setDescription('Registrar una escena')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -227,7 +227,7 @@ export const data = new SlashCommandBuilder()
             .setName('logro_general')
             .setDescription('Registrar un logro general')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -254,7 +254,7 @@ export const data = new SlashCommandBuilder()
             .setName('logro_saga')
             .setDescription('Registrar un logro de saga')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -274,7 +274,7 @@ export const data = new SlashCommandBuilder()
             .setName('logro_reputacion')
             .setDescription('Registrar un logro de reputación')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -301,7 +301,7 @@ export const data = new SlashCommandBuilder()
             .setName('balance_general')
             .setDescription('Registrar un balance general')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -319,7 +319,7 @@ export const data = new SlashCommandBuilder()
             .setName('experimento')
             .setDescription('Registrar un experimento')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -347,7 +347,7 @@ export const data = new SlashCommandBuilder()
             .setName('curacion')
             .setDescription('Registrar una curación')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -365,7 +365,7 @@ export const data = new SlashCommandBuilder()
             .setName('desarrollo_personal')
             .setDescription('Registrar desarrollo personal')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -376,7 +376,7 @@ export const data = new SlashCommandBuilder()
             .setName('timeskip')
             .setDescription('Registrar un timeskip')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription('Fecha de la actividad (DD/MM/YYYY).').setRequired(true)
+                o.setName('fecha').setDescription('Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)

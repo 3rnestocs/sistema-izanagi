@@ -179,7 +179,7 @@ export const data = new SlashCommandBuilder()
     .addStringOption((option) =>
         option
             .setName('fecha')
-            .setDescription('Fecha de creación de la ficha (DD/MM/YYYY).')
+            .setDescription('Fecha de creación de la ficha (en formato DD/MM/YYYY o escribe "hoy").')
             .setRequired(true)
     )
     .addStringOption((option) =>

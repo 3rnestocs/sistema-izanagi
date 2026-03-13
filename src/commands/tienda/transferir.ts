@@ -28,7 +28,7 @@ export const data = new SlashCommandBuilder()
     .setDescription('Transfiere Ryou y/o objetos a otro personaje.')
     .addStringOption(opt =>
         opt.setName('fecha')
-           .setDescription('Fecha de la transferencia (DD/MM/YYYY).')
+           .setDescription('Fecha de la transferencia (en formato DD/MM/YYYY o escribe "hoy").')
            .setRequired(true)
     )
     .addUserOption(opt => 

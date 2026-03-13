@@ -45,7 +45,7 @@ export const data = new SlashCommandBuilder()
   .addStringOption((option) =>
     option
       .setName('fecha')
-      .setDescription('Fecha del ascenso (DD/MM/YYYY).')
+      .setDescription('Fecha del ascenso (en formato DD/MM/YYYY o escribe "hoy").')
       .setRequired(true)
   )
   .addUserOption((option) =>

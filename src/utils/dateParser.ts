@@ -29,11 +29,18 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   }
 
   const trimmed = value.trim();
+
+  if (trimmed.toLowerCase() === 'hoy') {
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 12, 0, 0, 0));
+    return { success: true, date: today };
+  }
+
   const match = trimmed.match(DATE_REGEX);
   if (!match) {
     return {
       success: false,
-      message: `Formato de fecha inválido. Usa DD/MM/YYYY (ej: 15/01/2025).`
+      message: `Formato de fecha inválido. Usa DD/MM/YYYY (ej: 15/01/2025) o "hoy".`
     };
   }
 

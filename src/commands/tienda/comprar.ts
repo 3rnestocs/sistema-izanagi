@@ -14,7 +14,7 @@ export const data = new SlashCommandBuilder()
     .setDescription('Compra objetos del mercado de IZANAGI.')
     .addStringOption(opt =>
         opt.setName('fecha')
-           .setDescription('Fecha de la compra (DD/MM/YYYY).')
+           .setDescription('Fecha de la compra (en formato DD/MM/YYYY o escribe "hoy").')
            .setRequired(true)
     )
     .addStringOption(opt => 
