@@ -1,7 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 import { StatValidatorService } from './StatValidatorService';
 import { LevelUpService } from './LevelUpService';
-import { ActivityType } from '../domain/activityDomain';
+import {
+  ActivityType,
+  ActivityStatus,
+  ActivityResult,
+  canonicalizeActivityType,
+  canonicalizeActivityStatus,
+  canonicalizeActivityResult,
+  isSuccessResult
+} from '../domain/activityDomain';
 
 interface RequirementCheck {
   passed: boolean;
