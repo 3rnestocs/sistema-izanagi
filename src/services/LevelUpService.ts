@@ -11,7 +11,7 @@ import {
 
 export interface OptionalRequirement {
   description: string;
-  status: 'COMPLETADO' | 'PARCIAL' | 'SIN_PROGRESO';
+  status: 'COMPLETADO' | 'PARCIAL' | 'SIN PROGRESO';
   current?: number;
   required?: number;
 }
@@ -554,8 +554,8 @@ export class LevelUpService {
       missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
     }
 
-    const toStatus = (current: number, required: number): 'COMPLETADO' | 'PARCIAL' | 'SIN_PROGRESO' =>
-      current >= required ? 'COMPLETADO' : current > 0 ? 'PARCIAL' : 'SIN_PROGRESO';
+    const toStatus = (current: number, required: number): 'COMPLETADO' | 'PARCIAL' | 'SIN PROGRESO' =>
+      current >= required ? 'COMPLETADO' : current > 0 ? 'PARCIAL' : 'SIN PROGRESO';
 
     switch (normalizedTargetLevel) {
       case 'D2':
@@ -613,7 +613,7 @@ export class LevelUpService {
           { description: '1 logro', status: toStatus(metrics.achievements, 1), current: metrics.achievements, required: 1 },
           { description: '1 combate', status: toStatus(metrics.combats, 1), current: metrics.combats, required: 1 },
           { description: '1 misión C', status: toStatus(metrics.missionC, 1), current: metrics.missionC, required: 1 },
-          { description: 'Curar a 2 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 2 }
+          { description: 'Curar a 2 personajes', status: 'SIN PROGRESO' as const, current: 0, required: 2 }
         ];
 
         const optionalMet = [
@@ -652,7 +652,7 @@ export class LevelUpService {
           { description: '2 destacados', status: toStatus(metrics.highlightedNarrations, 2), current: metrics.highlightedNarrations, required: 2 },
           { description: 'Misiones C ≥ 4 (B cuenta como 2)', status: toStatus(missionEquivalentB1, 4), current: missionEquivalentB1, required: 4 },
           { description: '2 combates vs C+', status: toStatus(metrics.combatsVsCOrHigher, 2), current: metrics.combatsVsCOrHigher, required: 2 },
-          { description: 'Curar a 5 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 5 }
+          { description: 'Curar a 5 personajes', status: 'SIN PROGRESO' as const, current: 0, required: 5 }
         ];
 
         const optionalMet = [
@@ -690,7 +690,7 @@ export class LevelUpService {
           { description: '1 logro', status: toStatus(metrics.achievements, 1), current: metrics.achievements, required: 1 },
           { description: '2 combates vs B+', status: toStatus(metrics.combatsVsBOrHigher, 2), current: metrics.combatsVsBOrHigher, required: 2 },
           { description: '1 misión B/A', status: toStatus(missionEquivalentB2B3, 1), current: missionEquivalentB2B3, required: 1 },
-          { description: 'Curar a 2 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 2 }
+          { description: 'Curar a 2 personajes', status: 'SIN PROGRESO' as const, current: 0, required: 2 }
         ];
 
         const optionalMet = [
@@ -730,7 +730,7 @@ export class LevelUpService {
           { description: 'Misiones B/A ≥ 5', status: toStatus(missionEquivalentA1, 5), current: missionEquivalentA1, required: 5 },
           { description: '3 victorias vs B+', status: toStatus(metrics.combatWinsVsBOrHigher, 3), current: metrics.combatWinsVsBOrHigher, required: 3 },
           { description: '8 logros', status: toStatus(metrics.achievements, 8), current: metrics.achievements, required: 8 },
-          { description: 'Curar a 10 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 10 }
+          { description: 'Curar a 10 personajes', status: 'SIN PROGRESO' as const, current: 0, required: 10 }
         ];
 
         const optionalMet = [
@@ -770,7 +770,7 @@ export class LevelUpService {
           { description: '2 logros', status: toStatus(metrics.achievements, 2), current: metrics.achievements, required: 2 },
           { description: '1 combate vs A+', status: toStatus(metrics.combatsVsAOrHigher, 1), current: metrics.combatsVsAOrHigher, required: 1 },
           { description: '2 misiones B/A', status: toStatus(missionEquivalentA2A3, 2), current: missionEquivalentA2A3, required: 2 },
-          { description: 'Curar a 2 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 2 }
+          { description: 'Curar a 2 personajes', status: 'SIN PROGRESO' as const, current: 0, required: 2 }
         ];
 
         const optionalMet = [
@@ -832,8 +832,8 @@ export class LevelUpService {
           { description: '2 narraciones', status: toStatus(metrics.narrations, 2), current: metrics.narrations, required: 2 },
           { description: '1 destacado', status: toStatus(metrics.highlightedNarrations, 1), current: metrics.highlightedNarrations, required: 1 },
           { description: '1 misión S', status: toStatus(metrics.missionSAnyResult, 1), current: metrics.missionSAnyResult, required: 1 },
-          { description: '500 PR', status: character.pr >= 500 ? 'COMPLETADO' as const : character.pr > 0 ? 'PARCIAL' as const : 'SIN_PROGRESO', current: character.pr, required: 500 },
-          { description: 'Curar a 5 personajes', status: 'SIN_PROGRESO' as const, current: 0, required: 5 }
+          { description: '500 PR', status: character.pr >= 500 ? 'COMPLETADO' as const : character.pr > 0 ? 'PARCIAL' as const : 'SIN PROGRESO', current: character.pr, required: 500 },
+          { description: 'Curar a 5 personajes', status: 'SIN PROGRESO' as const, current: 0, required: 5 }
         ];
 
         const optionalMet = [

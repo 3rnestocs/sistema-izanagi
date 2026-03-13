@@ -203,7 +203,7 @@ Introduce a **three-state result** from `checkLevelRequirements` / `checkRankReq
 ```ts
 interface OptionalRequirement {
   description: string;           // e.g., "3 narraciones"
-  status: 'COMPLETADO' | 'PARCIAL' | 'SIN_PROGRESO';
+  status: 'COMPLETADO' | 'PARCIAL' | 'SIN PROGRESO';
   current?: number;              // current count (if applicable)
   required?: number;             // required count (if applicable)
 }
@@ -222,7 +222,7 @@ interface RequirementCheck {
 **Build `optionalRequirements` in each level/rank case:**
 
 For each optional in the pool, calculate:
-- `status`: `COMPLETADO` if requirement met, `PARCIAL` if partially met (progress > 0), `SIN_PROGRESO` if 0.
+- `status`: `COMPLETADO` if requirement met, `PARCIAL` if partially met (progress > 0), `SIN PROGRESO` if 0.
 - `current` and `required`: the actual numbers so the user sees "2/3" or "1/4".
 
 Example (B1):
@@ -230,31 +230,31 @@ Example (B1):
 const optionalRequirements: OptionalRequirement[] = [
   {
     description: '3 narraciones',
-    status: metrics.narrations >= 3 ? 'COMPLETADO' : metrics.narrations > 0 ? 'PARCIAL' : 'SIN_PROGRESO',
+    status: metrics.narrations >= 3 ? 'COMPLETADO' : metrics.narrations > 0 ? 'PARCIAL' : 'SIN PROGRESO',
     current: metrics.narrations,
     required: 3
   },
   {
     description: '2 destacados',
-    status: metrics.highlightedNarrations >= 2 ? 'COMPLETADO' : metrics.highlightedNarrations > 0 ? 'PARCIAL' : 'SIN_PROGRESO',
+    status: metrics.highlightedNarrations >= 2 ? 'COMPLETADO' : metrics.highlightedNarrations > 0 ? 'PARCIAL' : 'SIN PROGRESO',
     current: metrics.highlightedNarrations,
     required: 2
   },
   {
     description: 'Misiones C ≥ 4 (B cuenta como 2)',
-    status: missionEquivalent >= 4 ? 'COMPLETADO' : missionEquivalent > 0 ? 'PARCIAL' : 'SIN_PROGRESO',
+    status: missionEquivalent >= 4 ? 'COMPLETADO' : missionEquivalent > 0 ? 'PARCIAL' : 'SIN PROGRESO',
     current: missionEquivalent,
     required: 4
   },
   {
     description: '2 combates vs C+',
-    status: metrics.combatsVsCOrHigher >= 2 ? 'COMPLETADO' : metrics.combatsVsCOrHigher > 0 ? 'PARCIAL' : 'SIN_PROGRESO',
+    status: metrics.combatsVsCOrHigher >= 2 ? 'COMPLETADO' : metrics.combatsVsCOrHigher > 0 ? 'PARCIAL' : 'SIN PROGRESO',
     current: metrics.combatsVsCOrHigher,
     required: 2
   },
   {
     description: 'Curar a 5 personajes',
-    status: 'SIN_PROGRESO', // always false optional
+    status: 'SIN PROGRESO', // always false optional
     current: 0,
     required: 5
   }
@@ -276,8 +276,8 @@ const optionalRequirements: OptionalRequirement[] = [
   3 narraciones (✅ COMPLETADO)
   2 destacados (⚠️ PARCIAL 1/2)
   Misiones C ≥ 4 (⚠️ PARCIAL 3/4)
-  2 combates vs C+ (❌ SIN_PROGRESO)
-  Curar a 5 personajes (❌ SIN_PROGRESO)
+  2 combates vs C+ (❌ SIN PROGRESO)
+  Curar a 5 personajes (❌ SIN PROGRESO)
   ```
 - Do **not** `throw` — use `editReply` and `return`.
 

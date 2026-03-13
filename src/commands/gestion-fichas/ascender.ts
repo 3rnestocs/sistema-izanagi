@@ -30,7 +30,7 @@ function formatOptionalStatus(opt: OptionalRequirement): string {
   if (opt.status === 'PARCIAL' && opt.current !== undefined && opt.required !== undefined) {
     return `⚠️ PARCIAL (${opt.current}/${opt.required})`;
   }
-  return '❌ SIN_PROGRESO';
+  return '❌ SIN PROGRESO';
 }
 
 function formatSnapshotForEmbed(snapshot: {
