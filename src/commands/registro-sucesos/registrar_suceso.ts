@@ -827,15 +827,22 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             ].join('\n');
 
             const hasClaimedRewards = (isManualType && claimedExp != null) || isBalanceManualOverride;
-            const claimedLines: string[] = [];
-            if ((claimedExp ?? 0) > 0) claimedLines.push(`✨ EXP: +${claimedExp}`);
-            if ((claimedPr ?? 0) > 0) claimedLines.push(`🏆 PR: +${claimedPr}`);
-            if ((claimedRyou ?? 0) > 0) claimedLines.push(`🪙 Ryou: +${claimedRyou}`);
-            if ((claimedRc ?? 0) > 0) claimedLines.push(`📜 RC: +${claimedRc}`);
-            if ((claimedCupos ?? 0) > 0) claimedLines.push(`📋 Cupos: +${claimedCupos}`);
-            if ((claimedBts ?? 0) > 0) claimedLines.push(`🔧 BTS: +${claimedBts}`);
             const rewardDisplayLines = hasClaimedRewards
-                ? (claimedLines.length > 0 ? claimedLines.join('\n') : '—')
+                ? (() => {
+                      const claimedDetailed = rewardCalculatorService.applyTraitsToClaimedRewards(
+                          character as any,
+                          {
+                              exp: claimedExp,
+                              pr: claimedPr,
+                              ryou: claimedRyou,
+                              rc: claimedRc,
+                              cupos: claimedCupos,
+                              bts: claimedBts
+                          }
+                      );
+                      const lines = formatDetailedRewardLines(claimedDetailed);
+                      return lines.length > 0 ? lines.join('\n') : '—';
+                  })()
                 : projectedRewardLines;
 
             const manualNotes = [

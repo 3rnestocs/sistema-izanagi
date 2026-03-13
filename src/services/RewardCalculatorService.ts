@@ -110,6 +110,32 @@ export class RewardCalculatorService {
   }
 
   /**
+   * Apply trait multipliers to user-claimed rewards (Escena, Timeskip, etc.).
+   * Treats claimed values as base; returns DetailedRewardBreakdown for display/approval.
+   */
+  public applyTraitsToClaimedRewards(
+    character: Character & { traits?: any[] },
+    claimed: {
+      exp?: number | null;
+      pr?: number | null;
+      ryou?: number | null;
+      rc?: number | null;
+      cupos?: number | null;
+      bts?: number | null;
+    }
+  ): DetailedRewardBreakdown {
+    const base: RewardBreakdown = {
+      exp: claimed.exp ?? 0,
+      pr: claimed.pr ?? 0,
+      ryou: claimed.ryou ?? 0
+    };
+    if ((claimed.rc ?? 0) > 0) base.rc = claimed.rc!;
+    if ((claimed.cupos ?? 0) > 0) base.cupos = claimed.cupos!;
+    if ((claimed.bts ?? 0) > 0) base.bts = claimed.bts!;
+    return this.applyTraitMultipliersWithDetails(base, character.traits ?? []);
+  }
+
+  /**
    * Check if an activity type is auto-approvable.
    */
   public isAutoApprovable(type: string | null | undefined): boolean {
@@ -393,7 +419,8 @@ export class RewardCalculatorService {
         total: rewards.ryou
       },
       ...(rewards.rc !== undefined && rewards.rc > 0 ? { rc: rewards.rc } : {}),
-      ...(rewards.cupos !== undefined && rewards.cupos > 0 ? { cupos: rewards.cupos } : {})
+      ...(rewards.cupos !== undefined && rewards.cupos > 0 ? { cupos: rewards.cupos } : {}),
+      ...(rewards.bts !== undefined && rewards.bts > 0 ? { bts: rewards.bts } : {})
     };
   }
 }

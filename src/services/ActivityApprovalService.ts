@@ -17,7 +17,11 @@ export class ActivityApprovalService {
         approvalMessageId: messageId,
         status: ActivityStatus.PENDIENTE
       },
-      include: { character: true }
+      include: {
+        character: {
+          include: { traits: { include: { trait: true } } }
+        }
+      }
     });
 
     if (!activityRecord) {
@@ -35,13 +39,24 @@ export class ActivityApprovalService {
       activityRecord.claimedBts !== null;
 
     if (hasClaimed) {
+      const claimedDetailed = rewardCalculatorService.applyTraitsToClaimedRewards(
+        activityRecord.character as any,
+        {
+          exp: activityRecord.claimedExp,
+          pr: activityRecord.claimedPr,
+          ryou: activityRecord.claimedRyou,
+          rc: activityRecord.claimedRc,
+          cupos: activityRecord.claimedCupos,
+          bts: activityRecord.claimedBts
+        }
+      );
       rewards = {
-        exp: activityRecord.claimedExp ?? 0,
-        pr: activityRecord.claimedPr ?? 0,
-        ryou: activityRecord.claimedRyou ?? 0,
-        rc: activityRecord.claimedRc ?? 0,
-        cupos: activityRecord.claimedCupos ?? 0,
-        bts: activityRecord.claimedBts ?? 0
+        exp: claimedDetailed.exp.total,
+        pr: claimedDetailed.pr.total,
+        ryou: claimedDetailed.ryou.total,
+        rc: claimedDetailed.rc ?? 0,
+        cupos: claimedDetailed.cupos ?? 0,
+        bts: claimedDetailed.bts ?? 0
       };
     } else {
       rewards = rewardCalculatorService.calculateRewards(
