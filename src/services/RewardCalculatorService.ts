@@ -277,28 +277,21 @@ export class RewardCalculatorService {
   }
 
   /**
-   * 🧬 Aplicar multiplicadores de rasgos a las recompensas
-   * - multiplierGanancia para Ryou (Ambicioso 1.5x)
-   * - mechanics.expMultiplier para EXP (Presteza 1.5x, Arrepentimiento 0.5x)
-   * - mechanics.prMultiplier para PR (Leyenda 1.25x, Presionado 0.75x)
+   * 🧬 Aplicar multiplicadores de rasgos a las recompensas de actividad.
+   * Solo mechanics.expMultiplier (Presteza 1.5x, Arrepentimiento 0.5x) y mechanics.prMultiplier (Leyenda, Cínico, Presionado).
+   * - multiplierGanancia NO se aplica aquí (Ambicioso solo afecta el sueldo semanal en Monday cron).
+   * - expCostMultiplier NO se aplica aquí (Tonto duplica costes de experimentos/Tienda EXP, no recompensas).
    */
   private applyTraitMultipliers(
     rewards: RewardBreakdown,
     traits: any[]
   ): RewardBreakdown {
-    let ryouMultiplier = 1.0;
     let expMultiplier = 1.0;
     let prMultiplier = 1.0;
 
     for (const traitRecord of traits) {
       const trait = traitRecord.trait || traitRecord;
 
-      // Aplicar multiplierGanancia para Ryou
-      if (trait.multiplierGanancia && typeof trait.multiplierGanancia === 'number') {
-        ryouMultiplier *= trait.multiplierGanancia;
-      }
-
-      // Aplicar multiplicadores de mechanics
       if (trait.mechanics && typeof trait.mechanics === 'object' && !Array.isArray(trait.mechanics)) {
         const mech = trait.mechanics as Record<string, unknown>;
 
@@ -315,7 +308,7 @@ export class RewardCalculatorService {
     return {
       exp: Math.floor(rewards.exp * expMultiplier),
       pr: Math.floor(rewards.pr * prMultiplier),
-      ryou: Math.floor(rewards.ryou * ryouMultiplier),
+      ryou: rewards.ryou,
       ...(rewards.rc !== undefined && rewards.rc > 0 ? { rc: rewards.rc } : {}),
       ...(rewards.cupos !== undefined && rewards.cupos > 0 ? { cupos: rewards.cupos } : {})
     };
