@@ -567,6 +567,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 throw validationError(fechaResult.error);
             }
             const createdAtOverride = fechaResult && 'date' in fechaResult ? fechaResult.date : undefined;
+            const fechaDisplay =
+                createdAtOverride
+                    ? `${String(createdAtOverride.getUTCDate()).padStart(2, '0')}/${String(createdAtOverride.getUTCMonth() + 1).padStart(2, '0')}/${createdAtOverride.getUTCFullYear()}`
+                    : interaction.options.getString('fecha', true);
 
             const valorRangoPersistido = tipo === ActivityType.CURACION ? severidad : rango;
             const isNarration =
@@ -766,7 +770,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                           ]
                         : []),
                     ...(resultado ? [`**Resultado:** ${resultado}`] : []),
-                    `**Fecha:** ${interaction.options.getString('fecha', true)}`,
+                    `**Fecha:** ${fechaDisplay}`,
                     `**Evidencia:** [Ver Prueba](${evidencia})`
                 ].join('\n');
 
@@ -822,7 +826,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                       ]
                     : []),
                 ...(resultado ? [`**Resultado:** ${resultado}`] : []),
-                `**Fecha:** ${interaction.options.getString('fecha', true)}`,
+                `**Fecha:** ${fechaDisplay}`,
                 `**Evidencia:** [Ver Prueba](${evidencia})`
             ].join('\n');
 
