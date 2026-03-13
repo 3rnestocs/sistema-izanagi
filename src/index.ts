@@ -15,13 +15,18 @@ import { prisma, disconnectPrisma } from './lib/prisma';
 import { loadCommands, Command } from './lib/commandLoader';
 import { BuildApprovalService } from './services/BuildApprovalService';
 import { ActivityApprovalService } from './services/ActivityApprovalService';
+import { PromotionApprovalService } from './services/PromotionApprovalService';
+import { ReactionApprovalRouter, type ReactionApprovalContext } from './services/ReactionApprovalRouter';
 import { getRegistrarSucesoForumIds, getAllBotForumIds } from './utils/channelGuards';
 
 // Commands will be loaded dynamically
 let commands: Collection<string, Command>;
 const buildApprovalService = new BuildApprovalService(prisma);
 const activityApprovalService = new ActivityApprovalService(prisma);
+const promotionApprovalService = new PromotionApprovalService(prisma);
+const reactionApprovalRouter = new ReactionApprovalRouter();
 const BUILD_APPROVAL_FORUM_ID = process.env.BUILD_APPROVAL_FORUM_ID;
+const GESTION_FORUM_ID = process.env.GESTION_FORUM_ID;
 
 const client = new Client({
     intents: [
@@ -47,31 +52,18 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         const member = await reaction.message.guild.members.fetch(user.id);
         if (!member.permissions.has(PermissionFlagsBits.Administrator)) return;
 
-        // Build approval: text channel where users upload their builds. Staff reacts with ✅ to approve.
         const channel = reaction.message.channel;
-        const isBuildApprovalChannel =
-            BUILD_APPROVAL_FORUM_ID &&
-            (reaction.message.channelId === BUILD_APPROVAL_FORUM_ID ||
-                (channel?.isThread?.() && channel.parentId === BUILD_APPROVAL_FORUM_ID));
-        if (isBuildApprovalChannel) {
-            const fullMessage = await reaction.message.fetch();
-            await buildApprovalService.upsertApprovalFromMessage(fullMessage, user.id);
-            console.log(`✅ Build aprobado desde reacción en mensaje ${reaction.message.id}`);
-            return;
-        }
+        const fullMessage = await reaction.message.fetch();
+        
+        const approved = await reactionApprovalRouter.route({
+            channelId: reaction.message.channelId,
+            parentId: channel?.isThread?.() ? channel.parentId : null,
+            messageId: reaction.message.id,
+            message: fullMessage
+        }, user.tag ?? user.username ?? user.id);
 
-        // Activity approval: forum threads for registrar_suceso
-        if (channel?.isThread?.() && channel.parentId) {
-            const activityForumIds = getRegistrarSucesoForumIds();
-            if (activityForumIds.includes(channel.parentId)) {
-                const approved = await activityApprovalService.approveActivityByMessageId(
-                    reaction.message.id,
-                    user.tag ?? user.username ?? user.id
-                );
-                if (approved) {
-                    console.log(`✅ Actividad aprobada desde reacción en mensaje ${reaction.message.id}`);
-                }
-            }
+        if (approved) {
+            console.log(`✅ Aprobación procesada desde reacción en mensaje ${reaction.message.id}`);
         }
     } catch (error) {
         console.error('❌ Error procesando aprobación por reacción:', error);
@@ -138,6 +130,32 @@ client.on(Events.MessageCreate, async (message) => {
 
 client.once(Events.ClientReady, async (c) => {
     console.log(`✅ Sistema IZANAGI en línea. Bot: ${c.user.tag}`);
+    
+    // Register reaction approval handlers
+    reactionApprovalRouter.register({
+        matches: (ctx) => {
+            return !!(BUILD_APPROVAL_FORUM_ID &&
+                (ctx.channelId === BUILD_APPROVAL_FORUM_ID ||
+                    (ctx.parentId === BUILD_APPROVAL_FORUM_ID)));
+        },
+        approve: async (ctx, staff) => {
+            await buildApprovalService.upsertApprovalFromMessage(ctx.message, staff);
+            return true;
+        }
+    });
+
+    reactionApprovalRouter.register({
+        matches: (ctx) => {
+            const activityForumIds = getRegistrarSucesoForumIds();
+            return ctx.parentId ? activityForumIds.includes(ctx.parentId) : false;
+        },
+        approve: (ctx, staff) => activityApprovalService.approveActivityByMessageId(ctx.messageId, staff)
+    });
+
+    reactionApprovalRouter.register({
+        matches: (ctx) => ctx.parentId === GESTION_FORUM_ID,
+        approve: (ctx, staff) => promotionApprovalService.approveByMessageId(ctx.messageId, staff, ctx.message)
+    });
     
     // Load commands on startup
     commands = await loadCommands();

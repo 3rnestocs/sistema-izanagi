@@ -1,7 +1,6 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  PermissionFlagsBits,
   EmbedBuilder
 } from 'discord.js';
 import { prisma } from '../../lib/prisma';
@@ -10,6 +9,7 @@ import { StatValidatorService } from '../../services/StatValidatorService';
 import { type OptionalRequirement } from '../../services/LevelUpService';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { getFechaFromOption } from '../../utils/dateParser';
+import { assertForumPostContext } from '../../utils/channelGuards';
 
 const promotionService = new PromotionService(prisma);
 
@@ -73,12 +73,6 @@ export const data = new SlashCommandBuilder()
       .setDescription('Fecha del ascenso (en formato DD/MM/YYYY o escribe "hoy").')
       .setRequired(true)
   )
-  .addUserOption((option) =>
-    option
-      .setName('usuario')
-      .setDescription('Usuario al que se le aplicará el ascenso')
-      .setRequired(true)
-  )
   .addStringOption((option) =>
     option
       .setName('cargo')
@@ -92,21 +86,34 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     interaction,
     'ascender',
     async (interaction) => {
-      const isStaff = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator);
-      const targetUser = interaction.options.getUser('usuario', true);
+      // Guard: must be in a gestion thread
+      assertForumPostContext(interaction, {
+        enforceThreadOwnership: true,
+        invalidForumMessage: '⛔ Debes ejecutar este comando en tu thread de gestión dentro del foro de fichas.',
+        invalidThreadOwnershipMessage: '⛔ Debes ejecutar este comando en tu propio thread de gestión.'
+      });
+
       const cargo = interaction.options.getString('cargo');
 
-      if (!isStaff && targetUser.id !== interaction.user.id) {
-        throw new Error('⛔ Solo puedes ascendarte a ti mismo. El staff puede ascender a otros.');
-      }
-
       const character = await prisma.character.findUnique({
-        where: { discordId: targetUser.id },
+        where: { discordId: interaction.user.id },
         select: { id: true, name: true, level: true, rank: true }
       });
 
       if (!character) {
-        throw new Error(`⛔ ${targetUser.username} no tiene ficha registrada.`);
+        throw new Error(`⛔ No tienes ficha registrada.`);
+      }
+
+      // Guard: check for existing PENDING promotion
+      const existingPending = await prisma.pendingPromotion.findFirst({
+        where: {
+          characterId: character.id,
+          status: 'PENDING'
+        }
+      });
+
+      if (existingPending) {
+        throw new Error('⛔ Ya tienes un ascenso pendiente de validación. Espera a que el Staff lo apruebe.');
       }
 
       let targetType: 'level' | 'rank';
@@ -138,7 +145,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           .setColor(0xed4245)
           .setTitle('❌ No cumples los requisitos')
           .setDescription(
-            `**Personaje:** ${character.name} (<@${targetUser.id}>)\n**Objetivo:** ${objective}\n**Estado actual:** ${character.level} | ${character.rank}`
+            `**Personaje:** ${character.name}\n**Objetivo:** ${objective}\n**Estado actual:** ${character.level} | ${character.rank}`
           );
 
         if (check.missingRequirements && check.missingRequirements.length > 0) {
@@ -162,46 +169,60 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
         return interaction.editReply({ embeds: [embed] });
       } else if (check.promotionState === 'PENDING_STAFF') {
-        if (!isStaff) {
-          await interaction.editReply({
-            content: '⏳ Tu ascenso está pendiente de validación. Se ha publicado un mensaje en el canal para que el Staff lo revise.'
-          });
-
-          const staffEmbed = new EmbedBuilder()
-            .setColor(0xfee75c)
-            .setTitle('⏳ Ascenso pendiente de validación')
-            .setDescription(
-              `**Personaje:** ${character.name} (<@${targetUser.id}>)\n**Objetivo:** ${objective}\n**Estado actual:** ${character.level} | ${character.rank}`
-            )
-            .addFields({
-              name: 'Verificación manual requerida',
-              value: (check.manualRequirements ?? []).map((r) => `• ${r.replace(/^\s*-\s*/, '')}`).join('\n'),
-              inline: false
-            })
-            .addFields({
-              name: 'Métricas del personaje',
-              value: formatSnapshotForEmbed(check.snapshot),
-              inline: false
-            });
-
-          if (check.optionalRequirements && check.optionalRequirements.length > 0) {
-            const optionalLines = check.optionalRequirements
-              .map((opt) => `${opt.description} (${formatOptionalStatus(opt)})`)
-              .join('\n');
-            staffEmbed.addFields({
-              name: 'Requisitos opcionales (completados)',
-              value: optionalLines,
-              inline: false
-            });
+        // Create PendingPromotion record
+        const pending = await prisma.pendingPromotion.create({
+          data: {
+            characterId: character.id,
+            discordId: interaction.user.id,
+            targetType,
+            target: objective,
+            channelId: interaction.channelId ?? '',
+            manualRequirements: check.manualRequirements ?? []
           }
+        });
 
-          staffEmbed.setFooter({
-            text: 'Un miembro del Staff debe verificar los requisitos anteriores y aplicar el ascenso con /ascender si procede.'
+        const staffEmbed = new EmbedBuilder()
+          .setColor(0xfee75c)
+          .setTitle('⏳ Ascenso pendiente de validación')
+          .setDescription(
+            `**Personaje:** ${character.name} (<@${interaction.user.id}>)\n**Objetivo:** ${objective}\n**Estado actual:** ${character.level} | ${character.rank}`
+          )
+          .addFields({
+            name: 'Verificación manual requerida',
+            value: (check.manualRequirements ?? []).map((r) => `• ${r.replace(/^\s*-\s*/, '')}`).join('\n'),
+            inline: false
+          })
+          .addFields({
+            name: 'Métricas del personaje',
+            value: formatSnapshotForEmbed(check.snapshot),
+            inline: false
           });
 
-          return interaction.followUp({ embeds: [staffEmbed], ephemeral: false });
+        if (check.optionalRequirements && check.optionalRequirements.length > 0) {
+          const optionalLines = check.optionalRequirements
+            .map((opt) => `${opt.description} (${formatOptionalStatus(opt)})`)
+            .join('\n');
+          staffEmbed.addFields({
+            name: 'Requisitos opcionales (completados)',
+            value: optionalLines,
+            inline: false
+          });
         }
-        // Staff: fall through to apply promotion
+
+        staffEmbed.setFooter({
+          text: `Staff puede aprobar este ascenso reaccionando con ✅ — ID: ${pending.id}`
+        });
+
+        // Publish the embed as a non-ephemeral message
+        const publishedMessage = await interaction.editReply({ embeds: [staffEmbed] });
+
+        // Save the message ID
+        await prisma.pendingPromotion.update({
+          where: { id: pending.id },
+          data: { approvalMessageId: publishedMessage.id }
+        });
+
+        return;
       } else {
         throw new Error(`⛔ No cumples los requisitos: ${check.reason ?? 'Revisa los requisitos de ascenso.'}`);
       }

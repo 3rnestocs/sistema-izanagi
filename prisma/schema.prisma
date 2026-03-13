@@ -59,6 +59,7 @@ model Character {
   gradationHistory GradationHistory[]
   inventory   InventoryItem[]
   activities ActivityRecord[]
+  pendingPromotions PendingPromotion[]
   approvalId String? @unique
   approval CharacterBuildApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
 
@@ -322,5 +323,28 @@ model ActivityRecord {
   character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 
   @@index([characterId, type])
+  @@index([approvalMessageId])
+}
+
+// ==========================================
+// 📈 7. PROMOTION APPROVAL (for /ascender)
+// ==========================================
+
+model PendingPromotion {
+  id               String   @id @default(uuid())
+  characterId      String
+  discordId        String
+  targetType       String   // 'level' | 'rank'
+  target           String   // 'C1', 'D2', 'Jounin', etc.
+  channelId        String   // Discord thread channel ID where embed was posted
+  approvalMessageId String? @unique // Discord message ID of the pending embed
+  status           String   @default("PENDING") // PENDING, APPROVED, EXPIRED
+  manualRequirements String[] // Frozen list of manual requirements at request time
+  createdAt        DateTime @default(now())
+  approvedAt       DateTime?
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([characterId, status])
   @@index([approvalMessageId])
 }
