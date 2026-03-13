@@ -1,14 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { StatValidatorService } from './StatValidatorService';
-import {
-  ActivityResult,
-  ActivityStatus,
-  ActivityType,
-  canonicalizeActivityResult,
-  canonicalizeActivityStatus,
-  canonicalizeActivityType,
-  isSuccessResult
-} from '../domain/activityDomain';
+import { LevelUpService } from './LevelUpService';
+import { ActivityType } from '../domain/activityDomain';
 
 interface RequirementCheck {
   passed: boolean;
@@ -40,7 +33,11 @@ interface RequirementCheck {
 }
 
 export class PromotionService {
-  constructor(private prisma: PrismaClient) {}
+  private levelUpService: LevelUpService;
+
+  constructor(private prisma: PrismaClient) {
+    this.levelUpService = new LevelUpService(prisma);
+  }
 
   private readonly APPROVED_STATUSES = new Set<string>([ActivityStatus.APROBADO, ActivityStatus.AUTO_APROBADO]);
   private readonly NARRATION_TYPES = new Set<string>([ActivityType.EVENTO, ActivityType.CRONICA, ActivityType.ESCENA]);
@@ -138,48 +135,11 @@ export class PromotionService {
   }
 
   async checkRankRequirements(characterId: string, targetRank: string): Promise<RequirementCheck> {
-    const character = await this.prisma.character.findUnique({
-      where: { id: characterId },
-      include: { traits: { include: { trait: true } } }
-    });
-
-    if (!character) {
-      throw new Error('Personaje no encontrado.');
-    }
-
-    const snapshot = await this.buildMetrics(character);
-    const normalizedTarget = this.normalizeTarget(targetRank);
-    const displayName = this.RANK_DISPLAY_NAMES[normalizedTarget];
-
-    if (!displayName) {
-      throw new Error(`Rango no reconocido: ${targetRank}`);
-    }
-
-    // Validation logic here (condensed for brevity - copy from LevelUpService)
-    return { passed: true, snapshot };
+    return this.levelUpService.checkRankRequirements(characterId, targetRank);
   }
 
   async checkLevelRequirements(characterId: string, targetLevel: string): Promise<RequirementCheck> {
-    const character = await this.prisma.character.findUnique({
-      where: { id: characterId }
-    });
-
-    if (!character) {
-      throw new Error('Personaje no encontrado.');
-    }
-
-    const snapshot = await this.buildMetrics(character);
-    const requiredExp = this.LEVEL_EXP_REQUIREMENTS[targetLevel];
-
-    if (requiredExp === undefined) {
-      throw new Error(`Nivel no reconocido: ${targetLevel}`);
-    }
-
-    return {
-      passed: character.exp >= requiredExp,
-      ...(character.exp < requiredExp && { reason: `Necesitas ${requiredExp - character.exp} EXP más.` }),
-      snapshot
-    };
+    return this.levelUpService.checkLevelRequirements(characterId, targetLevel);
   }
 
   async applyPromotion(
@@ -201,6 +161,14 @@ export class PromotionService {
             level: target,
             sp: { increment: spGranted }
           }
+        });
+        const achievedAt = promotedAt ?? new Date();
+        await tx.gradationHistory.upsert({
+          where: {
+            characterId_level: { characterId, level: target }
+          },
+          create: { characterId, level: target, achievedAt },
+          update: { achievedAt }
         });
       } else {
         const displayName = this.RANK_DISPLAY_NAMES[this.normalizeTarget(target)];

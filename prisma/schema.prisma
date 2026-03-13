@@ -56,6 +56,7 @@ model Character {
   traits        CharacterTrait[]
   plazas CharacterPlaza[]
   logs   AuditLog[]
+  gradationHistory GradationHistory[]
   inventory   InventoryItem[]
   activities ActivityRecord[]
   approvalId String? @unique
@@ -233,6 +234,18 @@ model AuditLog {
   character Character? @relation(fields: [characterId], references: [id], onDelete: SetNull)
 
   // 🚀 SOLUCIÓN: Índice manual para optimizar consultas por personaje
+  @@index([characterId])
+}
+
+model GradationHistory {
+  id          String   @id @default(uuid())
+  characterId String
+  level       String   // D2, D3, C1, C2, ... S2
+  achievedAt  DateTime @default(now())
+
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@unique([characterId, level])
   @@index([characterId])
 }
 
