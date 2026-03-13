@@ -210,22 +210,31 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       if (fechaResult && 'error' in fechaResult) {
         throw new Error(`⛔ ${fechaResult.error}`);
       }
-      const promotedAt = fechaResult && 'date' in fechaResult ? fechaResult.date : undefined;
+      if (!fechaResult || !('date' in fechaResult)) {
+        throw new Error('⛔ Debes indicar una fecha válida (DD/MM/YYYY o "hoy").');
+      }
+      const promotedAt = fechaResult.date;
 
       const result = await promotionService.applyPromotion(character.id, targetType, objective, promotedAt);
 
-      const responseLines = [
-        '✅ Ascenso aplicado correctamente.',
-        `👤 Personaje: **${character.name}**`,
-        `🎯 Objetivo: **${objective}**`,
-        `📈 Nivel Anterior: **${character.level}**`,
-        `🏷️ Cargo Anterior: **${character.rank}**`
-      ];
+      const fechaFormateada = `${String(promotedAt.getUTCDate()).padStart(2, '0')}/${String(promotedAt.getUTCMonth() + 1).padStart(2, '0')}/${promotedAt.getUTCFullYear()}`;
+
+      const successEmbed = new EmbedBuilder()
+        .setColor(0x57f287)
+        .setTitle('✅ Ascenso aplicado')
+        .addFields(
+          { name: 'Personaje', value: character.name, inline: true },
+          { name: 'Objetivo', value: objective, inline: true },
+          { name: 'Nivel anterior', value: character.level, inline: true },
+          { name: 'Cargo anterior', value: character.rank, inline: true },
+          { name: 'Fecha', value: fechaFormateada, inline: true }
+        );
+
       if (result.spGranted !== undefined) {
-        responseLines.push(`✨ SP otorgados: **+${result.spGranted}**`);
+        successEmbed.addFields({ name: 'SP otorgados', value: `+${result.spGranted}`, inline: true });
       }
 
-      return interaction.editReply(responseLines.join('\n'));
+      return interaction.editReply({ embeds: [successEmbed] });
     },
     {
       defer: { ephemeral: true },
