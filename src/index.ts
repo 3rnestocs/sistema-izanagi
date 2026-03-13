@@ -16,7 +16,9 @@ import { loadCommands, Command } from './lib/commandLoader';
 import { BuildApprovalService } from './services/BuildApprovalService';
 import { ActivityApprovalService } from './services/ActivityApprovalService';
 import { PromotionApprovalService } from './services/PromotionApprovalService';
-import { ReactionApprovalRouter, type ReactionApprovalContext } from './services/ReactionApprovalRouter';
+import { WishApprovalHandler } from './services/WishApprovalHandler';
+import { PlazaService } from './services/PlazaService';
+import { ReactionApprovalRouter } from './services/ReactionApprovalRouter';
 import { getRegistrarSucesoForumIds, getAllBotForumIds } from './utils/channelGuards';
 
 // Commands will be loaded dynamically
@@ -24,6 +26,8 @@ let commands: Collection<string, Command>;
 const buildApprovalService = new BuildApprovalService(prisma);
 const activityApprovalService = new ActivityApprovalService(prisma);
 const promotionApprovalService = new PromotionApprovalService(prisma);
+const plazaService = new PlazaService(prisma);
+const wishApprovalHandler = new WishApprovalHandler(prisma, plazaService);
 const reactionApprovalRouter = new ReactionApprovalRouter();
 const BUILD_APPROVAL_FORUM_ID = process.env.BUILD_APPROVAL_FORUM_ID;
 const GESTION_FORUM_ID = process.env.GESTION_FORUM_ID;
@@ -131,7 +135,9 @@ client.on(Events.MessageCreate, async (message) => {
 client.once(Events.ClientReady, async (c) => {
     console.log(`✅ Sistema IZANAGI en línea. Bot: ${c.user.tag}`);
     
-    // Register reaction approval handlers
+    // Register reaction approval handlers (WishApprovalHandler first: specific embed title match)
+    reactionApprovalRouter.register(wishApprovalHandler);
+
     reactionApprovalRouter.register({
         matches: (ctx) => {
             return !!(BUILD_APPROVAL_FORUM_ID &&

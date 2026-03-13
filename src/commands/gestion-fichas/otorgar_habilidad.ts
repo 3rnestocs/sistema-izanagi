@@ -1,11 +1,12 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  PermissionFlagsBits
+  EmbedBuilder
 } from 'discord.js';
 import { prisma } from '../../lib/prisma';
 import { PlazaService, PlazaGrantType } from '../../services/PlazaService';
-import { executeWithErrorHandling } from '../../utils/errorHandler';
+import { assertForumPostContext } from '../../utils/channelGuards';
+import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 
 const plazaService = new PlazaService(prisma);
 
@@ -15,16 +16,16 @@ const GRANT_TYPE_CHOICES: Array<{ name: string; value: PlazaGrantType }> = [
   { name: 'Deseo Especial', value: 'DESEO_ESPECIAL' }
 ];
 
+const TIPO_LABELS: Record<PlazaGrantType, string> = {
+  INICIAL: 'Inicial',
+  DESARROLLO: 'Desarrollo',
+  DESEO_NORMAL: 'Deseo Normal',
+  DESEO_ESPECIAL: 'Deseo Especial'
+};
+
 export const data = new SlashCommandBuilder()
   .setName('otorgar_habilidad')
-  .setDescription('Otorga una habilidad/plaza a un personaje (solo Staff).')
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-  .addUserOption((option) =>
-    option
-      .setName('usuario')
-      .setDescription('Usuario que recibirá la habilidad')
-      .setRequired(true)
-  )
+  .setDescription('Solicita una habilidad/plaza para tu personaje. Staff aprobará con ✅.')
   .addStringOption((option) =>
     option
       .setName('plaza')
@@ -64,77 +65,70 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     interaction,
     'otorgar_habilidad',
     async (interaction) => {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-      throw new Error('⛔ Este comando es exclusivo de Staff.');
-    }
+      assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
-    const targetUser = interaction.options.getUser('usuario', true);
-    const plazaName = interaction.options.getString('plaza', true).trim();
-    const grantType = interaction.options.getString('tipo_otorgamiento', true) as PlazaGrantType;
-    const evidence = interaction.options.getString('evidencia', true).trim();
-    const costoBts = interaction.options.getInteger('costo_bts') ?? undefined;
-    const costoBes = interaction.options.getInteger('costo_bes') ?? undefined;
+      const plazaName = interaction.options.getString('plaza', true).trim();
+      const grantType = interaction.options.getString('tipo_otorgamiento', true) as PlazaGrantType;
+      const evidence = interaction.options.getString('evidencia', true).trim();
+      const costoBts = interaction.options.getInteger('costo_bts') ?? 0;
+      const costoBes = interaction.options.getInteger('costo_bes') ?? 0;
 
-    if (costoBts && costoBes) {
-      throw new Error('⛔ Debes elegir solo una ruta de costo: BTS o BES.');
-    }
-
-    const character = await prisma.character.findUnique({
-      where: { discordId: targetUser.id },
-      select: {
-        id: true,
-        name: true,
-        cupos: true,
-        bts: true,
-        bes: true,
-        specialWishUsed: true
+      if (costoBts > 0 && costoBes > 0) {
+        throw validationError('Debes elegir solo una ruta de costo: BTS o BES.');
       }
-    });
 
-    if (!character) {
-      throw new Error(`⛔ ${targetUser.username} no tiene ficha registrada.`);
-    }
+      const character = await prisma.character.findUnique({
+        where: { discordId: interaction.user.id },
+        select: { id: true, name: true }
+      });
 
-    const assignPayload = {
-      characterId: character.id,
-      plazaName,
-      grantType,
-      evidence: `${evidence} | Staff: ${interaction.user.tag}`,
-      ...(costoBts ? { costoBts } : {}),
-      ...(costoBes ? { costoBes } : {})
-    };
-
-    await plazaService.assignPlaza(assignPayload);
-
-    const updatedCharacter = await prisma.character.findUnique({
-      where: { id: character.id },
-      select: {
-        cupos: true,
-        bts: true,
-        bes: true,
-        specialWishUsed: true
+      if (!character) {
+        throw validationError('No tienes ficha registrada. Usa `/registro` primero.');
       }
-    });
 
-    const responseLines = [
-      '✅ Habilidad otorgada correctamente.',
-      `👤 Personaje: **${character.name}** (<@${targetUser.id}>)`,
-      `📚 Plaza: **${plazaName}**`,
-      `🧾 Tipo: **${grantType}**`,
-      `🔗 Evidencia: ${evidence}`,
-      '',
-      '**Estado actual de recursos:**',
-      `- Cupos: ${updatedCharacter?.cupos ?? character.cupos}`,
-      `- BTS: ${updatedCharacter?.bts ?? character.bts}`,
-      `- BES: ${updatedCharacter?.bes ?? character.bes}`,
-      `- Deseo especial usado: ${(updatedCharacter?.specialWishUsed ?? character.specialWishUsed) ? 'Sí' : 'No'}`
-    ];
+      const plaza = await prisma.plaza.findUnique({
+        where: { name: plazaName },
+        select: { id: true }
+      });
 
-    return interaction.editReply(responseLines.join('\n'));
+      if (!plaza) {
+        throw validationError(`La plaza '${plazaName}' no existe. Revisa el nombre en /catalogo.`);
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle('Solicitud de Habilidad')
+        .setColor(0xfee75c)
+        .addFields(
+          { name: 'Solicitante', value: `<@${interaction.user.id}> (${character.name})`, inline: false },
+          { name: 'Plaza', value: plazaName, inline: true },
+          { name: 'Tipo de otorgamiento', value: TIPO_LABELS[grantType], inline: true },
+          { name: 'Evidencia', value: evidence, inline: false }
+        );
+
+      if (costoBts > 0) {
+        embed.addFields({ name: 'Costo BTS', value: String(costoBts), inline: true });
+      }
+      if (costoBes > 0) {
+        embed.addFields({ name: 'Costo BES', value: String(costoBes), inline: true });
+      }
+
+      const footerParts = [
+        `UserID: ${interaction.user.id}`,
+        `PlazaID: ${plaza.id}`,
+        `Tipo: ${grantType}`,
+        `BTS: ${costoBts}`,
+        `BES: ${costoBes}`
+      ];
+      embed.setFooter({ text: footerParts.join(' | ') });
+
+      return interaction.reply({
+        embeds: [embed],
+        ephemeral: false
+      });
     },
     {
-      defer: { ephemeral: true },
-      fallbackMessage: 'Error desconocido al otorgar habilidad.',
+      defer: false,
+      fallbackMessage: 'Error al crear solicitud de habilidad.',
       errorEphemeral: true
     }
   );
