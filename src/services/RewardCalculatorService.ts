@@ -7,7 +7,10 @@ import {
   STANDARD_NARRATION_REWARDS,
   getLogroGeneralEntry,
   getLogroReputacionEntry,
-  RewardBreakdown
+  RewardBreakdown,
+  DetailedRewardBreakdown,
+  RewardDetail,
+  roundHalfUp
 } from '../config/activityRewards';
 import { getHistoricalNarrationRewards } from '../config/historicalNarrations';
 import {
@@ -19,7 +22,7 @@ import {
   isSuccessResult
 } from '../domain/activityDomain';
 
-export type { RewardBreakdown };
+export type { RewardBreakdown, DetailedRewardBreakdown, RewardDetail };
 
 export class RewardCalculatorService {
   private readonly RANK_VALUES: Readonly<Record<string, number>> = {
@@ -63,6 +66,47 @@ export class RewardCalculatorService {
 
     // Apply trait multipliers if character has traits
     return this.applyTraitMultipliers(baseRewards, character.traits ?? []);
+  }
+
+  /**
+   * Like calculateRewards but returns per-resource breakdown (base, bonus, total, source) for embed display.
+   */
+  public calculateDetailedRewards(
+    character: Character & { traits?: any[] },
+    activity: ActivityRecord & { narrationKey?: string | null }
+  ): DetailedRewardBreakdown {
+    const normalizedType = canonicalizeActivityType(activity.type);
+
+    let baseRewards: RewardBreakdown;
+
+    if (normalizedType === ActivityType.MISION) {
+      baseRewards = this.calculateMissionRewards(activity.rank, activity.result);
+    } else if (normalizedType === ActivityType.COMBATE) {
+      baseRewards = this.calculateCombatRewards(character.level, activity.rank, activity.result);
+    } else if (normalizedType === ActivityType.CURACION) {
+      baseRewards = this.calculateCuracionRewards(activity.rank);
+    } else if (normalizedType === ActivityType.DESARROLLO_PERSONAL) {
+      baseRewards = this.calculateDesarrolloPersonalRewards(character.level);
+    } else if (normalizedType === ActivityType.CRONICA) {
+      baseRewards = this.calculateCronicaRewards(activity.result, activity.narrationKey);
+    } else if (normalizedType === ActivityType.EVENTO) {
+      baseRewards = this.calculateEventoRewards(activity.result, activity.narrationKey);
+    } else if (normalizedType === ActivityType.LOGRO_GENERAL) {
+      baseRewards = this.calculateLogroGeneralRewards(activity.narrationKey);
+    } else if (normalizedType === ActivityType.LOGRO_REPUTACION) {
+      baseRewards = this.calculateLogroReputacionRewards(activity.narrationKey);
+    } else if (normalizedType === ActivityType.BALANCE_GENERAL) {
+      baseRewards = this.calculateBalanceGeneralRewards(activity.narrationKey);
+    } else {
+      return {
+        exp: { base: 0, bonus: 0, total: 0 },
+        pr: { base: 0, bonus: 0, total: 0 },
+        ryou: { base: 0, bonus: 0, total: 0 }
+      };
+    }
+
+    const details = this.applyTraitMultipliersWithDetails(baseRewards, character.traits ?? []);
+    return details;
   }
 
   /**
@@ -278,37 +322,76 @@ export class RewardCalculatorService {
 
   /**
    * 🧬 Aplicar multiplicadores de rasgos a las recompensas de actividad.
-   * Solo mechanics.expMultiplier (Presteza 1.5x, Arrepentimiento 0.5x) y mechanics.prMultiplier (Leyenda, Cínico, Presionado).
-   * - multiplierGanancia NO se aplica aquí (Ambicioso solo afecta el sueldo semanal en Monday cron).
-   * - expCostMultiplier NO se aplica aquí (Tonto duplica costes de experimentos/Tienda EXP, no recompensas).
+   * Rounding: < 0.5 stays, >= 0.5 goes up (e.g. 1.4→1, 4.5→5).
    */
   private applyTraitMultipliers(
     rewards: RewardBreakdown,
     traits: any[]
   ): RewardBreakdown {
+    const detailed = this.applyTraitMultipliersWithDetails(rewards, traits);
+    return {
+      exp: detailed.exp.total,
+      pr: detailed.pr.total,
+      ryou: detailed.ryou.total,
+      ...(detailed.rc !== undefined && detailed.rc > 0 ? { rc: detailed.rc } : {}),
+      ...(detailed.cupos !== undefined && detailed.cupos > 0 ? { cupos: detailed.cupos } : {})
+    };
+  }
+
+  /**
+   * Returns per-resource breakdown with base, bonus (trait contribution), total, and source trait name(s).
+   */
+  private applyTraitMultipliersWithDetails(
+    rewards: RewardBreakdown,
+    traits: any[]
+  ): DetailedRewardBreakdown {
     let expMultiplier = 1.0;
     let prMultiplier = 1.0;
+    const expSources: string[] = [];
+    const prSources: string[] = [];
 
     for (const traitRecord of traits) {
       const trait = traitRecord.trait || traitRecord;
+      const name = trait.name as string | undefined;
 
       if (trait.mechanics && typeof trait.mechanics === 'object' && !Array.isArray(trait.mechanics)) {
         const mech = trait.mechanics as Record<string, unknown>;
 
         if (mech.expMultiplier && typeof mech.expMultiplier === 'number') {
           expMultiplier *= mech.expMultiplier;
+          if (name) expSources.push(name);
         }
 
         if (mech.prMultiplier && typeof mech.prMultiplier === 'number') {
           prMultiplier *= mech.prMultiplier;
+          if (name) prSources.push(name);
         }
       }
     }
 
+    const expTotal = roundHalfUp(rewards.exp * expMultiplier);
+    const prTotal = roundHalfUp(rewards.pr * prMultiplier);
+    const expBonus = expTotal - rewards.exp;
+    const prBonus = prTotal - rewards.pr;
+
     return {
-      exp: Math.floor(rewards.exp * expMultiplier),
-      pr: Math.floor(rewards.pr * prMultiplier),
-      ryou: rewards.ryou,
+      exp: {
+        base: rewards.exp,
+        bonus: expBonus,
+        total: expTotal,
+        ...(expSources.length > 0 ? { source: expSources.join(', ') } : {})
+      },
+      pr: {
+        base: rewards.pr,
+        bonus: prBonus,
+        total: prTotal,
+        ...(prSources.length > 0 ? { source: prSources.join(', ') } : {})
+      },
+      ryou: {
+        base: rewards.ryou,
+        bonus: 0,
+        total: rewards.ryou
+      },
       ...(rewards.rc !== undefined && rewards.rc > 0 ? { rc: rewards.rc } : {}),
       ...(rewards.cupos !== undefined && rewards.cupos > 0 ? { cupos: rewards.cupos } : {})
     };

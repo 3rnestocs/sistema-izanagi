@@ -22,7 +22,8 @@ import {
     LOGRO_GENERAL_CATALOG,
     LOGRO_REPUTACION_CATALOG,
     getLogroGeneralEntry,
-    getLogroReputacionEntry
+    getLogroReputacionEntry,
+    type DetailedRewardBreakdown
 } from '../../config/activityRewards';
 
 const rewardCalculatorService = new RewardCalculatorService();
@@ -91,6 +92,46 @@ async function publishActivityEmbed(
     embed: EmbedBuilder
 ): Promise<Message> {
     return (await interaction.editReply({ embeds: [embed] })) as Message;
+}
+
+function formatDetailedRewardLines(detailed: DetailedRewardBreakdown): string[] {
+    const lines: string[] = [];
+
+    if (detailed.exp.total > 0) {
+        if (detailed.exp.bonus !== 0 && detailed.exp.source) {
+            const sign = detailed.exp.bonus > 0 ? '+' : '';
+            lines.push(
+                `✨ EXP: ${detailed.exp.base} (Base) ${sign}${detailed.exp.bonus} (${detailed.exp.source}) [${detailed.exp.total} EXP Totales]`
+            );
+        } else {
+            lines.push(`✨ EXP: +${detailed.exp.total}`);
+        }
+    }
+    if (detailed.pr.total > 0) {
+        if (detailed.pr.bonus !== 0 && detailed.pr.source) {
+            const sign = detailed.pr.bonus > 0 ? '+' : '';
+            lines.push(
+                `🏆 PR: ${detailed.pr.base} (Base) ${sign}${detailed.pr.bonus} (${detailed.pr.source}) [${detailed.pr.total} PR Totales]`
+            );
+        } else {
+            lines.push(`🏆 PR: +${detailed.pr.total}`);
+        }
+    }
+    if (detailed.ryou.total > 0) {
+        if (detailed.ryou.bonus !== 0 && detailed.ryou.source) {
+            const sign = detailed.ryou.bonus > 0 ? '+' : '';
+            lines.push(
+                `🪙 Ryou: ${detailed.ryou.base} (Base) ${sign}${detailed.ryou.bonus} (${detailed.ryou.source}) [${detailed.ryou.total} Ryou Totales]`
+            );
+        } else {
+            lines.push(`🪙 Ryou: +${detailed.ryou.total}`);
+        }
+    }
+    if ((detailed.rc ?? 0) > 0) lines.push(`📜 RC: +${detailed.rc}`);
+    if ((detailed.cupos ?? 0) > 0) lines.push(`📋 Cupos: +${detailed.cupos}`);
+    if ((detailed.bts ?? 0) > 0) lines.push(`🔧 BTS: +${detailed.bts}`);
+
+    return lines;
 }
 
 const evidenciaDesc = 'Link al foro, pantallazo o mensaje de Discord que prueba la actividad';
@@ -664,19 +705,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 !isBalanceManualOverride;
 
             if (isAutoApprovable) {
-                const rewards = rewardCalculatorService.calculateRewards(
+                const detailed = rewardCalculatorService.calculateDetailedRewards(
                     character as any,
                     { ...nuevaActividad, narrationKey: selectedCatalogKey } as any
                 );
 
                 await prisma.$transaction(async (tx: any) => {
                     const updateData: Record<string, { increment: number }> = {
-                        exp: { increment: rewards.exp },
-                        pr: { increment: rewards.pr },
-                        ryou: { increment: rewards.ryou }
+                        exp: { increment: detailed.exp.total },
+                        pr: { increment: detailed.pr.total },
+                        ryou: { increment: detailed.ryou.total }
                     };
-                    if (rewards.rc && rewards.rc > 0) updateData.rc = { increment: rewards.rc };
-                    if (rewards.cupos && rewards.cupos > 0) updateData.cupos = { increment: rewards.cupos };
+                    if ((detailed.rc ?? 0) > 0) updateData.rc = { increment: detailed.rc! };
+                    if ((detailed.cupos ?? 0) > 0) updateData.cupos = { increment: detailed.cupos! };
 
                     await tx.character.update({
                         where: { id: character.id },
@@ -689,33 +730,28 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                     });
 
                     const auditData: Record<string, number> = {
-                        deltaExp: rewards.exp,
-                        deltaPr: rewards.pr,
-                        deltaRyou: rewards.ryou
+                        deltaExp: detailed.exp.total,
+                        deltaPr: detailed.pr.total,
+                        deltaRyou: detailed.ryou.total
                     };
-                    if (rewards.rc && rewards.rc > 0) auditData.deltaRc = rewards.rc;
-                    if (rewards.cupos && rewards.cupos > 0) auditData.deltaCupos = rewards.cupos;
+                    if ((detailed.rc ?? 0) > 0) auditData.deltaRc = detailed.rc!;
+                    if ((detailed.cupos ?? 0) > 0) auditData.deltaCupos = detailed.cupos!;
 
                     await tx.auditLog.create({
                         data: {
                             characterId: character.id,
                             category: 'Registro Automático de Actividad',
-                            detail: `Actividad ${tipo} auto-aprobada. Recompensas: EXP=${rewards.exp}, PR=${rewards.pr}, Ryou=${rewards.ryou}` +
-                                (rewards.rc ? `, RC=${rewards.rc}` : '') +
-                                (rewards.cupos ? `, Cupos=${rewards.cupos}` : ''),
+                            detail: `Actividad ${tipo} auto-aprobada. Recompensas: EXP=${detailed.exp.total}, PR=${detailed.pr.total}, Ryou=${detailed.ryou.total}` +
+                                (detailed.rc ? `, RC=${detailed.rc}` : '') +
+                                (detailed.cupos ? `, Cupos=${detailed.cupos}` : ''),
                             evidence: evidencia,
                             ...auditData
                         }
                     });
                 });
 
-                const rewardLines = [
-                    `✨ EXP: +${rewards.exp}`,
-                    `🏆 PR: +${rewards.pr}`,
-                    `🪙 Ryou: +${rewards.ryou}`,
-                    ...(rewards.rc && rewards.rc > 0 ? [`📜 RC: +${rewards.rc}`] : []),
-                    ...(rewards.cupos && rewards.cupos > 0 ? [`📋 Cupos: +${rewards.cupos}`] : [])
-                ].join('\n');
+                const rewardLinesArr = formatDetailedRewardLines(detailed);
+                const rewardLines = rewardLinesArr.length > 0 ? rewardLinesArr.join('\n') : '—';
 
                 const activitySummary = [
                     `**Usuario:** <@${interaction.user.id}> (${character.name})`,
@@ -762,18 +798,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 return;
             }
 
-            const projectedRewards = rewardCalculatorService.calculateRewards(
+            const projectedDetailed = rewardCalculatorService.calculateDetailedRewards(
                 character as any,
                 { ...nuevaActividad, narrationKey: selectedCatalogKey } as any
             );
 
-            const projectedRewardLines = [
-                `✨ EXP: +${projectedRewards.exp}`,
-                `🏆 PR: +${projectedRewards.pr}`,
-                `🪙 Ryou: +${projectedRewards.ryou}`,
-                ...(projectedRewards.rc && projectedRewards.rc > 0 ? [`📜 RC: +${projectedRewards.rc}`] : []),
-                ...(projectedRewards.cupos && projectedRewards.cupos > 0 ? [`📋 Cupos: +${projectedRewards.cupos}`] : [])
-            ].join('\n');
+            const projectedRewardLinesArr = formatDetailedRewardLines(projectedDetailed);
+            const projectedRewardLines =
+                projectedRewardLinesArr.length > 0 ? projectedRewardLinesArr.join('\n') : '—';
 
             const pendingSummary = [
                 `**ID de Registro:** ${nuevaActividad.id}`,
@@ -818,10 +850,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                               : 'Esta Crónica/Evento tiene recompensas históricas especiales que requieren revisión.'
                       ]
                     : []),
-                ...(!hasClaimedRewards &&
-                projectedRewards.exp === 0 &&
-                projectedRewards.pr === 0 &&
-                projectedRewards.ryou === 0
+                ...                (!hasClaimedRewards &&
+                projectedDetailed.exp.total === 0 &&
+                projectedDetailed.pr.total === 0 &&
+                projectedDetailed.ryou.total === 0
                     ? [
                           'Este tipo de actividad requiere revisión manual por parte del staff. Usa `/ajustar_recursos otorgar` si el mensaje fue borrado.'
                       ]

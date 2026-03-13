@@ -14,6 +14,28 @@ export interface RewardBreakdown {
   bts?: number;
 }
 
+/** Per-resource breakdown for embed display (base + trait bonus). */
+export interface RewardDetail {
+  base: number;
+  bonus: number;
+  total: number;
+  source?: string;
+}
+
+export interface DetailedRewardBreakdown {
+  exp: RewardDetail;
+  pr: RewardDetail;
+  ryou: RewardDetail;
+  rc?: number;
+  cupos?: number;
+  bts?: number;
+}
+
+/** Round half up: < 0.5 stays, >= 0.5 rounds up (e.g. 1.4→1, 4.5→5). */
+export function roundHalfUp(x: number): number {
+  return Math.floor(x + 0.5);
+}
+
 // Activity tier classification: AUTO = deterministic rewards, MANUAL = staff-set rewards
 export const ACTIVITY_TIER: Record<string, 'AUTO' | 'MANUAL'> = {
   [ActivityType.MISION]: 'AUTO',
