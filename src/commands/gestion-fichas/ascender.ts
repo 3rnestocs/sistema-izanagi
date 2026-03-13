@@ -133,10 +133,19 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         objective = nextLevel;
       }
 
+      const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
+      if (fechaResult && 'error' in fechaResult) {
+        throw new Error(`⛔ ${fechaResult.error}`);
+      }
+      if (!fechaResult || !('date' in fechaResult)) {
+        throw new Error('⛔ Debes indicar una fecha válida (DD/MM/YYYY o "hoy").');
+      }
+      const promotedAt = fechaResult.date;
+
       const check =
         targetType === 'level'
-          ? await promotionService.checkLevelRequirements(character.id, objective)
-          : await promotionService.checkRankRequirements(character.id, objective);
+          ? await promotionService.checkLevelRequirements(character.id, objective, promotedAt)
+          : await promotionService.checkRankRequirements(character.id, objective, promotedAt);
 
       if (check.passed) {
         // APPROVED: proceed to promotion
@@ -227,15 +236,6 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         throw new Error(`⛔ No cumples los requisitos: ${check.reason ?? 'Revisa los requisitos de ascenso.'}`);
       }
 
-      const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
-      if (fechaResult && 'error' in fechaResult) {
-        throw new Error(`⛔ ${fechaResult.error}`);
-      }
-      if (!fechaResult || !('date' in fechaResult)) {
-        throw new Error('⛔ Debes indicar una fecha válida (DD/MM/YYYY o "hoy").');
-      }
-      const promotedAt = fechaResult.date;
-
       const result = await promotionService.applyPromotion(character.id, targetType, objective, promotedAt);
 
       const fechaFormateada = `${String(promotedAt.getUTCDate()).padStart(2, '0')}/${String(promotedAt.getUTCMonth() + 1).padStart(2, '0')}/${promotedAt.getUTCFullYear()}`;
@@ -244,9 +244,9 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         .setColor(0x57f287)
         .setTitle('✅ Ascenso aplicado')
         .addFields(
-          { name: 'Personaje', value: character.name, inline: true },
-          { name: 'Objetivo', value: objective, inline: true },
-          { name: 'Nivel anterior', value: character.level, inline: true },
+          { name: 'Usuario', value: character.name, inline: true },
+          { name: 'Nuevo rango', value: objective, inline: true },
+          { name: 'Rango anterior', value: character.level, inline: true },
           { name: 'Cargo anterior', value: character.rank, inline: true },
           { name: 'Fecha', value: fechaFormateada, inline: true }
         );

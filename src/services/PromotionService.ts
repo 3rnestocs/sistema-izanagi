@@ -116,12 +116,20 @@ export class PromotionService {
     return metrics;
   }
 
-  async checkRankRequirements(characterId: string, targetRank: string): Promise<RequirementCheck> {
-    return this.levelUpService.checkRankRequirements(characterId, targetRank);
+  async checkRankRequirements(
+    characterId: string,
+    targetRank: string,
+    referenceDate?: Date
+  ): Promise<RequirementCheck> {
+    return this.levelUpService.checkRankRequirements(characterId, targetRank, referenceDate);
   }
 
-  async checkLevelRequirements(characterId: string, targetLevel: string): Promise<RequirementCheck> {
-    return this.levelUpService.checkLevelRequirements(characterId, targetLevel);
+  async checkLevelRequirements(
+    characterId: string,
+    targetLevel: string,
+    referenceDate?: Date
+  ): Promise<RequirementCheck> {
+    return this.levelUpService.checkLevelRequirements(characterId, targetLevel, referenceDate);
   }
 
   async applyPromotion(

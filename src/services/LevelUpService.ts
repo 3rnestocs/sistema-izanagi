@@ -307,10 +307,14 @@ export class LevelUpService {
     };
   }
 
-  async checkRankRequirements(characterId: string, targetRankOrLevel: string): Promise<RequirementCheck> {
+  async checkRankRequirements(
+    characterId: string,
+    targetRankOrLevel: string,
+    referenceDate?: Date
+  ): Promise<RequirementCheck> {
     const normalizedTarget = this.normalizeTarget(targetRankOrLevel);
     if (this.isInternalLevel(normalizedTarget)) {
-      return this.checkLevelRequirements(characterId, normalizedTarget);
+      return this.checkLevelRequirements(characterId, normalizedTarget, referenceDate);
     }
 
     const character = await this.prisma.character.findUnique({
@@ -503,7 +507,12 @@ export class LevelUpService {
     return { passed: true, promotionState: 'APPROVED' as const, snapshot };
   }
 
-  async checkLevelRequirements(characterId: string, targetLevel: string): Promise<RequirementCheck> {
+  async checkLevelRequirements(
+    characterId: string,
+    targetLevel: string,
+    referenceDate?: Date
+  ): Promise<RequirementCheck> {
+    const refDate = referenceDate ?? new Date();
     const normalizedTargetLevel = this.normalizeTarget(targetLevel);
     if (!this.isInternalLevel(normalizedTargetLevel)) {
       throw new Error(`⛔ ACCIÓN PROHIBIDA: El nivel '${targetLevel}' no es una gradación válida.`);
@@ -558,7 +567,7 @@ export class LevelUpService {
         if (!refDateC1) {
           manualRequirements.push('No hay historial de gradación. Requiere revisión manual.');
         } else {
-          const daysSinceD = this.calendarDaysBetween(refDateC1, new Date());
+          const daysSinceD = this.calendarDaysBetween(refDateC1, refDate);
           if (daysSinceD < 5) {
             missingRequirements.push(`Faltan días como Rango D para C1 (requiere 5, actualmente ${daysSinceD}).`);
           }
@@ -592,7 +601,7 @@ export class LevelUpService {
           manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
         } else {
           const daysRequiredC2C3 = 2;
-          const daysSince = this.calendarDaysBetween(refDateC2C3, new Date());
+          const daysSince = this.calendarDaysBetween(refDateC2C3, refDate);
           if (daysSince < daysRequiredC2C3) {
             missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredC2C3}, actualmente ${daysSince}).`);
           }
@@ -627,7 +636,7 @@ export class LevelUpService {
         if (!refDateB1) {
           manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
         } else {
-          const daysSinceC = this.calendarDaysBetween(refDateB1, new Date());
+          const daysSinceC = this.calendarDaysBetween(refDateB1, refDate);
           if (daysSinceC < 8) {
             missingRequirements.push(`Faltan días como Rango C para B1 (requiere 8, actualmente ${daysSinceC}).`);
           }
@@ -668,7 +677,7 @@ export class LevelUpService {
           manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
         } else {
           const daysRequiredB2B3 = 3;
-          const daysSince = this.calendarDaysBetween(refDateB2B3, new Date());
+          const daysSince = this.calendarDaysBetween(refDateB2B3, refDate);
           if (daysSince < daysRequiredB2B3) {
             missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredB2B3}, actualmente ${daysSince}).`);
           }
@@ -704,7 +713,7 @@ export class LevelUpService {
         if (!refDateA1) {
           manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
         } else {
-          const daysSinceB = this.calendarDaysBetween(refDateA1, new Date());
+          const daysSinceB = this.calendarDaysBetween(refDateA1, refDate);
           if (daysSinceB < 14) {
             missingRequirements.push(`Faltan días como Rango B para A1 (requiere 14, actualmente ${daysSinceB}).`);
           }
@@ -747,7 +756,7 @@ export class LevelUpService {
           manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
         } else {
           const daysRequiredA2A3 = 6;
-          const daysSince = this.calendarDaysBetween(refDateA2A3, new Date());
+          const daysSince = this.calendarDaysBetween(refDateA2A3, refDate);
           if (daysSince < daysRequiredA2A3) {
             missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredA2A3}, actualmente ${daysSince}).`);
           }
@@ -784,7 +793,7 @@ export class LevelUpService {
         if (!refDateS1) {
           manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
         } else {
-          const daysSinceA = this.calendarDaysBetween(refDateS1, new Date());
+          const daysSinceA = this.calendarDaysBetween(refDateS1, refDate);
           if (daysSinceA < 20) {
             missingRequirements.push(`Faltan días como Rango A para S1 (requiere 20, actualmente ${daysSinceA}).`);
           }
@@ -813,7 +822,7 @@ export class LevelUpService {
         if (!refDateS2) {
           manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
         } else {
-          const daysSinceS = this.calendarDaysBetween(refDateS2, new Date());
+          const daysSinceS = this.calendarDaysBetween(refDateS2, refDate);
           if (daysSinceS < 10) {
             missingRequirements.push(`Faltan días como Rango S para S2 (requiere 10, actualmente ${daysSinceS}).`);
           }
