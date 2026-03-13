@@ -34,6 +34,7 @@ interface RequirementCheck {
     combatsVsBOrHigher: number;
     combatsVsAOrHigher: number;
     combatWinsVsAOrHigher: number;
+    combatWinsVsBOrHigher: number;
     achievements: number;
   };
 }
@@ -257,6 +258,14 @@ export class LevelUpService {
       return rank === 'A' || rank === 'S';
     }).length;
 
+    const combatWinsVsBOrHigher = approved.filter((activity) => {
+      if (!this.isCombatType(activity.type) || !this.isVictory(activity.result)) {
+        return false;
+      }
+      const rank = activity.rank?.toUpperCase();
+      return rank === 'B' || rank === 'A' || rank === 'S';
+    }).length;
+
     const achievements = approved.filter((activity) => {
       const type = canonicalizeActivityType(activity.type);
       return type ? this.ACHIEVEMENT_TYPES.has(type) : false;
@@ -278,6 +287,7 @@ export class LevelUpService {
       combatsVsBOrHigher,
       combatsVsAOrHigher,
       combatWinsVsAOrHigher,
+      combatWinsVsBOrHigher,
       achievements
     };
   }
@@ -542,8 +552,8 @@ export class LevelUpService {
           metrics.achievements >= 2
         ].filter(Boolean).length;
 
-        if (optionalMet < 1) {
-          missingRequirements.push('Falta al menos 1 requisito adicional para C1 (narración, combate, 2 misiones D o 2 logros).');
+        if (optionalMet < 2) {
+          missingRequirements.push('Falta al menos 2 requisitos adicionales para C1 (narración, combate, 2 misiones D o 2 logros).');
         }
         break;
       }
@@ -561,18 +571,18 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredC2C3}, actualmente ${daysSince}).`);
           }
         }
-        manualRequirements.push('Manual parcial: curar a 2 usuarios diferentes no es trazable con el schema actual.');
 
         const optionalMet = [
           metrics.narrations >= 1,
           metrics.highlightedNarrations >= 1,
           metrics.achievements >= 1,
           metrics.combats >= 1,
-          metrics.missionC >= 1
+          metrics.missionC >= 1,
+          false // Curar a 2 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
-        if (optionalMet < 1) {
-          missingRequirements.push('Falta al menos 1 requisito adicional para C2/C3 (narración, destacado, logro, combate o misión C).');
+        if (optionalMet < 2) {
+          missingRequirements.push('Falta al menos 2 requisitos adicionales para C2/C3 (narración, destacado, logro, combate, misión C o curar a 2 personajes).');
         }
         break;
       }
@@ -587,7 +597,6 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días como Rango C para B1 (requiere 8, actualmente ${daysSinceC}).`);
           }
         }
-        manualRequirements.push('Manual parcial: curar a 5 usuarios diferentes no es trazable con el schema actual.');
 
         if (character.pr < 500) {
           missingRequirements.push(`PR insuficiente para B1 (${character.pr}/500).`);
@@ -598,11 +607,12 @@ export class LevelUpService {
           metrics.narrations >= 3,
           metrics.highlightedNarrations >= 2,
           missionEquivalent >= 4,
-          metrics.combatsVsCOrHigher >= 2
+          metrics.combatsVsCOrHigher >= 2,
+          false // Curar a 5 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
-        if (optionalMet < 1) {
-          missingRequirements.push('Falta al menos 1 requisito adicional para B1 (narraciones, destacados, misiones equivalentes C o combates vs C+).');
+        if (optionalMet < 3) {
+          missingRequirements.push('Falta al menos 3 requisitos adicionales para B1 (narraciones, destacados, misiones equivalentes C, combates vs C+ o curar a 5 personajes).');
         }
         break;
       }
@@ -620,7 +630,6 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredB2B3}, actualmente ${daysSince}).`);
           }
         }
-        manualRequirements.push('Manual parcial: curar a 2 usuarios diferentes no es trazable con el schema actual.');
 
         const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
         const optionalMet = [
@@ -628,11 +637,12 @@ export class LevelUpService {
           metrics.highlightedNarrations >= 1,
           metrics.achievements >= 1,
           metrics.combatsVsBOrHigher >= 2,
-          missionEquivalent >= 1
+          missionEquivalent >= 1,
+          false // Curar a 2 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
-        if (optionalMet < 1) {
-          missingRequirements.push('Falta al menos 1 requisito adicional para B2/B3 (narración, destacado, logro, 2 combates B+ o misión B/A).');
+        if (optionalMet < 2) {
+          missingRequirements.push('Falta al menos 2 requisitos adicionales para B2/B3 (narración, destacado, logro, 2 combates B+, misión B/A o curar a 2 personajes).');
         }
         break;
       }
@@ -647,7 +657,6 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días como Rango B para A1 (requiere 14, actualmente ${daysSinceB}).`);
           }
         }
-        manualRequirements.push('Manual parcial: curar a 10 usuarios diferentes no es trazable con el schema actual.');
 
         if (character.pr < 1000) {
           missingRequirements.push(`PR insuficiente para A1 (${character.pr}/1000).`);
@@ -658,12 +667,13 @@ export class LevelUpService {
           metrics.narrations >= 6,
           metrics.highlightedNarrations >= 3,
           missionEquivalent >= 5,
-          metrics.combatWinsVsAOrHigher >= 3,
-          metrics.achievements >= 8
+          metrics.combatWinsVsBOrHigher >= 3,
+          metrics.achievements >= 8,
+          false // Curar a 10 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
-        if (optionalMet < 1) {
-          missingRequirements.push('Falta al menos 1 requisito adicional para A1 (narraciones, destacados, misiones B/A, victorias A+ o logros).');
+        if (optionalMet < 3) {
+          missingRequirements.push('Falta al menos 3 requisitos adicionales para A1 (narraciones, destacados, misiones B/A, victorias vs B+, logros o curar a 10 personajes).');
         }
         break;
       }
@@ -681,7 +691,6 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredA2A3}, actualmente ${daysSince}).`);
           }
         }
-        manualRequirements.push('Manual parcial: curar a 2 usuarios diferentes no es trazable con el schema actual.');
         manualRequirements.push('Manual parcial: “obtener 300 PR durante la gradación anterior” no es trazable sin ledger temporal.');
 
         const missionEquivalent = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
@@ -690,11 +699,12 @@ export class LevelUpService {
           metrics.highlightedNarrations >= 1,
           metrics.achievements >= 2,
           metrics.combatsVsAOrHigher >= 1,
-          missionEquivalent >= 2
+          missionEquivalent >= 2,
+          false // Curar a 2 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
-        if (optionalMet < 1) {
-          missingRequirements.push('Falta al menos 1 requisito adicional para A2/A3 (narración, destacado, 2 logros, combate A+ o misiones B/A).');
+        if (optionalMet < 2) {
+          missingRequirements.push('Falta al menos 2 requisitos adicionales para A2/A3 (narración, destacado, 2 logros, combate A+, misiones B/A o curar a 2 personajes).');
         }
         break;
       }
@@ -738,17 +748,17 @@ export class LevelUpService {
             missingRequirements.push(`Faltan días como Rango S para S2 (requiere 10, actualmente ${daysSinceS}).`);
           }
         }
-        manualRequirements.push('Manual parcial: curar a 5 usuarios diferentes no es trazable con el schema actual.');
 
         const optionalMet = [
           metrics.narrations >= 2,
           metrics.highlightedNarrations >= 1,
           metrics.missionSAnyResult >= 1,
-          character.pr >= 500
+          character.pr >= 500,
+          false // Curar a 5 personajes (no trazable automáticamente)
         ].filter(Boolean).length;
 
-        if (optionalMet < 1) {
-          missingRequirements.push('Falta al menos 1 requisito adicional para S2 (2 narraciones, 1 destacado, 1 misión S o 500 PR).');
+        if (optionalMet < 2) {
+          missingRequirements.push('Falta al menos 2 requisitos adicionales para S2 (2 narraciones, 1 destacado, 1 misión S, 500 PR o curar a 5 personajes).');
         }
         break;
       }

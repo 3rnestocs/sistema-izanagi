@@ -48,12 +48,12 @@ export class StatValidatorService {
     C2: { rankLetter: 'C', expRequired: 150, spGranted: 1 },
     C3: { rankLetter: 'C', expRequired: 200, spGranted: 1 },
     B1: { rankLetter: 'B', expRequired: 250, spGranted: 2 },
-    B2: { rankLetter: 'B', expRequired: 325, spGranted: 1 },
-    B3: { rankLetter: 'B', expRequired: 400, spGranted: 1 },
+    B2: { rankLetter: 'B', expRequired: 350, spGranted: 1 },
+    B3: { rankLetter: 'B', expRequired: 450, spGranted: 1 },
     A1: { rankLetter: 'A', expRequired: 500, spGranted: 4 },
     A2: { rankLetter: 'A', expRequired: 700, spGranted: 1 },
     A3: { rankLetter: 'A', expRequired: 900, spGranted: 1 },
-    S1: { rankLetter: 'S', expRequired: 1000, spGranted: 1 },
+    S1: { rankLetter: 'S', expRequired: 1000, spGranted: 2 },
     S2: { rankLetter: 'S', expRequired: 1300, spGranted: 1 }
   };
 

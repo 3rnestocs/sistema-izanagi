@@ -36,6 +36,7 @@ interface RequirementCheck {
     combatsVsBOrHigher: number;
     combatsVsAOrHigher: number;
     combatWinsVsAOrHigher: number;
+    combatWinsVsBOrHigher: number;
     achievements: number;
   };
 }
@@ -132,6 +133,9 @@ export class PromotionService {
       ).length,
       combatWinsVsAOrHigher: approvedActivities.filter(
         a => canonicalizeActivityType(a.type) === ActivityType.COMBATE && ['A', 'S'].includes(a.rank || '') && isSuccessResult(a.result)
+      ).length,
+      combatWinsVsBOrHigher: approvedActivities.filter(
+        a => canonicalizeActivityType(a.type) === ActivityType.COMBATE && ['B', 'A', 'S'].includes(a.rank || '') && isSuccessResult(a.result)
       ).length,
       achievements: approvedActivities.filter(a => {
         const type = canonicalizeActivityType(a.type);
