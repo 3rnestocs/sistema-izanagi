@@ -64,7 +64,7 @@ PLAYER_COMMAND_FORUM_MAP="registro:1234567890123456789;ficha:1234567890123456789
 Optional staff / feature flags:
 
 ```env
-# Comma-separated role IDs allowed to run staff-only commands (e.g. /otorgar_habilidad, /ascender)
+# Comma-separated role IDs allowed to run staff-only commands (e.g. /ascender, /retirar_habilidad)
 STAFF_ALLOWED_ROLE_IDS="1234567890123456789"
 
 # Optional: single user ID allowed to run /bienvenida
@@ -116,7 +116,7 @@ npm run dev
 - `/invertir_sp` — Spend SP
 - `/otorgar_habilidad` — Request ability (player initiates; staff approves with ✅)
 - `/retirar_habilidad` — Revoke ability (staff)
-- `/otorgar_rasgo` — Grant trait (staff)
+- `/otorgar_rasgo` — Request trait add/remove (player initiates; staff approves with ✅)
 - `/ascender` — Promote (staff)
 - `/rechazar_registro` — Reject registration (staff)
 - `/catalogo` — Browse catalog

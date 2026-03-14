@@ -53,14 +53,15 @@ model Character {
   armas         Int       @default(0)
   inteligencia  Int       @default(0)
 
-  traits        CharacterTrait[]
-  plazas CharacterPlaza[]
-  logs   AuditLog[]
-  gradationHistory GradationHistory[]
-  inventory   InventoryItem[]
-  activities ActivityRecord[]
-  pendingPromotions PendingPromotion[]
-  pendingWishes     PendingWish[]
+  traits               CharacterTrait[]
+  plazas               CharacterPlaza[]
+  logs                 AuditLog[]
+  gradationHistory     GradationHistory[]
+  inventory            InventoryItem[]
+  activities           ActivityRecord[]
+  pendingPromotions    PendingPromotion[]
+  pendingWishes        PendingWish[]
+  pendingTraitRequests PendingTraitRequest[]
   approvalId String? @unique
   approval CharacterBuildApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
 
@@ -338,6 +339,11 @@ enum ApprovalStatus {
   EXPIRED
 }
 
+enum TraitOperation {
+  ASIGNAR
+  RETIRAR
+}
+
 enum TipoOtorgamiento {
   DESARROLLO
   DESEO_NORMAL
@@ -375,6 +381,23 @@ model PendingWish {
   channelId          String?
   status             ApprovalStatus   @default(PENDING)
   createdAt          DateTime         @default(now())
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([characterId, status])
+  @@index([approvalMessageId])
+}
+
+model PendingTraitRequest {
+  id                  String          @id @default(uuid())
+  characterId         String
+  discordId           String
+  traitName           String
+  operation           TraitOperation
+  approvalMessageId   String?         @unique
+  channelId           String?
+  status              ApprovalStatus  @default(PENDING)
+  createdAt           DateTime        @default(now())
 
   character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 

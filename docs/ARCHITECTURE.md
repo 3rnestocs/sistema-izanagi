@@ -71,7 +71,7 @@ The system is a **Discord bot** backed by **PostgreSQL**: slash commands for sel
 ```
 sistema-izanagi/
 ├── prisma/
-│   ├── schema.prisma              # Database schema (16 models, ApprovalStatus + TipoOtorgamiento enums)
+│   ├── schema.prisma              # Database schema (17 models, ApprovalStatus + TipoOtorgamiento + TraitOperation enums)
 │   ├── migrations/                # Prisma migrations
 │   └── seed-data/                 # JSON data for seeds
 │       ├── traits.json
@@ -86,7 +86,7 @@ sistema-izanagi/
 │   │   │   ├── invertir_sp.ts     # Player: spend skill points
 │   │   │   ├── otorgar_habilidad.ts   # Player: initiates skill/plaza request (async approval)
 │   │   │   ├── retirar_habilidad.ts   # Staff: revoke skill
-│   │   │   ├── otorgar_rasgo.ts   # Staff: assign/remove traits
+│   │   │   ├── otorgar_rasgo.ts   # Player: initiates trait add/remove request (async approval)
 │   │   │   ├── ascender.ts        # Staff: promote character
 │   │   │   ├── rechazar_registro.ts   # Staff: reject registration
 │   │   │   ├── catalogo.ts        # Player: browse catalog
@@ -110,6 +110,7 @@ sistema-izanagi/
 │   │   ├── ReactionApprovalRouter.ts    # Centralized reaction dispatcher
 │   │   ├── PromotionApprovalService.ts  # Async promotion handling
 │   │   ├── WishApprovalHandler.ts       # Async skill assignment: reads PendingWish by messageId, fallback for legacy footer
+│   │   ├── TraitApprovalHandler.ts      # Async trait add/remove: reads PendingTraitRequest by messageId, staff approves with ✅
 │   │   ├── CharacterService.ts    # Character creation with trait validation
 │   │   ├── TraitRuleService.ts    # Trait rules and nacimiento gradations
 │   │   ├── LevelUpService.ts      # Legacy compatibility (kept)
@@ -197,7 +198,7 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 
 ## 5. Domain Model
 
-### Key Models (16 total)
+### Key Models (17 total)
 
 | Model | Purpose |
 |---|---|
@@ -214,9 +215,10 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 | `ActivityRecord` | Missions, combats, narrations with approval workflow |
 | `PendingPromotion` | Async workflow: stores pending rank/level requests awaiting staff approval |
 | `PendingWish` | Async workflow: stores pending skill/plaza requests; staff approves via reaction; uses `ApprovalStatus` + `TipoOtorgamiento` enums |
+| `PendingTraitRequest` | Async workflow: stores pending trait add/remove requests; staff approves via reaction; uses `ApprovalStatus` + `TraitOperation` enums |
 | `AuditLog` | Full audit trail with delta tracking |
 
-**Enums:** `ApprovalStatus` (PENDING, APPROVED, REJECTED, EXPIRED), `TipoOtorgamiento` (DESARROLLO, DESEO_NORMAL, DESEO_ESPECIAL).
+**Enums:** `ApprovalStatus` (PENDING, APPROVED, REJECTED, EXPIRED), `TipoOtorgamiento` (DESARROLLO, DESEO_NORMAL, DESEO_ESPECIAL), `TraitOperation` (ASIGNAR, RETIRAR).
 
 ---
 
@@ -230,7 +232,7 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 | Mirror mode (dual-target activities, e.g. Curación/Enfrentamiento) | Not implemented |
 | Sell items | `/vender` exists; confirm 50% refund and full parity if required |
 | Bulk activity flows (ALL targeting) | Not implemented |
-| Post-creation trait add/remove | `/otorgar_rasgo` exists; confirm add/remove parity and validation |
+| Post-creation trait add/remove | `/otorgar_rasgo` exists; player initiates, staff approves via ✅; add/remove parity and validation handled in `CharacterService` during approval |
 | Plaza inheritance seeding | Seed script exists but may not create inheritance records; verify |
 | ~~Weekly salary~~ | Implemented via `SalaryService` + `/cobrar_sueldo` + `/forzar_sueldo` |
 | Trait stat bonuses at creation | Only `bonusRyou` and `costRC` applied; other per-trait bonuses may be partial |

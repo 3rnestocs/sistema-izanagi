@@ -1,24 +1,30 @@
 import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
-  PermissionFlagsBits
+  EmbedBuilder
 } from 'discord.js';
 import { prisma } from '../../lib/prisma';
-import { CharacterService } from '../../services/CharacterService';
+import { TraitOperation } from '@prisma/client';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 
-const characterService = new CharacterService(prisma);
+const EMBED_TITLE = 'Solicitud de Rasgo';
+const EMBED_COLOR_PENDING = 0xfee75c;
+
+function formatRcImpact(costRC: number, operation: TraitOperation): string {
+  if (operation === 'ASIGNAR') {
+    if (costRC < 0) return `Costo: ${Math.abs(costRC)} RC`;
+    if (costRC > 0) return `Bonificación: +${costRC} RC`;
+    return 'Sin costo RC';
+  }
+  // RETIRAR
+  if (costRC < 0) return `Reembolso: ${Math.abs(costRC)} RC`;
+  if (costRC > 0) return `Pérdida: ${costRC} RC`;
+  return 'Sin impacto RC';
+}
 
 export const data = new SlashCommandBuilder()
   .setName('otorgar_rasgo')
-  .setDescription('Asigna o remueve rasgos post-creación (Staff)')
-  .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-  .addUserOption((option) =>
-    option
-      .setName('usuario')
-      .setDescription('Usuario al que se le asignará/removerá el rasgo')
-      .setRequired(true)
-  )
+  .setDescription('Solicita asignar o remover un rasgo de tu personaje (requiere aprobación Staff)')
   .addStringOption((option) =>
     option
       .setName('operacion')
@@ -41,41 +47,65 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     interaction,
     'otorgar_rasgo',
     async (interaction) => {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-      throw new Error('⛔ Este comando es exclusivo de Staff.');
-    }
+      const discordId = interaction.user.id;
+      const operation = interaction.options.getString('operacion', true) as 'ASIGNAR' | 'RETIRAR';
+      const traitName = interaction.options.getString('rasgo', true);
 
-    const targetUser = interaction.options.getUser('usuario', true);
-    const operation = interaction.options.getString('operacion', true) as 'ASIGNAR' | 'RETIRAR';
-    const traitName = interaction.options.getString('rasgo', true);
+      const character = await prisma.character.findUnique({
+        where: { discordId },
+        select: { id: true, name: true }
+      });
+      if (!character) {
+        throw new Error('⛔ No tienes un personaje registrado.');
+      }
 
-    const character = await prisma.character.findUnique({
-      where: { discordId: targetUser.id },
-      select: { id: true, name: true }
-    });
+      const trait = await prisma.trait.findUnique({
+        where: { name: traitName }
+      });
+      if (!trait) {
+        throw new Error(`⛔ El rasgo '${traitName}' no existe en el sistema.`);
+      }
 
-    if (!character) {
-      throw new Error(`⛔ ${targetUser.username} no tiene un personaje registrado.`);
-    }
+      const pending = await prisma.pendingTraitRequest.create({
+        data: {
+          characterId: character.id,
+          discordId,
+          traitName,
+          operation: operation as TraitOperation,
+          channelId: interaction.channelId
+        }
+      });
 
-    let result;
-    if (operation === 'ASIGNAR') {
-      result = await characterService.addTrait(character.id, traitName);
-      return interaction.editReply(
-        `✅ Rasgo '${traitName}' asignado a **${character.name}**.\n` +
-          `RC disponibles: **${result.rc}** | Stats actualizados.`
-      );
-    } else {
-      result = await characterService.removeTrait(character.id, traitName);
-      return interaction.editReply(
-        `✅ Rasgo '${traitName}' removido de **${character.name}**.\n` +
-          `RC reembolsado: **${result.rc}** | Stats restaurados.`
-      );
-    }
+      const embed = new EmbedBuilder()
+        .setColor(EMBED_COLOR_PENDING)
+        .setTitle(EMBED_TITLE)
+        .addFields(
+          { name: 'Personaje', value: character.name, inline: true },
+          { name: 'Operación', value: operation === 'ASIGNAR' ? 'Asignar' : 'Remover', inline: true },
+          { name: 'Rasgo', value: traitName, inline: true },
+          {
+            name: 'Costo/Reembolso RC',
+            value: formatRcImpact(trait.costRC, operation as TraitOperation),
+            inline: false
+          }
+        )
+        .setFooter({
+          text: `Reacciona con ✅ para aprobar | ID: ${pending.id}`
+        })
+        .setTimestamp();
+
+      const reply = await interaction.editReply({
+        embeds: [embed]
+      });
+
+      await prisma.pendingTraitRequest.update({
+        where: { id: pending.id },
+        data: { approvalMessageId: reply.id }
+      });
     },
     {
-      defer: { ephemeral: true },
-      fallbackMessage: 'Error desconocido al gestionar rasgo.',
+      defer: { ephemeral: false },
+      fallbackMessage: 'Error desconocido al solicitar rasgo.',
       errorEphemeral: true
     }
   );
