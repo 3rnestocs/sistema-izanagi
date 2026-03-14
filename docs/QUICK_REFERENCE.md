@@ -42,21 +42,27 @@ Player commands:
 - `/tienda`
 - `/transferir`
 - `/cobrar_sueldo`
+- `/otorgar_habilidad` (Initiates request)
 
 Staff/Admin commands:
 - `/ascender`
 - `/ajustar_recursos` (retirar/otorgar recursos)
 - `/rechazar_registro`
 - `/otorgar_rasgo`
-- `/otorgar_habilidad`
 - `/retirar_habilidad`
 - `/listar_tienda`
 - `/catalogo`
 - `/listar`
 - `/npc` (crear/listar/retirar)
 - `/bienvenida`
+- `/forzar_sueldo`
 
 ## Service Map
+
+Routing & Approval Services:
+- `ReactionApprovalRouter`: Centralized dispatcher for ✅ emoji workflows.
+- `PromotionApprovalService`: Handles pending rank/level promotions.
+- `WishApprovalHandler`: Handles pending /otorgar_habilidad requests.
 
 Core Services:
 - `CharacterService`: Character creation and trait management.

@@ -83,7 +83,7 @@ sistema-izanagi/
 │   │   │   ├── registro.ts        # Player: create character sheet
 │   │   │   ├── ficha.ts           # Player: view character
 │   │   │   ├── invertir_sp.ts     # Player: spend skill points
-│   │   │   ├── otorgar_habilidad.ts   # Staff: grant skill/plaza
+│   │   │   ├── otorgar_habilidad.ts   # Player: initiates skill/plaza request (async approval)
 │   │   │   ├── retirar_habilidad.ts   # Staff: revoke skill
 │   │   │   ├── otorgar_rasgo.ts   # Staff: assign/remove traits
 │   │   │   ├── ascender.ts        # Staff: promote character
@@ -103,8 +103,12 @@ sistema-izanagi/
 │   │   └── staff/                 # Staff-only commands
 │   │       ├── npc.ts             # Staff: NPC management
 │   │       ├── ajustar_recursos.ts    # Staff: adjust resources
-│   │       └── bienvenida.ts      # Staff: welcome flow
-│   ├── services/                  # Business logic (16 services)
+│   │       ├── bienvenida.ts      # Staff: welcome flow
+│   │       └── forzar_sueldo.ts   # Staff: retroactive salary override
+│   ├── services/                  # Business logic
+│   │   ├── ReactionApprovalRouter.ts    # Centralized reaction dispatcher
+│   │   ├── PromotionApprovalService.ts  # Async promotion handling
+│   │   ├── WishApprovalHandler.ts       # Async skill assignment handling
 │   │   ├── CharacterService.ts    # Character creation with trait validation
 │   │   ├── TraitRuleService.ts    # Trait rules and nacimiento gradations
 │   │   ├── LevelUpService.ts      # Legacy compatibility (kept)
@@ -190,7 +194,7 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 
 ## 5. Domain Model
 
-### Key Models (14 total)
+### Key Models (15 total)
 
 | Model | Purpose |
 |---|---|
@@ -205,6 +209,7 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 | `Item` | Market catalog (name, type, price, currency) |
 | `InventoryItem` | Character inventory (stackable quantities) |
 | `ActivityRecord` | Missions, combats, narrations with approval workflow |
+| `PendingPromotion` | Async workflow: stores pending rank/level requests awaiting staff approval |
 | `AuditLog` | Full audit trail with delta tracking |
 
 ---
@@ -221,7 +226,7 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 | Bulk activity flows (ALL targeting) | Not implemented |
 | Post-creation trait add/remove | `/otorgar_rasgo` exists; confirm add/remove parity and validation |
 | Plaza inheritance seeding | Seed script exists but may not create inheritance records; verify |
-| Weekly salary | Implemented via `SalaryService` + `/cobrar_sueldo` |
+| ~~Weekly salary~~ | Implemented via `SalaryService` + `/cobrar_sueldo` + `/forzar_sueldo` |
 | Trait stat bonuses at creation | Only `bonusRyou` and `costRC` applied; other per-trait bonuses may be partial |
 | Factory reset / bulk admin utilities | Intentionally absent or low priority |
 
