@@ -3,6 +3,7 @@ import {
   ChatInputCommandInteraction,
   EmbedBuilder
 } from 'discord.js';
+import { TipoOtorgamiento } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { PlazaService, PlazaGrantType } from '../../services/PlazaService';
 import { assertForumPostContext } from '../../utils/channelGuards';
@@ -16,11 +17,10 @@ const GRANT_TYPE_CHOICES: Array<{ name: string; value: PlazaGrantType }> = [
   { name: 'Deseo Especial', value: 'DESEO_ESPECIAL' }
 ];
 
-const TIPO_LABELS: Record<PlazaGrantType, string> = {
-  INICIAL: 'Inicial',
-  DESARROLLO: 'Desarrollo',
-  DESEO_NORMAL: 'Deseo Normal',
-  DESEO_ESPECIAL: 'Deseo Especial'
+const tipoOtorgamientoDisplay: Record<TipoOtorgamiento, string> = {
+  [TipoOtorgamiento.DESARROLLO]: 'Desarrollo',
+  [TipoOtorgamiento.DESEO_NORMAL]: 'Deseo Normal',
+  [TipoOtorgamiento.DESEO_ESPECIAL]: 'Deseo Especial'
 };
 
 export const data = new SlashCommandBuilder()
@@ -95,13 +95,26 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         throw validationError(`La plaza '${plazaName}' no existe. Revisa el nombre en /catalogo.`);
       }
 
+      const tipoOtorgamiento = grantType as TipoOtorgamiento;
+      const pendingWish = await prisma.pendingWish.create({
+        data: {
+          characterId: character.id,
+          discordId: interaction.user.id,
+          plazaId: plaza.id,
+          tipoOtorgamiento,
+          costoBts,
+          costoBes,
+          channelId: interaction.channelId ?? null
+        }
+      });
+
       const embed = new EmbedBuilder()
         .setTitle('Solicitud de Habilidad')
         .setColor(0xfee75c)
         .addFields(
           { name: 'Solicitante', value: `<@${interaction.user.id}> (${character.name})`, inline: false },
           { name: 'Plaza', value: plazaName, inline: true },
-          { name: 'Tipo de otorgamiento', value: TIPO_LABELS[grantType], inline: true },
+          { name: 'Tipo de otorgamiento', value: tipoOtorgamientoDisplay[tipoOtorgamiento], inline: true },
           { name: 'Evidencia', value: evidence, inline: false }
         );
 
@@ -112,18 +125,17 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         embed.addFields({ name: 'Costo BES', value: String(costoBes), inline: true });
       }
 
-      const footerParts = [
-        `UserID: ${interaction.user.id}`,
-        `PlazaID: ${plaza.id}`,
-        `Tipo: ${grantType}`,
-        `BTS: ${costoBts}`,
-        `BES: ${costoBes}`
-      ];
-      embed.setFooter({ text: footerParts.join(' | ') });
+      embed.setFooter({ text: `Reacciona con ✅ para aprobar | ID: ${pendingWish.id}` });
 
-      return interaction.reply({
+      const reply = await interaction.reply({
         embeds: [embed],
-        ephemeral: false
+        ephemeral: false,
+        fetchReply: true
+      });
+
+      await prisma.pendingWish.update({
+        where: { id: pendingWish.id },
+        data: { approvalMessageId: reply.id }
       });
     },
     {

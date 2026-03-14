@@ -1,17 +1,20 @@
 import { EmbedBuilder } from 'discord.js';
 import type { PrismaClient } from '@prisma/client';
+import { ApprovalStatus } from '@prisma/client';
 import type { ReactionHandler, ReactionApprovalContext } from './ReactionApprovalRouter';
 import type { PlazaService } from './PlazaService';
 import type { PlazaGrantType } from './PlazaService';
 
 const WISH_EMBED_TITLE = 'Solicitud de Habilidad';
 
-const FOOTER_REGEX =
+const OLD_FOOTER_REGEX =
   /UserID:\s*(\S+)\s*\|\s*PlazaID:\s*(\S+)\s*\|\s*Tipo:\s*(\S+)(?:\s*\|\s*BTS:\s*(\d+))?(?:\s*\|\s*BES:\s*(\d+))?/;
 
-function parseFooter(footerText: string | null): { userId: string; plazaId: string; tipo: string; bts: number; bes: number } | null {
+function parseOldFooter(
+  footerText: string | null
+): { userId: string; plazaId: string; tipo: string; bts: number; bes: number } | null {
   if (!footerText) return null;
-  const match = footerText.match(FOOTER_REGEX);
+  const match = footerText.match(OLD_FOOTER_REGEX);
   if (!match || !match[1] || !match[2] || !match[3]) return null;
   return {
     userId: match[1],
@@ -36,11 +39,81 @@ export class WishApprovalHandler implements ReactionHandler {
   async approve(ctx: ReactionApprovalContext, staffIdentifier: string): Promise<boolean> {
     const embed = ctx.message.embeds?.[0];
     if (!embed) return false;
-    const parsed = parseFooter(embed.footer?.text ?? null);
-    if (!parsed) {
-      await this.editEmbedFailure(ctx, 'No se pudo extraer la información del footer.');
+
+    const pendingWish = await this.prisma.pendingWish.findUnique({
+      where: { approvalMessageId: ctx.messageId },
+      include: { character: { select: { id: true, name: true } } }
+    });
+
+    if (pendingWish) {
+      return this.approveFromDb(ctx, pendingWish, staffIdentifier);
+    }
+
+    const parsed = parseOldFooter(embed.footer?.text ?? null);
+    if (parsed) {
+      return this.approveFromFooter(ctx, parsed, staffIdentifier);
+    }
+
+    await this.editEmbedFailure(ctx, 'No se pudo extraer la información del footer.');
+    return false;
+  }
+
+  private async approveFromDb(
+    ctx: ReactionApprovalContext,
+    pendingWish: {
+      id: string;
+      discordId: string;
+      plazaId: string;
+      tipoOtorgamiento: string;
+      costoBts: number;
+      costoBes: number;
+      character: { id: string; name: string };
+    },
+    staffIdentifier: string
+  ): Promise<boolean> {
+    const plaza = await this.prisma.plaza.findUnique({
+      where: { id: pendingWish.plazaId },
+      select: { id: true, name: true }
+    });
+    if (!plaza) {
+      await this.editEmbedFailure(ctx, `La plaza con ID ${pendingWish.plazaId} no existe.`);
       return false;
     }
+
+    const assignPayload = {
+      characterId: pendingWish.character.id,
+      plazaName: plaza.name,
+      grantType: pendingWish.tipoOtorgamiento as PlazaGrantType,
+      evidence: `Aprobado por reacción | Staff: ${staffIdentifier}`,
+      ...(pendingWish.costoBts > 0 ? { costoBts: pendingWish.costoBts } : {}),
+      ...(pendingWish.costoBes > 0 ? { costoBes: pendingWish.costoBes } : {})
+    };
+
+    try {
+      await this.plazaService.assignPlaza(assignPayload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Error desconocido al otorgar habilidad.';
+      await this.editEmbedFailure(ctx, message);
+      return false;
+    }
+
+    await this.prisma.pendingWish.update({
+      where: { id: pendingWish.id },
+      data: { status: ApprovalStatus.APPROVED }
+    });
+
+    const embed = ctx.message.embeds?.[0];
+    if (embed) await this.editEmbedSuccess(ctx, embed, staffIdentifier);
+    return true;
+  }
+
+  private async approveFromFooter(
+    ctx: ReactionApprovalContext,
+    parsed: { userId: string; plazaId: string; tipo: string; bts: number; bes: number },
+    staffIdentifier: string
+  ): Promise<boolean> {
+    const embed = ctx.message.embeds?.[0];
+    if (!embed) return false;
 
     const character = await this.prisma.character.findUnique({
       where: { discordId: parsed.userId },
@@ -77,6 +150,15 @@ export class WishApprovalHandler implements ReactionHandler {
       return false;
     }
 
+    await this.editEmbedSuccess(ctx, embed, staffIdentifier);
+    return true;
+  }
+
+  private async editEmbedSuccess(
+    ctx: ReactionApprovalContext,
+    embed: { fields?: Array<{ name: string; value: string; inline?: boolean }>; footer?: { text: string } | null },
+    staffIdentifier: string
+  ): Promise<void> {
     const originalFields = (embed.fields ?? []).map((f) => ({
       name: f.name,
       value: f.value,
@@ -91,9 +173,7 @@ export class WishApprovalHandler implements ReactionHandler {
       )
       .setTimestamp();
     if (embed.footer?.text) successEmbed.setFooter({ text: embed.footer.text });
-
     await ctx.message.edit({ embeds: [successEmbed] });
-    return true;
   }
 
   private async editEmbedFailure(ctx: ReactionApprovalContext, reason: string): Promise<void> {

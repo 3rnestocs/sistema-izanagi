@@ -60,6 +60,7 @@ model Character {
   inventory   InventoryItem[]
   activities ActivityRecord[]
   pendingPromotions PendingPromotion[]
+  pendingWishes     PendingWish[]
   approvalId String? @unique
   approval CharacterBuildApproval? @relation(fields: [approvalId], references: [id], onDelete: SetNull)
 
@@ -330,18 +331,50 @@ model ActivityRecord {
 // 📈 7. PROMOTION APPROVAL (for /ascender)
 // ==========================================
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum TipoOtorgamiento {
+  DESARROLLO
+  DESEO_NORMAL
+  DESEO_ESPECIAL
+}
+
 model PendingPromotion {
-  id               String   @id @default(uuid())
+  id               String         @id @default(uuid())
   characterId      String
   discordId        String
-  targetType       String   // 'level' | 'rank'
-  target           String   // 'C1', 'D2', 'Jounin', etc.
-  channelId        String   // Discord thread channel ID where embed was posted
-  approvalMessageId String? @unique // Discord message ID of the pending embed
-  status           String   @default("PENDING") // PENDING, APPROVED, EXPIRED
-  manualRequirements String[] // Frozen list of manual requirements at request time
-  createdAt        DateTime @default(now())
+  targetType       String         // 'level' | 'rank'
+  target           String         // 'C1', 'D2', 'Jounin', etc.
+  channelId        String         // Discord thread channel ID where embed was posted
+  approvalMessageId String?       @unique // Discord message ID of the pending embed
+  status           ApprovalStatus @default(PENDING)
+  manualRequirements String[]     // Frozen list of manual requirements at request time
+  createdAt        DateTime       @default(now())
   approvedAt       DateTime?
+
+  character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([characterId, status])
+  @@index([approvalMessageId])
+}
+
+model PendingWish {
+  id                 String           @id @default(uuid())
+  characterId        String
+  discordId          String
+  plazaId            String
+  tipoOtorgamiento   TipoOtorgamiento
+  costoBts           Int              @default(0)
+  costoBes           Int              @default(0)
+  approvalMessageId  String?          @unique
+  channelId          String?
+  status             ApprovalStatus   @default(PENDING)
+  createdAt          DateTime         @default(now())
 
   character Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
 

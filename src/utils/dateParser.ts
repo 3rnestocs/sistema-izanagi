@@ -3,6 +3,15 @@
  * Format: DD/MM/YYYY. Max 730 days (2 years) back for migration support.
  */
 
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+const VZLA_TZ = 'America/Caracas';
+const CARACAS_TIMEZONE = VZLA_TZ;
 const MAX_DAYS_BACK = 730;
 const DATE_REGEX = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 
@@ -85,8 +94,6 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   return { success: true, date };
 }
 
-const CARACAS_TIMEZONE = 'America/Caracas';
-
 /**
  * Returns the weekday (0=Sunday, 1=Monday, ..., 6=Saturday) in the given timezone for the given date.
  */
@@ -112,29 +119,16 @@ export function isMondayInTimezone(date: Date = new Date(), timeZone: string = C
 /**
  * Returns the most recent Monday in America/Caracas (UTC-4).
  * If fromDate is a Monday, returns that date at 00:00:00. Otherwise returns the preceding Monday.
+ * Uses dayjs for timezone-safe date math (avoids UTC-host issues).
  */
-export function getMostRecentMonday(fromDate: Date = new Date()): Date {
-  const dayOfWeek = getDayOfWeekInTimezone(fromDate, CARACAS_TIMEZONE); // 0=Sun, 1=Mon, ..., 6=Sat
-  const daysBack = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: CARACAS_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  }).formatToParts(fromDate);
-
-  const year = parseInt(parts.find((p) => p.type === 'year')!.value, 10);
-  const month = parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1;
-  const day = parseInt(parts.find((p) => p.type === 'day')!.value, 10);
-
-  const caracasMonday = new Date(Date.UTC(year, month, day - daysBack, 4, 0, 0, 0)); // midnight Caracas = 04:00 UTC
-  return new Date(Date.UTC(
-    caracasMonday.getUTCFullYear(),
-    caracasMonday.getUTCMonth(),
-    caracasMonday.getUTCDate(),
-    0, 0, 0, 0
-  ));
+export function getMostRecentMonday(fromDate: Date | string = new Date()): Date {
+  const dateInVzla = dayjs(fromDate).tz(VZLA_TZ);
+  const dayOfWeek = dateInVzla.day(); // 0=Sun, 1=Mon, ..., 6=Sat
+  const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  return dateInVzla
+    .subtract(daysToSubtract, 'day')
+    .startOf('day')
+    .toDate();
 }
 
 /**
