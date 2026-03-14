@@ -232,13 +232,14 @@ export class CharacterService {
       );
 
       // 5. Validar costo RC
-      const totalRcNeeded = Math.abs(traitToAdd.costRC);
-      if (traitToAdd.costRC > 0 && character.rc < traitToAdd.costRC) {
-        throw new Error(`⛔ No hay suficientes RC. Necesitas ${traitToAdd.costRC}, tienes ${character.rc}.`);
+      // Si el costo es menor a 0 (es un cobro), validamos que el usuario tenga suficiente RC
+      if (traitToAdd.costRC < 0 && character.rc < Math.abs(traitToAdd.costRC)) {
+        throw new Error(`⛔ No hay suficientes RC. Necesitas ${Math.abs(traitToAdd.costRC)}, tienes ${character.rc}.`);
       }
 
       // 6. Calcular bonificaciones
-      let rcDelta = -traitToAdd.costRC;
+      // Aplicamos el valor tal cual. Si el costo es -1, rcDelta será -1 y se restará.
+      let rcDelta = traitToAdd.costRC;
       let statBonuses: Record<string, number> = {};
 
       // Stat bonuses for traits come from mechanics JSON, not direct fields
@@ -305,7 +306,8 @@ export class CharacterService {
       }
 
       // 3. Revertir bonificaciones
-      let rcDelta = traitToRemove.costRC;
+      // Para revertir, invertimos el signo. Si costó -1, el reembolso es +1.
+      let rcDelta = -traitToRemove.costRC;
       let statReversals: Record<string, number> = {};
 
       // Stat bonuses for traits come from mechanics JSON, not direct fields
