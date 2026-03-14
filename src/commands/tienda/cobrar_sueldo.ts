@@ -9,7 +9,6 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
-import { getFechaFromOption } from '../../utils/dateParser';
 
 const salaryService = new SalaryService(prisma);
 
@@ -25,67 +24,49 @@ async function publishPublicSalaryEmbed(
 
 export const data = new SlashCommandBuilder()
   .setName('cobrar_sueldo')
-  .setDescription('Cobra tu sueldo semanal como personaje')
-  .addStringOption((o) =>
-    o.setName('fecha').setDescription('Fecha del cobro (en formato DD/MM/YYYY o escribe "hoy").').setRequired(true)
-  );
+  .setDescription('Cobra tu sueldo semanal como personaje (solo los lunes, America/Caracas)');
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await executeWithErrorHandling(
     interaction,
     COMMAND_NAMES.cobrar_sueldo,
     async (interaction) => {
-    assertForumPostContext(interaction, { enforceThreadOwnership: true });
+      assertForumPostContext(interaction, { enforceThreadOwnership: true });
 
-    const character = await prisma.character.findUnique({
-      where: { discordId: interaction.user.id },
-      select: { id: true, name: true }
-    });
+      const character = await prisma.character.findUnique({
+        where: { discordId: interaction.user.id },
+        select: { id: true }
+      });
+      if (!character) {
+        throw validationError('No tienes un personaje registrado. Usa `/registro` para crear uno.');
+      }
 
-    if (!character) {
-      throw validationError('No tienes un personaje registrado. Usa `/registro` para crear uno.');
-    }
+      cleanupExpiredCooldowns();
+      consumeCommandCooldown({
+        commandName: COMMAND_NAMES.cobrar_sueldo,
+        actorId: interaction.user.id
+      });
 
-    const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
-    if (fechaResult && 'error' in fechaResult) {
-      throw validationError(fechaResult.error);
-    }
+      const result = await salaryService.claimWeeklySalary(interaction.user.id, false);
 
-    cleanupExpiredCooldowns();
-    consumeCommandCooldown({
-      commandName: COMMAND_NAMES.cobrar_sueldo,
-      actorId: interaction.user.id
-    });
+      const embed = new EmbedBuilder()
+        .setColor(0x00AA00)
+        .setTitle('💰 Cobro de Sueldo Semanal')
+        .setDescription(`**${result.characterName}** ha cobrado su sueldo semanal.`)
+        .addFields(
+          { name: 'Sueldo Base', value: `${result.baseSalary} Ryou`, inline: true },
+          { name: 'Bonos de Origen', value: `${result.bonusRyou} Ryou`, inline: true },
+          {
+            name: 'Multiplicador de Balance',
+            value: `${result.multiplierGanancia.toFixed(2)}x`,
+            inline: true
+          },
+          { name: 'Balance Final', value: `**${result.finalRyou} Ryou**`, inline: true },
+          { name: 'Bono EXP Semanal', value: `+${result.weeklyExpBonus} EXP`, inline: true }
+        )
+        .setTimestamp();
 
-    const claimedAt = fechaResult && 'date' in fechaResult ? fechaResult.date : undefined;
-    const result = await salaryService.claimWeeklySalary(character.id, claimedAt);
-
-    const embed = new EmbedBuilder()
-      .setColor(0x00AA00)
-      .setTitle('💰 Cobro de Sueldo Semanal')
-      .setDescription(`**${character.name}** ha cobrado su sueldo semanal.`)
-      .addFields(
-        { name: 'Sueldo Base', value: `${result.baseSalary} Ryou`, inline: true },
-        { name: 'Bonificación Rasgos', value: `${result.bonusRyou} Ryou`, inline: true },
-        { name: 'Ingreso Bruto', value: `${result.grossSalary} Ryou`, inline: true },
-        {
-          name: 'Multiplicador Semanal',
-          value: `${result.multiplierGanancia.toFixed(2)}x`,
-          inline: true
-        },
-        {
-          name: 'Pérdida por Derrochador',
-          value: `${result.derrochadorLoss} Ryou`,
-          inline: true
-        },
-        { name: 'Ryou Recibido', value: `+${result.netDeltaRyou} Ryou`, inline: true },
-        { name: 'Bono EXP Semanal', value: `+${result.weeklyExpBonus} EXP`, inline: true },
-        { name: 'Total de Ryou', value: `**${result.finalRyou} Ryou**`, inline: false }
-      )
-      .setTimestamp();
-
-    await publishPublicSalaryEmbed(interaction, embed);
-    return;
+      await publishPublicSalaryEmbed(interaction, embed);
     },
     {
       defer: { ephemeral: true },

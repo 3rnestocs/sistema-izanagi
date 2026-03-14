@@ -85,6 +85,30 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   return { success: true, date };
 }
 
+const CARACAS_TIMEZONE = 'America/Caracas';
+
+/**
+ * Returns the weekday (0=Sunday, 1=Monday, ..., 6=Saturday) in the given timezone for the given date.
+ */
+export function getDayOfWeekInTimezone(date: Date, timeZone: string = CARACAS_TIMEZONE): number {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    weekday: 'short'
+  });
+  const weekday = formatter.format(date); // "Mon", "Tue", ...
+  const map: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+  return map[weekday] ?? 0;
+}
+
+/**
+ * Returns true if the given date (or current time if omitted) is a Monday in the specified timezone.
+ * Uses Intl.DateTimeFormat for reliable timezone conversion.
+ */
+export function isMondayInTimezone(date: Date = new Date(), timeZone: string = CARACAS_TIMEZONE): boolean {
+  const weekday = new Intl.DateTimeFormat('en-CA', { timeZone, weekday: 'long' }).format(date);
+  return weekday === 'Monday';
+}
+
 /**
  * Helper to get optional fecha from interaction and return a Date for createdAt override.
  * Returns null when no fecha was provided (caller uses default now).

@@ -89,10 +89,12 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           {
             name: `🟡 OCASIONALMENTE — ${gestionRef}`,
             value:
+            '`/ficha` — Consulta tu ficha completa en cualquier momento.\n' +
             '`/invertir_sp` — Reparte tus puntos de stat. El bot valida topes, escalas y bloqueos.\n' +
             '`/ascender` — Solicita un ascenso de rango cuando cumplas los requisitos.\n' +
-            '`/ficha` — Consulta tu ficha completa en cualquier momento.\n' +
-            '`/catalogo` — Consulta rasgos, habilidades o ítems disponibles.',
+            '`/otorgar_habilidad` — Solicita una nueva habilidad cuando tengas un deseo aprobado.\n' +
+            '`/catalogo` — Consulta rasgos, habilidades o ítems disponibles.\n' +
+            '• **Cambio de rasgo:** Si quieres modificar un rasgo de tu personaje, solicítalo mencionando a un miembro del Staff.',
           inline: false
         },
         {

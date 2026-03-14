@@ -1,30 +1,23 @@
 import { PrismaClient } from '@prisma/client';
+import {
+  BASE_SALARIES,
+  SALARY_COOLDOWN_DAYS,
+  WEEKLY_EXP_BONUS
+} from '../config/salaryConfig';
+import { isMondayInTimezone } from '../utils/dateParser';
 
 export class SalaryService {
   constructor(private prisma: PrismaClient) {}
 
-  private readonly DAYS_BETWEEN_SALARY = 7;
-
-  private readonly BASE_SALARIES: Readonly<Record<string, number>> = {
-    Genin: 0,
-    Chuunin: 800,
-    'Tokubetsu Jounin': 1200,
-    Jounin: 1800,
-    ANBU: 2400,
-    Buntaichoo: 3000,
-    'Jounin Hanchou': 3000,
-    'Go-Ikenban': 3500,
-    Kage: 5000
-  };
-
   /**
    * Claim weekly salary with trait bonuses and multipliers.
-   * @param claimedAt Optional backdate for migration (skips cooldown check).
+   * @param discordId Discord user ID (used to find character)
+   * @param forceOverride If true, skip Monday and cooldown checks (staff use)
    */
-  async claimWeeklySalary(characterId: string, claimedAt?: Date) {
+  async claimWeeklySalary(discordId: string, forceOverride = false) {
     return this.prisma.$transaction(async (tx) => {
       const character = await tx.character.findUnique({
-        where: { id: characterId },
+        where: { discordId },
         include: { traits: { include: { trait: true } } }
       });
 
@@ -32,83 +25,98 @@ export class SalaryService {
         throw new Error('Personaje no encontrado.');
       }
 
-      const effectiveDate = claimedAt ?? new Date();
-      if (!claimedAt) {
-        const elapsedMs = effectiveDate.getTime() - character.lastSalaryClaim.getTime();
+      const now = new Date();
+
+      if (!forceOverride) {
+        if (!isMondayInTimezone(now)) {
+          throw new Error(
+            '⛔ Solo puedes cobrar el sueldo semanal los lunes (zona horaria: America/Caracas).'
+          );
+        }
+
+        const elapsedMs = now.getTime() - character.lastSalaryClaim.getTime();
         const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-        if (elapsedDays < this.DAYS_BETWEEN_SALARY) {
-          const daysLeft = Math.ceil(this.DAYS_BETWEEN_SALARY - elapsedDays);
-          throw new Error(`⛔ Ya cobraste el sueldo semanal. Intenta nuevamente en ${daysLeft} día(s).`);
+        if (elapsedDays < SALARY_COOLDOWN_DAYS) {
+          const daysLeft = Math.ceil(SALARY_COOLDOWN_DAYS - elapsedDays);
+          throw new Error(
+            `⛔ Ya cobraste el sueldo semanal. Intenta nuevamente en ${daysLeft} día(s).`
+          );
         }
       }
 
-      const baseSalary = this.BASE_SALARIES[character.rank] ?? 0;
+      const baseSalary = BASE_SALARIES[character.rank] ?? 0;
 
-      let weeklyTotalMultiplier = 1;
-      let weeklyTraitBonusRyou = 0;
+      let traitFlatBonus = 0;
+      let traitMultiplier = 1;
 
-      // Apply trait bonuses and multipliers
-      for (const characterTrait of character.traits) {
-        const mechanics = characterTrait.trait.mechanics;
+      for (const { trait } of character.traits) {
+        traitFlatBonus += trait.bonusRyou ?? 0;
+
+        if (
+          typeof trait.multiplierGanancia === 'number' &&
+          trait.multiplierGanancia > 1
+        ) {
+          traitMultiplier *= trait.multiplierGanancia;
+        }
+
+        const mechanics = trait.mechanics;
         if (mechanics && typeof mechanics === 'object' && !Array.isArray(mechanics)) {
-          const weeklyBonus = (mechanics as Record<string, unknown>).weeklyRyouBonus;
-          if (typeof weeklyBonus === 'number' && Number.isFinite(weeklyBonus)) {
-            weeklyTraitBonusRyou += Math.floor(weeklyBonus);
-          }
-
-          const mondayMultiplier = (mechanics as Record<string, unknown>).mondayTotalMultiplier;
-          if (typeof mondayMultiplier === 'number' && Number.isFinite(mondayMultiplier) && mondayMultiplier > 0) {
-            weeklyTotalMultiplier *= mondayMultiplier;
+          const mondayMultiplier = (mechanics as Record<string, unknown>)
+            .mondayTotalMultiplier;
+          if (
+            typeof mondayMultiplier === 'number' &&
+            Number.isFinite(mondayMultiplier) &&
+            mondayMultiplier > 0
+          ) {
+            traitMultiplier *= mondayMultiplier;
           }
         }
       }
 
-      const grossSalary = baseSalary + weeklyTraitBonusRyou;
-      const totalBeforeMultiplier = character.ryou + grossSalary;
-      const finalRyou = Math.floor(totalBeforeMultiplier * weeklyTotalMultiplier);
-      const netDeltaRyou = finalRyou - character.ryou;
-      const multiplierDelta = finalRyou - totalBeforeMultiplier;
+      const grossIncome = baseSalary + traitFlatBonus;
+      const newBalanceBeforeMultiplier = character.ryou + grossIncome;
+      const finalRyouBalance = Math.floor(
+        newBalanceBeforeMultiplier * traitMultiplier
+      );
+      const actualRyouEarnedOrLost = finalRyouBalance - character.ryou;
+      const multiplierDelta = finalRyouBalance - newBalanceBeforeMultiplier;
 
-      // Weekly EXP bonus (2 EXP every Monday)
-      const weeklyExpBonus = 2;
-
-      // Update character
       await tx.character.update({
         where: { id: character.id },
         data: {
-          ryou: finalRyou,
-          exp: { increment: weeklyExpBonus },
-          lastSalaryClaim: effectiveDate
+          ryou: finalRyouBalance,
+          exp: { increment: WEEKLY_EXP_BONUS },
+          lastSalaryClaim: now
         }
       });
 
-      // Create audit log
-      const statusDetail = multiplierDelta !== 0
-        ? `Cobro semanal: +${grossSalary} Ryou, +${weeklyExpBonus} EXP (bono semanal). Multiplicador lunes aplicado (${weeklyTotalMultiplier.toFixed(2)}x): ${multiplierDelta >= 0 ? '+' : ''}${multiplierDelta} Ryou.`
-        : `Cobro semanal exitoso: +${grossSalary} Ryou, +${weeklyExpBonus} EXP (bono semanal).`;
+      const statusDetail =
+        multiplierDelta !== 0
+          ? `Cobro semanal: +${grossIncome} Ryou, +${WEEKLY_EXP_BONUS} EXP (bono semanal). Multiplicador aplicado (${traitMultiplier.toFixed(2)}x): ${multiplierDelta >= 0 ? '+' : ''}${multiplierDelta} Ryou.`
+          : `Cobro semanal exitoso: +${grossIncome} Ryou, +${WEEKLY_EXP_BONUS} EXP (bono semanal).`;
 
       await tx.auditLog.create({
         data: {
-          characterId,
+          characterId: character.id,
           category: 'Sueldo Semanal',
           detail: statusDetail,
-          evidence: 'Sistema Automatizado',
-          deltaRyou: netDeltaRyou,
-          deltaExp: weeklyExpBonus,
-          ...(claimedAt && { createdAt: claimedAt })
+          evidence: forceOverride ? 'Comando /forzar_sueldo' : 'Sistema Automatizado',
+          deltaRyou: actualRyouEarnedOrLost,
+          deltaExp: WEEKLY_EXP_BONUS
         }
       });
 
       return {
         success: true,
+        characterName: character.name,
         baseSalary,
-        bonusRyou: weeklyTraitBonusRyou,
-        multiplierGanancia: weeklyTotalMultiplier,
-        grossSalary,
+        bonusRyou: traitFlatBonus,
+        multiplierGanancia: traitMultiplier,
+        grossSalary: grossIncome,
         derrochadorLoss: multiplierDelta < 0 ? Math.abs(multiplierDelta) : 0,
-        finalRyou,
-        netDeltaRyou,
-        weeklyExpBonus
+        finalRyou: finalRyouBalance,
+        netDeltaRyou: actualRyouEarnedOrLost,
+        weeklyExpBonus: WEEKLY_EXP_BONUS
       };
     });
   }
@@ -129,43 +137,58 @@ export class SalaryService {
     const now = new Date();
     const elapsedMs = now.getTime() - character.lastSalaryClaim.getTime();
     const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-    const canClaim = elapsedDays >= this.DAYS_BETWEEN_SALARY;
-    const daysUntilNextClaim = Math.max(0, Math.ceil(this.DAYS_BETWEEN_SALARY - elapsedDays));
+    const canClaim = elapsedDays >= SALARY_COOLDOWN_DAYS;
+    const daysUntilNextClaim = Math.max(
+      0,
+      Math.ceil(SALARY_COOLDOWN_DAYS - elapsedDays)
+    );
 
-    const baseSalary = this.BASE_SALARIES[character.rank] ?? 0;
+    const baseSalary = BASE_SALARIES[character.rank] ?? 0;
 
-    let weeklyTotalMultiplier = 1;
-    let weeklyTraitBonusRyou = 0;
+    let traitFlatBonus = 0;
+    let traitMultiplier = 1;
 
-    for (const characterTrait of character.traits) {
-      const mechanics = characterTrait.trait.mechanics;
+    for (const { trait } of character.traits) {
+      traitFlatBonus += trait.bonusRyou ?? 0;
+
+      if (
+        typeof trait.multiplierGanancia === 'number' &&
+        trait.multiplierGanancia > 1
+      ) {
+        traitMultiplier *= trait.multiplierGanancia;
+      }
+
+      const mechanics = trait.mechanics;
       if (mechanics && typeof mechanics === 'object' && !Array.isArray(mechanics)) {
-        const weeklyBonus = (mechanics as Record<string, unknown>).weeklyRyouBonus;
-        if (typeof weeklyBonus === 'number' && Number.isFinite(weeklyBonus)) {
-          weeklyTraitBonusRyou += Math.floor(weeklyBonus);
-        }
-
-        const mondayMultiplier = (mechanics as Record<string, unknown>).mondayTotalMultiplier;
-        if (typeof mondayMultiplier === 'number' && Number.isFinite(mondayMultiplier) && mondayMultiplier > 0) {
-          weeklyTotalMultiplier *= mondayMultiplier;
+        const mondayMultiplier = (mechanics as Record<string, unknown>)
+          .mondayTotalMultiplier;
+        if (
+          typeof mondayMultiplier === 'number' &&
+          Number.isFinite(mondayMultiplier) &&
+          mondayMultiplier > 0
+        ) {
+          traitMultiplier *= mondayMultiplier;
         }
       }
     }
 
-    const grossSalary = baseSalary + weeklyTraitBonusRyou;
-    const totalBeforeMultiplier = character.ryou + grossSalary;
-    const estimatedFinalRyou = Math.floor(totalBeforeMultiplier * weeklyTotalMultiplier);
+    const grossIncome = baseSalary + traitFlatBonus;
+    const newBalanceBeforeMultiplier = character.ryou + grossIncome;
+    const estimatedFinalRyou = Math.floor(
+      newBalanceBeforeMultiplier * traitMultiplier
+    );
 
     return {
       rank: character.rank,
       baseSalary,
-      traitBonuses: weeklyTraitBonusRyou,
-      grossSalary,
-      multiplier: weeklyTotalMultiplier,
+      traitBonuses: traitFlatBonus,
+      grossSalary: grossIncome,
+      multiplier: traitMultiplier,
       estimatedFinalRyou,
-      weeklyExpBonus: 2,
+      weeklyExpBonus: WEEKLY_EXP_BONUS,
       canClaim,
-      daysUntilNextClaim
+      daysUntilNextClaim,
+      isMonday: isMondayInTimezone()
     };
   }
 }
