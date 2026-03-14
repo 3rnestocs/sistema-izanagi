@@ -81,7 +81,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             value:
             '`/registrar_suceso` — Registra misiones, combates, narraciones o cualquier actividad.\n' +
             '• Tú pones el tipo, rango y enlace de evidencia. Izanagi **calcula las recompensas** según tu nivel, rango y rasgos.\n' +
-            '• Staff aprueba con ✅ y los recursos se acreditan al instante.\n' +
+            '• Si el suceso queda como PENDIENTE, el staff debe  revisar y aprobar con ✅ para que obtengas tus recompensas.\n' +
             `• Si te sumas recompensas falsas y se comprueba que no fue por un error, la sanción hará que te plantees desinstalar Hobba ${leebirdEmoji}\n`
             ,
             inline: false
@@ -90,18 +90,20 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             name: `🟡 OCASIONALMENTE — ${gestionRef}`,
             value:
             '`/ficha` — Consulta tu ficha completa en cualquier momento.\n' +
+            '`/historial` — Consulta el historial de actividades y recompensas de tu personaje.\n' +
             '`/invertir_sp` — Reparte tus puntos de stat. El bot valida topes, escalas y bloqueos.\n' +
             '`/ascender` — Solicita un ascenso de rango cuando cumplas los requisitos.\n' +
-            '`/otorgar_habilidad` — Solicita una nueva habilidad cuando tengas un deseo aprobado.\n' +
-            '`/catalogo` — Consulta rasgos, habilidades o ítems disponibles.\n' +
-            '• **Cambio de rasgo:** Si quieres modificar un rasgo de tu personaje, solicítalo mencionando a un miembro del Staff.',
+            '`/otorgar_habilidad` — Solicita una nueva habilidad cuando tengas un deseo aprobado. Staff aprueba con ✅.\n' +
+            '`/otorgar_rasgo` — Solicita agregar o remover un rasgo. Staff aprueba con ✅.\n' +
+            '`/catalogo` — Consulta rasgos, habilidades o ítems disponibles.',
           inline: false
         },
         {
           name: `🟠 ECONOMÍA — ${tiendaRef}`,
           value:
-            '`/comprar` · `/vender` · `/transferir` · `/cobrar_sueldo`\n' +
-            'Izanagi aplica descuentos y recargos automáticamente según tus rasgos.',
+            '`/tienda` — Consulta el inventario disponible.\n' +
+            '`/comprar` · `/vender` · `/transferir` — Izanagi aplica descuentos y recargos según tus rasgos.\n' +
+            '`/cobrar_sueldo` — Cobra tu sueldo semanal (se registra el lunes más reciente). El monto depende de tu cargo y rasgos.',
           inline: false
         }
       );
