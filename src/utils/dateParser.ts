@@ -110,6 +110,41 @@ export function isMondayInTimezone(date: Date = new Date(), timeZone: string = C
 }
 
 /**
+ * Returns the most recent Monday in America/Caracas (UTC-4).
+ * If fromDate is a Monday, returns that date at 00:00:00. Otherwise returns the preceding Monday.
+ */
+export function getMostRecentMonday(fromDate: Date = new Date()): Date {
+  const dayOfWeek = getDayOfWeekInTimezone(fromDate, CARACAS_TIMEZONE); // 0=Sun, 1=Mon, ..., 6=Sat
+  const daysBack = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: CARACAS_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(fromDate);
+
+  const year = parseInt(parts.find((p) => p.type === 'year')!.value, 10);
+  const month = parseInt(parts.find((p) => p.type === 'month')!.value, 10) - 1;
+  const day = parseInt(parts.find((p) => p.type === 'day')!.value, 10);
+
+  const caracasMonday = new Date(Date.UTC(year, month, day - daysBack, 4, 0, 0, 0)); // midnight Caracas = 04:00 UTC
+  return new Date(Date.UTC(
+    caracasMonday.getUTCFullYear(),
+    caracasMonday.getUTCMonth(),
+    caracasMonday.getUTCDate(),
+    0, 0, 0, 0
+  ));
+}
+
+/**
+ * Normalizes a Date to midnight UTC (date-only) for exact date matching.
+ */
+export function toDateOnlyUTC(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0));
+}
+
+/**
  * Helper to get optional fecha from interaction and return a Date for createdAt override.
  * Returns null when no fecha was provided (caller uses default now).
  */

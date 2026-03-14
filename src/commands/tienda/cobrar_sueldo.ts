@@ -9,6 +9,7 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { getMostRecentMonday } from '../../utils/dateParser';
 
 const salaryService = new SalaryService(prisma);
 
@@ -22,9 +23,18 @@ async function publishPublicSalaryEmbed(
   });
 }
 
+function formatClaimDate(d: Date): string {
+  return d.toLocaleDateString('es-ES', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
 export const data = new SlashCommandBuilder()
   .setName('cobrar_sueldo')
-  .setDescription('Cobra tu sueldo semanal como personaje (solo los lunes, America/Caracas)');
+  .setDescription('Cobra tu sueldo semanal (lunes más reciente, Caracas).');
 
 export async function execute(interaction: ChatInputCommandInteraction) {
   await executeWithErrorHandling(
@@ -47,13 +57,15 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         actorId: interaction.user.id
       });
 
-      const result = await salaryService.claimWeeklySalary(interaction.user.id, false);
+      const mostRecentMonday = getMostRecentMonday(new Date());
+      const result = await salaryService.claimWeeklySalary(interaction.user.id, mostRecentMonday);
 
       const embed = new EmbedBuilder()
         .setColor(0x00AA00)
         .setTitle('💰 Cobro de Sueldo Semanal')
         .setDescription(`**${result.characterName}** ha cobrado su sueldo semanal.`)
         .addFields(
+          { name: 'Correspondiente a la semana del', value: formatClaimDate(result.claimDate), inline: false },
           { name: 'Sueldo Base', value: `${result.baseSalary} Ryou`, inline: true },
           { name: 'Bonos de Origen', value: `${result.bonusRyou} Ryou`, inline: true },
           {

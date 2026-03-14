@@ -1,10 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 import {
   BASE_SALARIES,
-  SALARY_COOLDOWN_DAYS,
   WEEKLY_EXP_BONUS
 } from '../config/salaryConfig';
-import { isMondayInTimezone } from '../utils/dateParser';
+import { toDateOnlyUTC } from '../utils/dateParser';
 
 export class SalaryService {
   constructor(private prisma: PrismaClient) {}
@@ -12,9 +11,9 @@ export class SalaryService {
   /**
    * Claim weekly salary with trait bonuses and multipliers.
    * @param discordId Discord user ID (used to find character)
-   * @param forceOverride If true, skip Monday and cooldown checks (staff use)
+   * @param claimDate The Monday date for which the salary is claimed (normalized to 00:00:00)
    */
-  async claimWeeklySalary(discordId: string, forceOverride = false) {
+  async claimWeeklySalary(discordId: string, claimDate: Date) {
     return this.prisma.$transaction(async (tx) => {
       const character = await tx.character.findUnique({
         where: { discordId },
@@ -25,23 +24,22 @@ export class SalaryService {
         throw new Error('Personaje no encontrado.');
       }
 
-      const now = new Date();
+      const claimDateNorm = toDateOnlyUTC(claimDate);
+      const createdAtNorm = toDateOnlyUTC(character.createdAt);
+      const lastClaimNorm = toDateOnlyUTC(character.lastSalaryClaim);
 
-      if (!forceOverride) {
-        if (!isMondayInTimezone(now)) {
-          throw new Error(
-            '⛔ Solo puedes cobrar el sueldo semanal los lunes (zona horaria: America/Caracas).'
-          );
-        }
+      if (claimDateNorm.getTime() < createdAtNorm.getTime()) {
+        throw new Error('No puedes cobrar sueldos de fechas anteriores a la creación de tu personaje.');
+      }
 
-        const elapsedMs = now.getTime() - character.lastSalaryClaim.getTime();
-        const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-        if (elapsedDays < SALARY_COOLDOWN_DAYS) {
-          const daysLeft = Math.ceil(SALARY_COOLDOWN_DAYS - elapsedDays);
-          throw new Error(
-            `⛔ Ya cobraste el sueldo semanal. Intenta nuevamente en ${daysLeft} día(s).`
-          );
-        }
+      if (claimDateNorm.getTime() === lastClaimNorm.getTime()) {
+        const fmt = claimDateNorm.toLocaleDateString('es-ES', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+        throw new Error(`Ya has cobrado el sueldo correspondiente a la semana del ${fmt}.`);
       }
 
       const baseSalary = BASE_SALARIES[character.rank] ?? 0;
@@ -86,7 +84,7 @@ export class SalaryService {
         data: {
           ryou: finalRyouBalance,
           exp: { increment: WEEKLY_EXP_BONUS },
-          lastSalaryClaim: now
+          lastSalaryClaim: claimDateNorm
         }
       });
 
@@ -100,7 +98,7 @@ export class SalaryService {
           characterId: character.id,
           category: 'Sueldo Semanal',
           detail: statusDetail,
-          evidence: forceOverride ? 'Comando /forzar_sueldo' : 'Sistema Automatizado',
+          evidence: 'Sistema Automatizado',
           deltaRyou: actualRyouEarnedOrLost,
           deltaExp: WEEKLY_EXP_BONUS
         }
@@ -109,6 +107,7 @@ export class SalaryService {
       return {
         success: true,
         characterName: character.name,
+        claimDate: claimDateNorm,
         baseSalary,
         bonusRyou: traitFlatBonus,
         multiplierGanancia: traitMultiplier,
@@ -133,15 +132,6 @@ export class SalaryService {
     if (!character) {
       throw new Error('Personaje no encontrado.');
     }
-
-    const now = new Date();
-    const elapsedMs = now.getTime() - character.lastSalaryClaim.getTime();
-    const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-    const canClaim = elapsedDays >= SALARY_COOLDOWN_DAYS;
-    const daysUntilNextClaim = Math.max(
-      0,
-      Math.ceil(SALARY_COOLDOWN_DAYS - elapsedDays)
-    );
 
     const baseSalary = BASE_SALARIES[character.rank] ?? 0;
 
@@ -186,9 +176,7 @@ export class SalaryService {
       multiplier: traitMultiplier,
       estimatedFinalRyou,
       weeklyExpBonus: WEEKLY_EXP_BONUS,
-      canClaim,
-      daysUntilNextClaim,
-      isMonday: isMondayInTimezone()
+      lastSalaryClaim: character.lastSalaryClaim
     };
   }
 }
