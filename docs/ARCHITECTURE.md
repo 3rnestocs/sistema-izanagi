@@ -1,6 +1,6 @@
 # Sistema IZANAGI — Architecture Analysis
 
-> **Date:** March 13, 2026
+> **Date:** March 14, 2026
 > **Scope:** Architectural baseline for the Discord bot + PostgreSQL system. For current operational state see `README.md` and `docs/QUICK_REFERENCE.md`.
 
 ---
@@ -41,6 +41,7 @@ The system is a **Discord bot** backed by **PostgreSQL**: slash commands for sel
 | DB Adapter | @prisma/adapter-pg | ^7.4.2 |
 | PG Client | pg | ^8.19.0 |
 | Env Config | dotenv | ^17.3.1 |
+| Date/Timezone | dayjs | ^1.11.20 |
 | Dev Tools | nodemon, ts-node | ^3.1.14, ^10.9.2 |
 
 ### Required Environment Variables
@@ -70,7 +71,7 @@ The system is a **Discord bot** backed by **PostgreSQL**: slash commands for sel
 ```
 sistema-izanagi/
 ├── prisma/
-│   ├── schema.prisma              # Database schema (14 models)
+│   ├── schema.prisma              # Database schema (16 models, ApprovalStatus + TipoOtorgamiento enums)
 │   ├── migrations/                # Prisma migrations
 │   └── seed-data/                 # JSON data for seeds
 │       ├── traits.json
@@ -108,7 +109,7 @@ sistema-izanagi/
 │   ├── services/                  # Business logic
 │   │   ├── ReactionApprovalRouter.ts    # Centralized reaction dispatcher
 │   │   ├── PromotionApprovalService.ts  # Async promotion handling
-│   │   ├── WishApprovalHandler.ts       # Async skill assignment handling
+│   │   ├── WishApprovalHandler.ts       # Async skill assignment: reads PendingWish by messageId, fallback for legacy footer
 │   │   ├── CharacterService.ts    # Character creation with trait validation
 │   │   ├── TraitRuleService.ts    # Trait rules and nacimiento gradations
 │   │   ├── LevelUpService.ts      # Legacy compatibility (kept)
@@ -130,6 +131,8 @@ sistema-izanagi/
 │   ├── config/
 │   │   ├── commandNames.ts        # Slash command name constants
 │   │   ├── activityRewards.ts     # Reward configuration
+│   │   ├── requirements.ts        # Optional requirement IDs for level-up validation
+│   │   ├── salaryConfig.ts
 │   │   └── historicalNarrations.ts    # Narration strings
 │   ├── lib/
 │   │   ├── commandLoader.ts       # Dynamic command loader
@@ -149,7 +152,7 @@ sistema-izanagi/
 │   │   ├── channelRefs.ts        # Channel references
 │   │   ├── staffGuards.ts        # Staff permission checks
 │   │   ├── commandThrottle.ts    # Command throttling
-│   │   └── dateParser.ts         # Date parsing utilities
+│   │   └── dateParser.ts         # Date parsing; getMostRecentMonday uses dayjs (America/Caracas) for salary week
 ├── dist/                          # Compiled output
 ├── package.json
 ├── tsconfig.json
@@ -194,7 +197,7 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 
 ## 5. Domain Model
 
-### Key Models (15 total)
+### Key Models (16 total)
 
 | Model | Purpose |
 |---|---|
@@ -210,7 +213,10 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 | `InventoryItem` | Character inventory (stackable quantities) |
 | `ActivityRecord` | Missions, combats, narrations with approval workflow |
 | `PendingPromotion` | Async workflow: stores pending rank/level requests awaiting staff approval |
+| `PendingWish` | Async workflow: stores pending skill/plaza requests; staff approves via reaction; uses `ApprovalStatus` + `TipoOtorgamiento` enums |
 | `AuditLog` | Full audit trail with delta tracking |
+
+**Enums:** `ApprovalStatus` (PENDING, APPROVED, REJECTED, EXPIRED), `TipoOtorgamiento` (DESARROLLO, DESEO_NORMAL, DESEO_ESPECIAL).
 
 ---
 
@@ -236,6 +242,7 @@ A single `PrismaClient` is instantiated in `index.ts` using the `@prisma/adapter
 
 - No automated tests for core business rules (`StatValidatorService`, `PromotionService`, `PlazaService`, `TransactionService`).
 - Hardcoded progression/economy tables in services; rule changes require code deployment.
+- ~~Footer-based state for skill requests~~ — remediated: `PendingWish` table with DB lookup; `OptionalRequirement` uses stable IDs (`requirements.ts`); salary uses dayjs for Venezuela timezone.
 - Coarse permission model (`Administrator` / `STAFF_ALLOWED_ROLE_IDS`) instead of finer role-based policy.
 
 **Medium**

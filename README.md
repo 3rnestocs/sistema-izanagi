@@ -6,6 +6,7 @@ Discord bot + PostgreSQL backend for Naruto RP character, economy, progression, 
 
 - `docs/ARCHITECTURE.md` — Architecture baseline, domain model, gaps/risks, and recommendations.
 - `docs/QUICK_REFERENCE.md` — Operational command/service cheat sheet.
+- `docs/ARCHITECTURAL_REMEDIATION.md` — Remediation plan (enums, PendingWish, requirements, timezone).
 - `docs/CHAKRA_NACIMIENTO_RULES_UPDATE.md` — Chakra/Nacimiento rules specification.
 
 ## Setup
@@ -113,7 +114,7 @@ npm run dev
 - `/ficha` — View character
 - `/historial` — Character history
 - `/invertir_sp` — Spend SP
-- `/otorgar_habilidad` — Grant ability (staff)
+- `/otorgar_habilidad` — Request ability (player initiates; staff approves with ✅)
 - `/retirar_habilidad` — Revoke ability (staff)
 - `/otorgar_rasgo` — Grant trait (staff)
 - `/ascender` — Promote (staff)

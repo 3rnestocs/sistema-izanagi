@@ -1,6 +1,6 @@
 # Quick Reference — IZANAGI V2
 
-Last updated: March 9, 2026
+Last updated: March 14, 2026
 
 ## Canonical Docs
 
@@ -13,11 +13,11 @@ Last updated: March 9, 2026
 ```text
 src/
   commands/      Slash commands (player + staff)
-  config/        Static rules, rewards, and command name mappings
+  config/        Static rules, rewards, requirements (OPTIONAL_REQUIREMENTS), command names
   database/      Seed scripts and migration backfills
   domain/        Domain logic and types (e.g., activity models)
   services/      Business rules and transactional logic
-  utils/         Guards, throttles, date parsing, and error handling
+  utils/         Guards, throttles, date parsing (dayjs/America/Caracas for salary), error handling
 prisma/
   schema.prisma
   seed-data/     JSON seed sources
@@ -62,7 +62,7 @@ Staff/Admin commands:
 Routing & Approval Services:
 - `ReactionApprovalRouter`: Centralized dispatcher for ✅ emoji workflows.
 - `PromotionApprovalService`: Handles pending rank/level promotions.
-- `WishApprovalHandler`: Handles pending /otorgar_habilidad requests.
+- `WishApprovalHandler`: Handles pending /otorgar_habilidad requests (reads PendingWish by messageId).
 
 Core Services:
 - `CharacterService`: Character creation and trait management.
