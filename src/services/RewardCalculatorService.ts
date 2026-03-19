@@ -306,7 +306,7 @@ export class RewardCalculatorService {
     }
 
     // Use standard table
-    const standard = STANDARD_NARRATION_REWARDS.Cronica;
+    const standard = STANDARD_NARRATION_REWARDS[ActivityType.CRONICA];
     if (isDestacado) {
       return {
         exp: standard.participant.exp + standard.destacado.exp,
@@ -342,7 +342,7 @@ export class RewardCalculatorService {
     }
 
     // Use standard table
-    const standard = STANDARD_NARRATION_REWARDS.Evento;
+    const standard = STANDARD_NARRATION_REWARDS[ActivityType.EVENTO];
     if (isDestacado) {
       return {
         exp: standard.participant.exp + standard.destacado.exp,

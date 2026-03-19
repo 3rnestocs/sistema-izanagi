@@ -1,6 +1,8 @@
-# Localization Audit — `src/commands/` & `src/config/`
+# Localization Audit — `src/commands/`, `src/config/`, `src/domain/`, `src/database/`
 
 Report of hardcoded strings that can be centralized in `src/config/` for reuse across the app.
+
+**Implementation status:** Sections 1–4 (commands) have been implemented. Sections 7–9 (config, domain, database) are audit findings for future work.
 
 ---
 
@@ -18,6 +20,8 @@ Report of hardcoded strings that can be centralized in `src/config/` for reuse a
 ---
 
 ## 2. Duplicates to remove (use existing config)
+
+**Status:** ✅ Implemented (ajustar_recursos, tienda, listar_tienda, registrar_suceso, ascender).
 
 ### 2.1 Resource labels — use `RESOURCE_LABEL_MAP`
 
@@ -224,3 +228,152 @@ export const STORE_CURRENCY_CHOICES = [
 - **Embed content in bienvenida.ts**: Long, narrative text; localization could be a separate phase.
 - **Dynamic strings** with interpolated values (e.g. `Ficha de ${character.name}`): keep as template literals; only extract shared patterns if needed.
 - **Discord option names** (e.g. `usuario`, `fecha`, `cargo`): internal IDs; keep as-is unless you want i18n for all options.
+
+---
+
+## 7. `src/config/` — Audit findings
+
+### 7.1 Cross-references and inconsistencies
+
+| Issue | Location | Notes |
+|-------|----------|-------|
+| **Cronica vs Crónica** | `activityRewards.ts` (STANDARD_NARRATION_REWARDS), `historicalNarrations.ts` (NARRATION_PREFIX_BY_TYPE) | `STANDARD_NARRATION_REWARDS` uses `Cronica` (no accent); `NARRATION_PREFIX_BY_TYPE` uses `Crónica`. `ActivityType.CRONICA` = `'Crónica'`. Align keys for consistency. |
+| **CARGO_CHOICES duplication** | `choices.ts` | CARGO_CHOICES is manually maintained. Could derive from `Object.keys(BASE_SALARIES).filter(k => k !== 'Genin')` to avoid drift. |
+| **Herido Critico display** | `choices.ts` | One-off `key === 'Herido Critico' ? 'Herido Crítico' : key` for display. Consider `SEVERIDAD_DISPLAY_MAP` if more accents/variants needed. |
+
+### 7.2 Strings that could be extracted (low priority)
+
+| File | String(s) | Suggested key | Notes |
+|------|-----------|---------------|-------|
+| `activityRewards.ts` | `'Iniciales' \| 'Libres' \| 'Maestria' \| 'Dados'` | `LOGRO_CATEGORIES` | LogroGeneralEntry category type; used in catalog. Extract only if shown in UI. |
+| `activityRewards.ts` | Notes in LOGRO_GENERAL_CATALOG | — | e.g. `'Recompensa variable (+1 EXP por miembro no-NPC).'` — domain content; keep in catalog. |
+| `historicalNarrations.ts` | `'Cronica vieja:'`, `'Evento viejo:'`, `'Balance General:'` | — | Already in `NARRATION_PREFIX_BY_TYPE`; used for autocomplete. |
+
+### 7.3 Config files with no localization needs
+
+| File | Reason |
+|------|--------|
+| `commandNames.ts` | Internal command IDs only. |
+| `requirements.ts` | Internal requirement IDs only. |
+| `newbieBoost.ts` | Env vars and logic; no user-facing strings. |
+| `salaryConfig.ts` | Rank names are domain keys; already centralized. |
+| `uiStrings.ts` | Already the localization target. |
+
+---
+
+## 8. `src/domain/activityDomain.ts` — Audit findings
+
+### 8.1 Canonical display values
+
+`ActivityType` and `ActivityResult` are the **single source of truth** for activity types and outcomes. They are used as:
+
+- Keys in `config/activityRewards.ts` (ACTIVITY_TIER, WEEKLY_CAPS)
+- Input to `canonicalizeActivityType`, `canonicalizeActivityResult`
+- Reference in `registrar_suceso.ts` for subcommand mapping
+
+| Export | Values | Localization opportunity |
+|--------|--------|---------------------------|
+| `ActivityType` | Misión, Combate, Crónica, Evento, Escena, Experimento, Curación, Logro General, etc. | Already canonical. `registrar_suceso` subcommand descriptions could import these for consistency. |
+| `ActivityResult` | EXITOSA, FALLIDA, VICTORIA, DERROTA, DESTACADO, PARTICIPACION, EMPATE | **Mismatch:** `registrar_suceso` uses `value: 'Exitosa'` (capitalized) for choices. Backend may expect different casing. Consider exporting `ACTIVITY_RESULT_CHOICES` from domain or config that maps to these values. |
+
+### 8.2 Suggested addition
+
+```ts
+// In activityDomain.ts or config/choices.ts
+/** Discord choice format for mission/combat/narration results. */
+export const ACTIVITY_RESULT_CHOICES = {
+  mision: [
+    { name: '✅ Exitosa', value: ActivityResult.EXITOSA },
+    { name: '❌ Fallida', value: ActivityResult.FALLIDA }
+  ],
+  combate: [
+    { name: '✅ Victoria', value: ActivityResult.VICTORIA },
+    { name: '❌ Derrota', value: ActivityResult.DERROTA },
+    { name: '🤝 Empate', value: ActivityResult.EMPATE }
+  ],
+  narracion: [
+    { name: '⭐ Destacado', value: ActivityResult.DESTACADO },
+    { name: '📝 Participación', value: ActivityResult.PARTICIPACION }
+  ]
+} as const;
+```
+
+**Note:** `registrar_suceso` currently uses `value: 'Exitosa'` but `ActivityResult.EXITOSA` is `'EXITOSA'`. The `canonicalizeActivityResult` normalizes input to uppercase. Verify backend expects normalized values before changing.
+
+### 8.3 Internal maps (no change needed)
+
+`ACTIVITY_TYPE_NORMALIZED_MAP`, `ACTIVITY_STATUS_NORMALIZED_MAP`, `ACTIVITY_RESULT_NORMALIZED_MAP` — internal normalization; keep as-is.
+
+---
+
+## 9. `src/database/` — Audit findings
+
+### 9.1 AuditLog category constant
+
+The string `'Ascenso'` is used in:
+
+- `backfillGradationHistory.ts` — `where: { category: 'Ascenso' }`
+- `historial.ts` — `formatAuditLine` checks `log.category.includes('Ascenso')`, `log.category.includes('Sueldo')`, etc.
+
+| Suggested constant | Value | Used in |
+|--------------------|-------|---------|
+| `AUDIT_LOG_CATEGORY` | `{ ASCENSO: 'Ascenso', ACTIVIDAD: 'Actividad', RASGO: 'Rasgo', STATS: 'Stats', RECURSOS: 'Recursos', SUELDO: 'Sueldo', HABILIDAD: 'Habilidad', CREACION_FICHA: 'Creación de Ficha', ... }` | historial, backfillGradationHistory, services that write AuditLog |
+
+**Priority:** Medium. Reduces typos and centralizes category names.
+
+### 9.2 Backfill / parsing strings
+
+`backfillGradationHistory.ts` parses `AuditLog.detail` with regexes matching:
+
+- `'Ascenso de nivel:'`
+- `'Nivel:'`
+- `'Objetivo:'`
+
+These must match what `PromotionService` and `LevelUpService` write. **Do not localize** — they are part of the audit format contract. If changed, backfill would break. Document in code comments.
+
+### 9.3 VALID_LEVELS in backfillGradationHistory
+
+```ts
+const VALID_LEVELS = new Set(['D2', 'D3', 'C1', 'C2', 'C3', 'B1', 'B2', 'B3', 'A1', 'A2', 'A3', 'S1', 'S2']);
+```
+
+**Suggestion:** Import from `StatValidatorService.getLevelExpRequirements()` keys or a shared `LEVEL_ORDER` constant to avoid drift.
+
+### 9.4 Console / log messages (developer-facing)
+
+| File | Strings | Priority |
+|------|---------|----------|
+| `auditPlazaTraitInheritance.ts` | `'🔎 Auditando consistencia...'`, `'❌ Plazas referenciadas...'`, `'✅ OK. X relaciones...'`, `'Accion sugerida: ejecutar...'` | Low — dev-only |
+| `seedRasgo.ts` | `'🚀 [PRISMA 7] Iniciando...'`, `'✅ X sincronizado.'`, `'🎉 SEED COMPLETADO'` | Low — dev-only |
+| `seedPlazas.ts` | `'✅ Guía sincronizada:'`, `'🔗 Creating Plaza-to-Plaza...'`, `'⚠️ Parent plaza...'` | Low — dev-only |
+| `seedMercados.ts` | `'🚀 Iniciando seed de mercados...'`, `'✅ Item sincronizado:'`, `'🎉 Seed de mercados completado.'` | Low — dev-only |
+| `backfillGradationHistory.ts` | `'📦 Backfilling GradationHistory...'`, `'✅ Backfill complete:'` | Low — dev-only |
+
+**Recommendation:** Optional `src/database/scriptStrings.ts` for consistency. Low priority since these are CLI/dev output.
+
+### 9.5 seedMercados — catalog data
+
+`MERCADO_NINJA`, `TIENDA_PR`, `TIENDA_EXP` contain item names and types (e.g. `'Kit Ninja'`, `'Corta Distancia'`, `'Servicios'`). These are **product catalog data** stored in the DB. Keep in seed file or move to `prisma/seed-data/` JSON. No localization needed for the seed itself.
+
+**Naming note:** Médico services use `'Herida Leve'`, `'Herida Grave'`, `'Herida Crítica'` (wound). `CURACION_PR_BY_SEVERITY` uses `'Herido Leve'`, `'Herido Grave'`, `'Herido Critico'` (wounded person). Different concepts; no change needed.
+
+### 9.6 Error messages in database scripts
+
+| File | String | Suggestion |
+|------|--------|------------|
+| `seedRasgo.ts` | `"Falta DATABASE_URL en .env"` | Could use shared `ERROR_MISSING_DATABASE_URL` if other scripts need it. |
+| `seedMercados.ts` | `'Falta DATABASE_URL en el entorno.'`, `'Error desconocido en seedMercados.'` | Same. |
+| `auditPlazaTraitInheritance.ts` | `'❌ Error durante la auditoria:'` | Low priority. |
+
+---
+
+## 10. Summary — config / domain / database
+
+| Area | Action | Priority |
+|------|--------|----------|
+| **activityDomain** | Export `ACTIVITY_RESULT_CHOICES` for registrar_suceso (after verifying value casing) | Medium |
+| **config** | Align `Cronica`/`Crónica` in STANDARD_NARRATION_REWARDS and NARRATION_PREFIX_BY_TYPE | Low |
+| **config** | Derive CARGO_CHOICES from BASE_SALARIES | Low |
+| **database** | Add `AUDIT_LOG_CATEGORY` constant; use in historial, backfill | Medium |
+| **database** | Import VALID_LEVELS from StatValidatorService in backfillGradationHistory | Low |
+| **database** | Optional scriptStrings.ts for console messages | Low |

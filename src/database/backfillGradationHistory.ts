@@ -8,8 +8,10 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 import 'dotenv/config';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { PromotionService } from '../services/PromotionService';
 
-const VALID_LEVELS = new Set(['D2', 'D3', 'C1', 'C2', 'C3', 'B1', 'B2', 'B3', 'A1', 'A2', 'A3', 'S1', 'S2']);
+const VALID_LEVELS = new Set(PromotionService.LEVEL_ORDER.slice(1));
 
 function isInternalLevel(level: string): boolean {
   const normalized = level.trim().toUpperCase();
@@ -52,7 +54,7 @@ async function main() {
 
   const logs = await prisma.auditLog.findMany({
     where: {
-      category: 'Ascenso',
+      category: AUDIT_LOG_CATEGORY.ASCENSO,
       characterId: { not: null }
     },
     select: { id: true, characterId: true, detail: true, createdAt: true },

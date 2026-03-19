@@ -12,6 +12,7 @@ import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
 import { RESOURCE_LABEL_MAP } from '../../services/ResourceAdjustmentService';
 import { LOGRO_GENERAL_CATALOG } from '../../config/activityRewards';
+import { AUDIT_LOG_CATEGORY } from '../../config/auditLogCategories';
 import {
   ERROR_STAFF_ONLY_HISTORIAL,
   ERROR_NO_CHARACTER,
@@ -64,7 +65,7 @@ function formatAuditLine(log: { category: string; detail: string; createdAt: Dat
   let title = log.category;
   let body = log.detail;
 
-  if (log.category.includes('Actividad')) {
+  if (log.category.includes(AUDIT_LOG_CATEGORY.ACTIVIDAD)) {
     icon = '📜';
     const typeMatch = body.match(/\((.*?)\)/) || body.match(/Actividad (.*?) (auto-)?aprobada/);
     const type = typeMatch ? typeMatch[1] : 'Actividad';
@@ -81,29 +82,29 @@ function formatAuditLine(log: { category: string; detail: string; createdAt: Dat
 
     title = type ?? 'Actividad';
     body = rewards;
-  } else if (log.category === 'Ascenso') {
+  } else if (log.category === AUDIT_LOG_CATEGORY.ASCENSO) {
     icon = '🌟';
     title = 'Ascenso';
     body = body.replace('Ascenso de nivel: ', 'Nivel ').replace('Ascenso de rango: ', 'Cargo ');
     const ascensoParts = body.split('. Objetivo:');
     body = (ascensoParts[0] ?? body) as string;
-  } else if (log.category.includes('Rasgo')) {
+  } else if (log.category.includes(AUDIT_LOG_CATEGORY.RASGO)) {
     icon = '🧬';
     title = log.category;
     body = body.replace(' agregado.', '').replace(' removido.', '').replace('Costo RC', 'RC');
   } else if (
-    log.category.includes('Stats') ||
-    log.category.includes('Recursos') ||
-    log.category.includes('Sueldo')
+    log.category.includes(AUDIT_LOG_CATEGORY.STATS) ||
+    log.category.includes(AUDIT_LOG_CATEGORY.RECURSOS) ||
+    log.category.includes(AUDIT_LOG_CATEGORY.SUELDO)
   ) {
     icon = '⚙️';
-    title = log.category.includes('Sueldo') ? 'Sueldo' : 'Ajuste de Recursos';
+    title = log.category.includes(AUDIT_LOG_CATEGORY.SUELDO) ? AUDIT_LOG_CATEGORY.SUELDO : 'Ajuste de Recursos';
     body = body.replace('Inversión: ', '');
-  } else if (log.category.includes('Habilidad') || log.category.includes('Gestor')) {
+  } else if (log.category.includes(AUDIT_LOG_CATEGORY.HABILIDAD) || log.category.includes(AUDIT_LOG_CATEGORY.GESTOR)) {
     icon = '🔥';
     title = 'Habilidad';
     body = body.replace('[INICIAL] Adquisición de: ', '');
-  } else if (log.category === 'Creación de Ficha') {
+  } else if (log.category === AUDIT_LOG_CATEGORY.CREACION_FICHA) {
     icon = '🐣';
     title = 'Ficha Creada';
     body = `${LOGRO_GENERAL_CATALOG[0]?.key ?? 'Bienvenido al Shinobi Sekai'}.`;

@@ -25,7 +25,7 @@ import {
     getLogroReputacionEntry,
     type DetailedRewardBreakdown
 } from '../../config/activityRewards';
-import { SEVERIDAD_CHOICES } from '../../config/choices';
+import { ACTIVITY_RESULT_CHOICES, SEVERIDAD_CHOICES } from '../../config/choices';
 import { DATE_OPTION_VARIANTS } from '../../config/uiStrings';
 
 const rewardCalculatorService = new RewardCalculatorService();
@@ -56,22 +56,6 @@ const RANGO_CHOICES = [
     { name: 'Rango B', value: 'B' },
     { name: 'Rango A', value: 'A' },
     { name: 'Rango S', value: 'S' }
-];
-
-const RESULTADO_MISION_CHOICES = [
-    { name: '✅ Exitosa', value: 'Exitosa' },
-    { name: '❌ Fallida', value: 'Fallida' }
-];
-
-const RESULTADO_COMBATE_CHOICES = [
-    { name: '✅ Victoria', value: 'Exitosa' },
-    { name: '❌ Derrota', value: 'Fallida' },
-    { name: '🤝 Empate', value: 'Empate' }
-];
-
-const RESULTADO_CRONICA_EVENTO_CHOICES = [
-    { name: '⭐ Destacado', value: 'Destacado' },
-    { name: '📝 Participación', value: 'Participación' }
 ];
 
 function normalizeForMatch(value: string): string {
@@ -157,7 +141,7 @@ export const data = new SlashCommandBuilder()
                     .setName('resultado')
                     .setDescription('Exitosa o Fallida')
                     .setRequired(true)
-                    .addChoices(...RESULTADO_MISION_CHOICES)
+                    .addChoices(...ACTIVITY_RESULT_CHOICES.mision)
             )
     )
     .addSubcommand((sc) =>
@@ -182,7 +166,7 @@ export const data = new SlashCommandBuilder()
                     .setName('resultado')
                     .setDescription('Victoria, Derrota o Empate')
                     .setRequired(true)
-                    .addChoices(...RESULTADO_COMBATE_CHOICES)
+                    .addChoices(...ACTIVITY_RESULT_CHOICES.combate)
             )
     )
     .addSubcommand((sc) =>
@@ -200,7 +184,7 @@ export const data = new SlashCommandBuilder()
                     .setName('resultado')
                     .setDescription('Destacado o Participación')
                     .setRequired(true)
-                    .addChoices(...RESULTADO_CRONICA_EVENTO_CHOICES)
+                    .addChoices(...ACTIVITY_RESULT_CHOICES.narracion)
             )
             .addStringOption((o) =>
                 o
@@ -225,7 +209,7 @@ export const data = new SlashCommandBuilder()
                     .setName('resultado')
                     .setDescription('Destacado o Participación')
                     .setRequired(true)
-                    .addChoices(...RESULTADO_CRONICA_EVENTO_CHOICES)
+                    .addChoices(...ACTIVITY_RESULT_CHOICES.narracion)
             )
             .addStringOption((o) =>
                 o
@@ -382,7 +366,7 @@ export const data = new SlashCommandBuilder()
                     .setName('resultado')
                     .setDescription('Exitosa o Fallida')
                     .setRequired(true)
-                    .addChoices(...RESULTADO_MISION_CHOICES)
+                    .addChoices(...ACTIVITY_RESULT_CHOICES.mision)
             )
             .addIntegerOption((o) =>
                 o.setName('exp').setDescription('EXP reclamada').setRequired(true).setMinValue(0)

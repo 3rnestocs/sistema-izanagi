@@ -90,13 +90,14 @@ export const DESARROLLO_PERSONAL_EXP: Record<string, number> = {
   S: 12
 };
 
-// Standard Cronica/Evento rewards for activities not in historical catalog
+// Standard Cronica/Evento rewards for activities not in historical catalog.
+// Keys use ActivityType for consistency with domain.
 export const STANDARD_NARRATION_REWARDS = {
-  Cronica: {
+  [ActivityType.CRONICA]: {
     participant: { exp: 15, pr: 20, ryou: 0 },
     destacado: { exp: 5, pr: 5, ryou: 0 } // additive to participant
   },
-  Evento: {
+  [ActivityType.EVENTO]: {
     participant: { exp: 15, pr: 15, ryou: 0 },
     destacado: { exp: 5, pr: 5, ryou: 0 } // additive to participant
   }
