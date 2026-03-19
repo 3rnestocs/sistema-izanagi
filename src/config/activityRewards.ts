@@ -12,6 +12,7 @@ export interface RewardBreakdown {
   rc?: number;
   cupos?: number;
   bts?: number;
+  sp?: number;
 }
 
 /** Per-resource breakdown for embed display (base + trait bonus). */
@@ -29,6 +30,7 @@ export interface DetailedRewardBreakdown {
   rc?: number;
   cupos?: number;
   bts?: number;
+  sp?: number;
 }
 
 /** Round half up: < 0.5 stays, >= 0.5 rounds up (e.g. 1.4→1, 4.5→5). */

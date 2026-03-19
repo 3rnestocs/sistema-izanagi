@@ -110,6 +110,7 @@ function formatDetailedRewardLines(detailed: DetailedRewardBreakdown): string[] 
     if ((detailed.rc ?? 0) > 0) lines.push(`📜 RC: +${detailed.rc}`);
     if ((detailed.cupos ?? 0) > 0) lines.push(`📋 Cupos: +${detailed.cupos}`);
     if ((detailed.bts ?? 0) > 0) lines.push(`🔧 BTS: +${detailed.bts}`);
+    if ((detailed.sp ?? 0) > 0) lines.push(`⭐ SP: +${detailed.sp}`);
 
     return lines;
 }
@@ -343,6 +344,9 @@ export const data = new SlashCommandBuilder()
             .addIntegerOption((o) =>
                 o.setName('bts').setDescription('Bonos de Técnica Superior (opcional)').setRequired(false).setMinValue(0)
             )
+            .addIntegerOption((o) =>
+                o.setName('sp').setDescription('Puntos de habilidad SP (opcional)').setRequired(false).setMinValue(0)
+            )
     )
     .addSubcommand((sc) =>
         sc
@@ -413,6 +417,7 @@ export const data = new SlashCommandBuilder()
             .addIntegerOption((o) => o.setName('rc').setDescription('RC (opcional)').setRequired(false).setMinValue(0))
             .addIntegerOption((o) => o.setName('cupos').setDescription('Cupos de habilidad (opcional)').setRequired(false).setMinValue(0))
             .addIntegerOption((o) => o.setName('bts').setDescription('Bonos de Técnica Superior (opcional)').setRequired(false).setMinValue(0))
+            .addIntegerOption((o) => o.setName('sp').setDescription('Puntos de habilidad SP (opcional)').setRequired(false).setMinValue(0))
     )
     .addSubcommand((sc) =>
         sc
@@ -569,6 +574,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
             const claimedRc = interaction.options.getInteger('rc');
             const claimedCupos = interaction.options.getInteger('cupos');
             const claimedBts = interaction.options.getInteger('bts');
+            const claimedSp = interaction.options.getInteger('sp');
             const detalle = interaction.options.getString('detalle');
             const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
             if (fechaResult && 'error' in fechaResult) {
@@ -611,7 +617,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                     claimedRyou != null ||
                     claimedRc != null ||
                     claimedCupos != null ||
-                    claimedBts != null);
+                    claimedBts != null ||
+                    claimedSp != null);
 
             // Validation: Balance General can use catalog name for special rewards, or be manual
             if (tipo === ActivityType.BALANCE_GENERAL) {
@@ -687,7 +694,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 isNarration && Boolean(getHistoricalNarrationRewards(nombreActividad ?? undefined));
             const shouldPersistClaimed =
                 (isManualType &&
-                    (claimedExp != null || claimedPr != null || claimedRyou != null || claimedRc != null || claimedCupos != null || claimedBts != null)) ||
+                    (claimedExp != null ||
+                        claimedPr != null ||
+                        claimedRyou != null ||
+                        claimedRc != null ||
+                        claimedCupos != null ||
+                        claimedBts != null ||
+                        claimedSp != null)) ||
                 isBalanceManualOverride;
             const activityCreateData: Prisma.ActivityRecordCreateInput = {
                 character: { connect: { id: character.id } },
@@ -704,7 +717,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                           ...(claimedRyou != null ? { claimedRyou } : {}),
                           ...(claimedRc != null ? { claimedRc } : {}),
                           ...(claimedCupos != null ? { claimedCupos } : {}),
-                          ...(claimedBts != null ? { claimedBts } : {})
+                          ...(claimedBts != null ? { claimedBts } : {}),
+                          ...(claimedSp != null ? { claimedSp } : {})
                       }
                     : {})
             };
@@ -843,7 +857,14 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                 `**Evidencia:** [Ver Prueba](${evidencia})`
             ].join('\n');
 
-            const isManualClaim = claimedExp != null || claimedPr != null || claimedRyou != null || claimedRc != null || claimedCupos != null || claimedBts != null;
+            const isManualClaim =
+                claimedExp != null ||
+                claimedPr != null ||
+                claimedRyou != null ||
+                claimedRc != null ||
+                claimedCupos != null ||
+                claimedBts != null ||
+                claimedSp != null;
             const hasClaimedRewards = (isManualType && isManualClaim) || isBalanceManualOverride;
             const rewardDisplayLines = hasClaimedRewards
                 ? (() => {
@@ -855,7 +876,8 @@ export async function execute(interaction: ChatInputCommandInteraction) {
                               ryou: claimedRyou,
                               rc: claimedRc,
                               cupos: claimedCupos,
-                              bts: claimedBts
+                              bts: claimedBts,
+                              sp: claimedSp
                           }
                       );
                       const lines = formatDetailedRewardLines(claimedDetailed);

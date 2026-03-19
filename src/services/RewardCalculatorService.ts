@@ -192,6 +192,7 @@ export class RewardCalculatorService {
       rc?: number | null;
       cupos?: number | null;
       bts?: number | null;
+      sp?: number | null;
     }
   ): DetailedRewardBreakdown {
     const base: RewardBreakdown = {
@@ -202,6 +203,7 @@ export class RewardCalculatorService {
     if ((claimed.rc ?? 0) > 0) base.rc = claimed.rc!;
     if ((claimed.cupos ?? 0) > 0) base.cupos = claimed.cupos!;
     if ((claimed.bts ?? 0) > 0) base.bts = claimed.bts!;
+    if ((claimed.sp ?? 0) > 0) base.sp = claimed.sp!;
 
     return this.buildDetailedFromBaseRewards(character, base, character.traits ?? []);
   }
@@ -491,7 +493,8 @@ export class RewardCalculatorService {
       },
       ...(rewards.rc !== undefined && rewards.rc > 0 ? { rc: rewards.rc } : {}),
       ...(rewards.cupos !== undefined && rewards.cupos > 0 ? { cupos: rewards.cupos } : {}),
-      ...(rewards.bts !== undefined && rewards.bts > 0 ? { bts: rewards.bts } : {})
+      ...(rewards.bts !== undefined && rewards.bts > 0 ? { bts: rewards.bts } : {}),
+      ...(rewards.sp !== undefined && rewards.sp > 0 ? { sp: rewards.sp } : {})
     };
   }
 }

@@ -29,7 +29,7 @@ export class ActivityApprovalService {
       return false;
     }
 
-    let rewards: { exp: number; pr: number; ryou: number; rc?: number; cupos?: number; bts?: number };
+    let rewards: { exp: number; pr: number; ryou: number; rc?: number; cupos?: number; bts?: number; sp?: number };
 
     const hasClaimed =
       activityRecord.claimedExp !== null ||
@@ -37,7 +37,8 @@ export class ActivityApprovalService {
       activityRecord.claimedRyou !== null ||
       activityRecord.claimedRc !== null ||
       activityRecord.claimedCupos !== null ||
-      activityRecord.claimedBts !== null;
+      activityRecord.claimedBts !== null ||
+      activityRecord.claimedSp !== null;
 
     if (hasClaimed) {
       const claimedDetailed = rewardCalculatorService.applyTraitsToClaimedRewards(
@@ -48,7 +49,8 @@ export class ActivityApprovalService {
           ryou: activityRecord.claimedRyou,
           rc: activityRecord.claimedRc,
           cupos: activityRecord.claimedCupos,
-          bts: activityRecord.claimedBts
+          bts: activityRecord.claimedBts,
+          sp: activityRecord.claimedSp
         }
       );
       rewards = {
@@ -57,7 +59,8 @@ export class ActivityApprovalService {
         ryou: claimedDetailed.ryou.total,
         rc: claimedDetailed.rc ?? 0,
         cupos: claimedDetailed.cupos ?? 0,
-        bts: claimedDetailed.bts ?? 0
+        bts: claimedDetailed.bts ?? 0,
+        sp: claimedDetailed.sp ?? 0
       };
     } else {
       rewards = rewardCalculatorService.calculateRewards(
@@ -66,7 +69,15 @@ export class ActivityApprovalService {
       );
     }
 
-    if (rewards.exp === 0 && rewards.pr === 0 && rewards.ryou === 0 && (rewards.rc ?? 0) === 0 && (rewards.cupos ?? 0) === 0 && (rewards.bts ?? 0) === 0) {
+    if (
+      rewards.exp === 0 &&
+      rewards.pr === 0 &&
+      rewards.ryou === 0 &&
+      (rewards.rc ?? 0) === 0 &&
+      (rewards.cupos ?? 0) === 0 &&
+      (rewards.bts ?? 0) === 0 &&
+      (rewards.sp ?? 0) === 0
+    ) {
       return false;
     }
 
@@ -79,6 +90,7 @@ export class ActivityApprovalService {
       if ((rewards.rc ?? 0) > 0) updateData.rc = { increment: rewards.rc! };
       if ((rewards.cupos ?? 0) > 0) updateData.cupos = { increment: rewards.cupos! };
       if ((rewards.bts ?? 0) > 0) updateData.bts = { increment: rewards.bts! };
+      if ((rewards.sp ?? 0) > 0) updateData.sp = { increment: rewards.sp! };
 
       await tx.character.update({
         where: { id: activityRecord.characterId },
@@ -97,6 +109,7 @@ export class ActivityApprovalService {
       if ((rewards.rc ?? 0) > 0) rewardParts.push(`RC:${rewards.rc}`);
       if ((rewards.cupos ?? 0) > 0) rewardParts.push(`Cupos:${rewards.cupos}`);
       if ((rewards.bts ?? 0) > 0) rewardParts.push(`BTS:${rewards.bts}`);
+      if ((rewards.sp ?? 0) > 0) rewardParts.push(`SP:${rewards.sp}`);
 
       const auditData: Record<string, number> = {
         deltaExp: rewards.exp,
@@ -106,6 +119,7 @@ export class ActivityApprovalService {
       if ((rewards.rc ?? 0) > 0) auditData.deltaRc = rewards.rc!;
       if ((rewards.cupos ?? 0) > 0) auditData.deltaCupos = rewards.cupos!;
       if ((rewards.bts ?? 0) > 0) auditData.deltaBts = rewards.bts!;
+      if ((rewards.sp ?? 0) > 0) auditData.deltaSp = rewards.sp!;
 
       const rewardsText = rewardParts.length > 0 ? rewardParts.join(', ') : 'ninguna';
 
