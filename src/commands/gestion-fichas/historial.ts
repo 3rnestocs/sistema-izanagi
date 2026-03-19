@@ -2,20 +2,40 @@ import {
   SlashCommandBuilder,
   ChatInputCommandInteraction,
   PermissionFlagsBits,
-  EmbedBuilder
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle
 } from 'discord.js';
 import { prisma } from '../../lib/prisma';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
 import { ActivityStatus } from '../../domain/activityDomain';
 
-const NARRATION_KEY_MAX_LEN = 30;
-const EMBED_FIELD_MAX_LEN = 1020; // Discord limit 1024, keep buffer
+const EMBED_FIELD_MAX_LEN = 1020;
 
-function truncateText(value: string, maxLen: number): string {
-  if (value.length <= maxLen) return value;
-  if (maxLen <= 3) return '.'.repeat(Math.max(0, maxLen));
-  return `${value.slice(0, maxLen - 3)}...`;
+function chunkByLines(lines: string[], maxSize = EMBED_FIELD_MAX_LEN): string[][] {
+  const chunks: string[][] = [];
+  let current: string[] = [];
+  let currentSize = 0;
+
+  for (const line of lines) {
+    const lineSize = line.length + 1;
+    if (currentSize + lineSize > maxSize && current.length > 0) {
+      chunks.push(current);
+      current = [line];
+      currentSize = lineSize;
+    } else {
+      current.push(line);
+      currentSize += lineSize;
+    }
+  }
+
+  if (current.length > 0) {
+    chunks.push(current);
+  }
+
+  return chunks;
 }
 
 function formatActivityLine(activity: {
@@ -29,17 +49,13 @@ function formatActivityLine(activity: {
   const date = activity.createdAt.toLocaleDateString('es-ES');
   const rankPart = activity.rank ? ` ${activity.rank}` : '';
   const resultPart = activity.result ? ` ${activity.result}` : '';
-  const narrationPart = activity.narrationKey
-    ? ` — ${truncateText(activity.narrationKey, NARRATION_KEY_MAX_LEN)}`
-    : '';
+  const narrationPart = activity.narrationKey ? ` — ${activity.narrationKey}` : '';
   return `${date} | ${activity.type}${rankPart}${resultPart}${narrationPart} [Ver](${activity.evidenceUrl})`;
 }
 
 function formatAuditLine(log: { category: string; detail: string; createdAt: Date }): string {
   const date = log.createdAt.toLocaleDateString('es-ES');
-  const shortCategory = log.category.length > 25 ? truncateText(log.category, 22) + '...' : log.category;
-  const truncatedDetail = truncateText(log.detail, 60);
-  return `${date} | ${shortCategory}: ${truncatedDetail}`;
+  return `${date} | ${log.category}: ${log.detail}`;
 }
 
 export const data = new SlashCommandBuilder()
@@ -90,47 +106,68 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         })
       ]);
 
-      let activitiesText =
-        activities.length > 0
-          ? activities.map(formatActivityLine).join('\n')
-          : 'Ninguna actividad aprobada.';
-      if (activitiesText.length > EMBED_FIELD_MAX_LEN) {
-        activitiesText = truncateText(activitiesText, EMBED_FIELD_MAX_LEN - 15) + '\n(truncado)';
-      }
+      const embeds: EmbedBuilder[] = [];
 
-      let auditText =
-        auditLogs.length > 0
-          ? auditLogs.map(formatAuditLine).join('\n')
-          : 'Sin eventos registrados.';
-      if (auditText.length > EMBED_FIELD_MAX_LEN) {
-        auditText = truncateText(auditText, EMBED_FIELD_MAX_LEN - 15) + '\n(truncado)';
-      }
-
-      const embed = new EmbedBuilder()
+      const headerEmbed = new EmbedBuilder()
         .setColor(0x0099ff)
-        .setTitle(`Historial de ${character.name}`)
-        .setDescription(`Personaje desde ${character.createdAt.toLocaleDateString('es-ES')}`)
-        .addFields(
-          {
-            name: 'Actividades recientes (últimas 15)',
-            value: activitiesText,
-            inline: false
-          },
-          {
-            name: 'Ascensos y eventos recientes (últimos 10)',
-            value: auditText,
-            inline: false
-          }
-        )
-        .setFooter({
-          text: 'Última actualización • Usa /historial para refrescar'
-        })
+        .setTitle(`📜 Historial de ${character.name}`)
+        .setDescription(`👤 Personaje desde ${character.createdAt.toLocaleDateString('es-ES')}`)
         .setTimestamp();
+      embeds.push(headerEmbed);
 
-      return interaction.editReply({ embeds: [embed] });
+      const activityLines =
+        activities.length > 0
+          ? activities.map(formatActivityLine)
+          : ['Ninguna actividad aprobada.'];
+      const activityChunks = chunkByLines(activityLines);
+
+      activityChunks.forEach((chunk, i) => {
+        const name =
+          activityChunks.length > 1
+            ? `📋 Actividades recientes (últimas 15) — Página ${i + 1}/${activityChunks.length}`
+            : '📋 Actividades recientes (últimas 15)';
+        embeds.push(
+          new EmbedBuilder()
+            .setColor(0x43b581)
+            .addFields({ name, value: chunk.join('\n'), inline: false })
+            .setTimestamp()
+        );
+      });
+
+      const auditLines =
+        auditLogs.length > 0
+          ? auditLogs.map(formatAuditLine)
+          : ['Sin eventos registrados.'];
+      const auditChunks = chunkByLines(auditLines);
+
+      auditChunks.forEach((chunk, i) => {
+        const name =
+          auditChunks.length > 1
+            ? `⚔️ Ascensos y eventos recientes (últimos 10) — Página ${i + 1}/${auditChunks.length}`
+            : '⚔️ Ascensos y eventos recientes (últimos 10)';
+        embeds.push(
+          new EmbedBuilder()
+            .setColor(0xfaa61a)
+            .addFields({ name, value: chunk.join('\n'), inline: false })
+            .setTimestamp()
+        );
+      });
+
+      const deleteRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(`historial_delete:${interaction.user.id}`)
+          .setLabel('Eliminar mensaje')
+          .setStyle(ButtonStyle.Secondary)
+          .setEmoji('🗑️')
+      );
+
+      return interaction.editReply({
+        embeds: embeds.slice(0, 10),
+        components: [deleteRow]
+      });
     },
     {
-      defer: { ephemeral: true },
+      defer: { ephemeral: false },
       fallbackMessage: 'Error al obtener historial.',
       errorEphemeral: true
     }

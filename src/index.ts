@@ -176,6 +176,32 @@ client.once(Events.ClientReady, async (c) => {
 // 🧠 MANEJADOR DE COMANDOS (Dynamic)
 client.on(Events.InteractionCreate, async interaction => {
     if (interaction.isButton()) {
+        if (interaction.customId.startsWith('historial_delete:')) {
+            const ownerId = interaction.customId.split(':')[1];
+            const isCommandAuthor = interaction.user.id === ownerId;
+            const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
+
+            if (!isCommandAuthor && !isAdmin) {
+                await interaction.reply({
+                    content: '⛔ Solo el autor del historial o staff puede eliminar este mensaje.',
+                    ephemeral: true
+                });
+                return;
+            }
+
+            try {
+                await interaction.message.delete();
+            } catch (error) {
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply({
+                        content: '❌ No se pudo eliminar el mensaje.',
+                        ephemeral: true
+                    });
+                }
+            }
+            return;
+        }
+
         if (interaction.customId.startsWith('ficha_delete:')) {
             const ownerId = interaction.customId.split(':')[1];
             const isCommandAuthor = interaction.user.id === ownerId;
