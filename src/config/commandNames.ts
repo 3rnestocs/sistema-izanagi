@@ -9,6 +9,7 @@ export const COMMAND_NAMES = {
   cobrar_sueldo: 'cobrar_sueldo',
   comprar: 'comprar',
   ficha: 'ficha',
+  forzar_ascenso: 'forzar_ascenso',
   forzar_sueldo: 'forzar_sueldo',
   historial: 'historial',
   invertir_sp: 'invertir_sp',

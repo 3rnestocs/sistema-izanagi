@@ -12,6 +12,8 @@ import {
 } from '../domain/activityDomain';
 
 export class PromotionService {
+  public static readonly LEVEL_ORDER = ['D1', 'D2', 'D3', 'C1', 'C2', 'C3', 'B1', 'B2', 'B3', 'A1', 'A2', 'A3', 'S1', 'S2'];
+
   private levelUpService: LevelUpService;
 
   constructor(private prisma: PrismaClient) {
@@ -30,6 +32,12 @@ export class PromotionService {
   ]);
 
   private readonly LEVEL_EXP_REQUIREMENTS: Readonly<Record<string, number>> = StatValidatorService.getLevelExpRequirements();
+
+  private readonly MIN_PR_BY_LEVEL: Record<string, number> = {
+    'B1': 500, 'B2': 500, 'B3': 500,
+    'A1': 1000, 'A2': 1000, 'A3': 1000,
+    'S1': 3500, 'S2': 3500
+  };
 
   private readonly RANK_DISPLAY_NAMES: Readonly<Record<string, string>> = {
     CHUUNIN: 'Chuunin',
@@ -189,5 +197,87 @@ export class PromotionService {
       return Math.floor(pr * 0.75);
     }
     return pr;
+  }
+
+  async forceLevelPromotion(
+    characterId: string,
+    targetLevel: string,
+    approvedBy: string,
+    promotedAt: Date = new Date()
+  ) {
+    const normalizedTarget = this.normalizeTarget(targetLevel);
+    if (!this.isInternalLevel(normalizedTarget)) {
+      throw new Error(`⛔ Nivel inválido: ${targetLevel}`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const character = await tx.character.findUnique({
+        where: { id: characterId }
+      });
+
+      if (!character) throw new Error('Personaje no encontrado.');
+
+      const currentIndex = PromotionService.LEVEL_ORDER.indexOf(character.level);
+      const targetIndex = PromotionService.LEVEL_ORDER.indexOf(normalizedTarget);
+
+      if (targetIndex <= currentIndex) {
+        throw new Error(`⛔ El personaje ya es ${character.level}. No puedes forzar un ascenso a un nivel igual o inferior.`);
+      }
+
+      // 1. Calcular SP acumulado y registrar historiales intermedios
+      let totalSpGranted = 0;
+      for (let i = currentIndex + 1; i <= targetIndex; i++) {
+        const stepLevel = PromotionService.LEVEL_ORDER[i]!;
+
+        const stepSp = StatValidatorService.getInitialSpForLevel(stepLevel) ?? 0;
+        totalSpGranted += stepSp;
+
+        await tx.gradationHistory.upsert({
+          where: { characterId_level: { characterId, level: stepLevel } },
+          create: { characterId, level: stepLevel, achievedAt: promotedAt },
+          update: { achievedAt: promotedAt }
+        });
+      }
+
+      // 2. Calcular topes de EXP y PR requeridos
+      const requiredExp = this.LEVEL_EXP_REQUIREMENTS[normalizedTarget] ?? 0;
+      const requiredPr = this.MIN_PR_BY_LEVEL[normalizedTarget] ?? 0;
+
+      const deltaExp = character.exp < requiredExp ? requiredExp - character.exp : 0;
+      const deltaPr = character.pr < requiredPr ? requiredPr - character.pr : 0;
+
+      // 3. Aplicar actualización al personaje
+      await tx.character.update({
+        where: { id: characterId },
+        data: {
+          level: normalizedTarget,
+          sp: { increment: totalSpGranted },
+          exp: { increment: deltaExp },
+          pr: { increment: deltaPr }
+        }
+      });
+
+      // 4. Auditar el movimiento administrativo
+      await tx.auditLog.create({
+        data: {
+          characterId: character.id,
+          category: 'Ajuste Staff de Recursos',
+          detail: `Ascenso FORZADO por ${approvedBy}. Nivel: ${character.level} -> ${normalizedTarget}. SP Otorgados: ${totalSpGranted}. Ajuste base: +${deltaExp} EXP, +${deltaPr} PR.`,
+          evidence: 'Comando /forzar_ascenso',
+          deltaSp: totalSpGranted,
+          deltaExp: deltaExp,
+          deltaPr: deltaPr,
+          createdAt: promotedAt
+        }
+      });
+
+      return {
+        previousLevel: character.level,
+        newLevel: normalizedTarget,
+        spGranted: totalSpGranted,
+        expGranted: deltaExp,
+        prGranted: deltaPr
+      };
+    });
   }
 }
