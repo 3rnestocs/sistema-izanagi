@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
 import { EVIDENCE } from '../config/evidenceStrings';
+import { RANK_DISPLAY_NAMES } from '../config/rankConfig';
 import {
   ERROR_CHARACTER_NOT_FOUND,
   ERROR_FORCE_ASCENSO_SAME_OR_LOWER,
@@ -32,31 +33,12 @@ export class PromotionService {
   private readonly NARRATION_TYPES = new Set<string>([ActivityType.EVENTO, ActivityType.CRONICA, ActivityType.ESCENA]);
   private readonly ACHIEVEMENT_TYPES = new Set<string>([ActivityType.LOGRO_GENERAL, ActivityType.LOGRO_SAGA]);
 
-  private readonly SANNIN_DISCOUNT_TARGETS = new Set<string>([
-    'JOUNIN',
-    'JOUNIN_HANCHOU',
-    'GO_IKENBAN',
-    'LIDER_DE_CLAN'
-  ]);
-
   private readonly LEVEL_EXP_REQUIREMENTS: Readonly<Record<string, number>> = StatValidatorService.getLevelExpRequirements();
 
   private readonly MIN_PR_BY_LEVEL: Record<string, number> = {
     'B1': 500, 'B2': 500, 'B3': 500,
     'A1': 1000, 'A2': 1000, 'A3': 1000,
     'S1': 3500, 'S2': 3500
-  };
-
-  private readonly RANK_DISPLAY_NAMES: Readonly<Record<string, string>> = {
-    CHUUNIN: 'Chuunin',
-    TOKUBETSU_JOUNIN: 'Tokubetsu Jounin',
-    JOUNIN: 'Jounin',
-    ANBU: 'ANBU',
-    BUNTAICHOO: 'Buntaichoo',
-    JOUNIN_HANCHOU: 'Jounin Hanchou',
-    GO_IKENBAN: 'Go-Ikenban',
-    LIDER_DE_CLAN: 'Lider de Clan',
-    KAGE: 'Kage'
   };
 
   private normalizeTarget(target: string): string {
@@ -177,7 +159,7 @@ export class PromotionService {
           update: { achievedAt }
         });
       } else {
-        const displayName = this.RANK_DISPLAY_NAMES[this.normalizeTarget(target)];
+        const displayName = RANK_DISPLAY_NAMES[this.normalizeTarget(target)];
         if (!displayName) throw new Error(ERROR_INVALID_RANK(target));
 
         await tx.character.update({

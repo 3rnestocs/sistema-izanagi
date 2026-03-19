@@ -2,12 +2,65 @@ import { PrismaClient } from '@prisma/client';
 import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
 import { EVIDENCE } from '../config/evidenceStrings';
 import { NEWBIE_BOOST_CONFIG } from '../config/newbieBoost';
-import { OPTIONAL_REQUIREMENTS } from '../config/requirements';
+import { AUDIT_ASCENSO_DETAIL, AUDIT_SALARY_SIMPLE, AUDIT_SALARY_WITH_MULTIPLIER } from '../config/auditDetailTemplates';
+import { RANK_DISPLAY_NAMES, SANNIN_DISCOUNT_TARGETS } from '../config/rankConfig';
 import {
+  ERROR_ASCENSO_INSUFFICIENT_REQUIREMENTS,
+  ERROR_ASCENSO_REJECTED,
+  ERROR_ASCENSO_TARGET_UNRECOGNIZED,
   ERROR_ACTION_PROHIBIDA_CHARACTER_NOT_FOUND,
   ERROR_CHARACTER_NOT_FOUND,
+  ERROR_LEVEL_INVALID_GRADATION,
+  ERROR_LEVEL_NOT_CONFIGURED,
+  ERROR_LEVEL_NO_EXP_CONFIG,
+  ERROR_RANK_NOT_CONFIGURED,
   ERROR_SALARY_ALREADY_CLAIMED
 } from '../config/serviceErrors';
+import { OPTIONAL_REQUIREMENTS } from '../config/requirements';
+import {
+  ERROR_EXP_INSUFFICIENT,
+  ERROR_PR_INSUFFICIENT,
+  REASON_MANUAL_REQUIREMENTS,
+  REQ_CLAN_CONSENT,
+  REQ_CLAN_VALIDATE_3,
+  REQ_COMBAT_WINS_A_S_S1,
+  REQ_DAYS_A_FOR_S1,
+  REQ_DAYS_B_FOR_A1,
+  REQ_DAYS_C_FOR_B1,
+  REQ_DAYS_D_FOR_C1,
+  REQ_DAYS_PREV_GRADATION,
+  REQ_DAYS_S_FOR_S2,
+  REQ_HIGHLIGHTS_S1,
+  REQ_JOUNIN_CONSENT,
+  REQ_KAGE_CONSENTS,
+  REQ_LEVEL_A_OR_HIGHER,
+  REQ_LEVEL_B_OR_HIGHER,
+  REQ_LEVEL_S,
+  REQ_MANUAL_PR_300_GRADACION,
+  REQ_MISSION_A_S_SUCCESS_2,
+  REQ_MISSION_A_SUCCESS_1,
+  REQ_MISSION_B_1,
+  REQ_MISSION_S_SUCCESS_1,
+  REQ_NARRATIONS_S1,
+  REQ_NO_GRADATION_HISTORY,
+  REQ_NO_GRADATION_HISTORY_DAYS,
+  REQ_OPTIONAL_A1,
+  REQ_OPTIONAL_A2A3,
+  REQ_OPTIONAL_B1,
+  REQ_OPTIONAL_B2B3,
+  REQ_OPTIONAL_C1,
+  REQ_OPTIONAL_C2C3,
+  REQ_OPTIONAL_S2,
+  REQ_PR_A1,
+  REQ_PR_B1,
+  REQ_PR_S1,
+  REQ_RANK_ANBU,
+  REQ_RANK_JOUNIN,
+  REQ_S1_MISSIONS,
+  REQ_S_TRACEABLE,
+  REQ_TWO_JUMPS_VALIDATION
+} from '../config/requirementMessages';
+import { BASE_SALARIES, SALARY_COOLDOWN_DAYS } from '../config/salaryConfig';
 import { StatValidatorService } from './StatValidatorService';
 import {
   ActivityStatus,
@@ -61,44 +114,11 @@ export interface RequirementCheck {
 export class LevelUpService {
   constructor(private prisma: PrismaClient) {}
 
-  private readonly DAYS_BETWEEN_SALARY = 7;
-
-  private readonly BASE_SALARIES: Readonly<Record<string, number>> = {
-    Genin: 0,
-    Chuunin: 800,
-    'Tokubetsu Jounin': 1200,
-    Jounin: 1800,
-    ANBU: 2400,
-    Buntaichoo: 3000,
-    'Jounin Hanchou': 3000,
-    'Go-Ikenban': 3500,
-    Kage: 5000
-  };
-
   private readonly APPROVED_STATUSES = new Set<string>([ActivityStatus.APROBADO, ActivityStatus.AUTO_APROBADO]);
   private readonly NARRATION_TYPES = new Set<string>([ActivityType.EVENTO, ActivityType.CRONICA, ActivityType.ESCENA]);
   private readonly ACHIEVEMENT_TYPES = new Set<string>([ActivityType.LOGRO_GENERAL, ActivityType.LOGRO_SAGA]);
 
-  private readonly SANNIN_DISCOUNT_TARGETS = new Set<string>([
-    'JOUNIN',
-    'JOUNIN_HANCHOU',
-    'GO_IKENBAN',
-    'LIDER_DE_CLAN'
-  ]);
-
   private readonly LEVEL_EXP_REQUIREMENTS: Readonly<Record<string, number>> = StatValidatorService.getLevelExpRequirements();
-
-  private readonly RANK_DISPLAY_NAMES: Readonly<Record<string, string>> = {
-    CHUUNIN: 'Chuunin',
-    TOKUBETSU_JOUNIN: 'Tokubetsu Jounin',
-    JOUNIN: 'Jounin',
-    ANBU: 'ANBU',
-    BUNTAICHOO: 'Buntaichoo',
-    JOUNIN_HANCHOU: 'Jounin Hanchou',
-    GO_IKENBAN: 'Go-Ikenban',
-    LIDER_DE_CLAN: 'Lider de Clan',
-    KAGE: 'Kage'
-  };
 
   private normalizeTarget(target: string): string {
     return target
@@ -146,7 +166,7 @@ export class LevelUpService {
   }
 
   private applySanninDiscount(targetRank: string, baseValue: number, hasSannin: boolean): number {
-    if (!hasSannin || !this.SANNIN_DISCOUNT_TARGETS.has(targetRank)) {
+    if (!hasSannin || !SANNIN_DISCOUNT_TARGETS.has(targetRank)) {
       return baseValue;
     }
 
@@ -207,7 +227,7 @@ export class LevelUpService {
     return {
       passed: false,
       promotionState,
-      reason: 'Cumple validaciones automáticas, pero faltan requisitos manuales.',
+        reason: REASON_MANUAL_REQUIREMENTS,
       manualRequirements,
       optionalRequirements,
       snapshot
@@ -361,13 +381,13 @@ export class LevelUpService {
         const requiredPr = 400;
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if ((metrics.missionB + metrics.missionA + metrics.missionS) < 1) {
-          missingRequirements.push('- Falta al menos 1 misión Rango B (fallida o exitosa).');
+          missingRequirements.push(REQ_MISSION_B_1);
         }
         break;
       }
@@ -376,13 +396,13 @@ export class LevelUpService {
         const requiredPr = 700;
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if ((metrics.missionASuccess + metrics.missionSSuccess) < 1) {
-          missingRequirements.push('- Falta cumplir exitosamente al menos 1 misión Rango A.');
+          missingRequirements.push(REQ_MISSION_A_SUCCESS_1);
         }
         break;
       }
@@ -391,16 +411,16 @@ export class LevelUpService {
         const requiredPr = this.applySanninDiscount('JOUNIN', 1100, hasSannin);
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if ((metrics.missionASuccess + metrics.missionSSuccess) < 2) {
-          missingRequirements.push(`- Falta cumplir exitosamente al menos 2 misión Rango A/S (${metrics.missionASuccess + metrics.missionSSuccess}/2).`);
+          missingRequirements.push(REQ_MISSION_A_S_SUCCESS_2(metrics.missionASuccess + metrics.missionSSuccess));
         }
 
-        manualRequirements.push('Requiere consentimiento de otro Jounin (o duelo de mérito válido).');
+        manualRequirements.push(REQ_JOUNIN_CONSENT);
         break;
       }
       case 'ANBU': {
@@ -408,13 +428,13 @@ export class LevelUpService {
         const requiredPr = 1200;
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if (!this.isLevelAtLeast(character.level, 'A')) {
-          missingRequirements.push(`- Se requiere potencial Rango A o superior (actual: ${character.level}).`);
+          missingRequirements.push(REQ_LEVEL_A_OR_HIGHER(character.level));
         }
         break;
       }
@@ -423,16 +443,16 @@ export class LevelUpService {
         const requiredPr = 1400;
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if (character.rank !== 'ANBU') {
-          missingRequirements.push(`- Se requiere ser ANBU actualmente (actual: ${character.rank}).`);
+          missingRequirements.push(REQ_RANK_ANBU(character.rank));
         }
         if (metrics.missionSSuccess < 1) {
-          missingRequirements.push('- Falta cumplir exitosamente al menos 1 misión Rango S.');
+          missingRequirements.push(REQ_MISSION_S_SUCCESS_1);
         }
         break;
       }
@@ -441,16 +461,16 @@ export class LevelUpService {
         const requiredPr = this.applySanninDiscount('JOUNIN_HANCHOU', 1400, hasSannin);
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if (character.rank !== 'Jounin') {
-          missingRequirements.push(`- Se requiere ser Jounin actualmente (actual: ${character.rank}).`);
+          missingRequirements.push(REQ_RANK_JOUNIN(character.rank));
         }
         if (metrics.missionSSuccess < 1) {
-          missingRequirements.push('- Falta cumplir exitosamente al menos 1 misión Rango S.');
+          missingRequirements.push(REQ_MISSION_S_SUCCESS_1);
         }
         break;
       }
@@ -459,16 +479,16 @@ export class LevelUpService {
         const requiredPr = this.applySanninDiscount('GO_IKENBAN', 1600, hasSannin);
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if (metrics.missionSAnyResult < 1 && metrics.combatWinsVsAOrHigher < 1) {
-          missingRequirements.push('- Falta al menos 1 requisito trazable de Rango S (misión S o combate ganado vs A/S).');
+          missingRequirements.push(REQ_S_TRACEABLE);
         }
 
-        manualRequirements.push('- Requiere validación de “dos saltos temporales” por Staff.');
+        manualRequirements.push(REQ_TWO_JUMPS_VALIDATION);
         break;
       }
       case 'KAGE': {
@@ -476,16 +496,16 @@ export class LevelUpService {
         const requiredPr = 1800;
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if (!this.isLevelAtLeast(character.level, 'S')) {
-          missingRequirements.push(`- Se requiere potencial Rango S (actual: ${character.level}).`);
+          missingRequirements.push(REQ_LEVEL_S(character.level));
         }
 
-        manualRequirements.push('- Requiere consentimientos: Jounin Hanchou/Jounin, Buntaichoo/ANBU, Go-Ikenban (mayoría) y líder de clan.');
+        manualRequirements.push(REQ_KAGE_CONSENTS);
         break;
       }
       case 'LIDER_DE_CLAN': {
@@ -493,21 +513,21 @@ export class LevelUpService {
         const requiredPr = this.applySanninDiscount('LIDER_DE_CLAN', 900, hasSannin);
 
         if (character.exp < requiredExp) {
-          missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+          missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
         }
         if (character.pr < requiredPr) {
-          missingRequirements.push(`- PR insuficiente (${character.pr}/${requiredPr}).`);
+          missingRequirements.push(ERROR_PR_INSUFFICIENT(character.pr, requiredPr));
         }
         if (!this.isLevelAtLeast(character.level, 'B')) {
-          missingRequirements.push(`- Se requiere potencial mínimo Rango B (actual: ${character.level}).`);
+          missingRequirements.push(REQ_LEVEL_B_OR_HIGHER(character.level));
         }
 
-        manualRequirements.push('- Requiere consentimiento de todos los miembros del clan en rangos B/A/S.');
-        manualRequirements.push('- Si es potencial B, validar externamente “3 requisitos cumplidos”.');
+        manualRequirements.push(REQ_CLAN_CONSENT);
+        manualRequirements.push(REQ_CLAN_VALIDATE_3);
         break;
       }
       default:
-        throw new Error(`⛔ ACCIÓN PROHIBIDA: El rango/cargo objetivo '${targetRankOrLevel}' no está configurado en el motor.`);
+        throw new Error(ERROR_RANK_NOT_CONFIGURED(targetRankOrLevel));
     }
 
     if (missingRequirements.length > 0 || manualRequirements.length > 0) {
@@ -525,12 +545,12 @@ export class LevelUpService {
     const refDate = referenceDate ?? new Date();
     const normalizedTargetLevel = this.normalizeTarget(targetLevel);
     if (!this.isInternalLevel(normalizedTargetLevel)) {
-      throw new Error(`⛔ ACCIÓN PROHIBIDA: El nivel '${targetLevel}' no es una gradación válida.`);
+      throw new Error(ERROR_LEVEL_INVALID_GRADATION(targetLevel));
     }
 
     const requiredExp = this.LEVEL_EXP_REQUIREMENTS[normalizedTargetLevel];
     if (requiredExp === undefined) {
-      throw new Error(`⛔ ACCIÓN PROHIBIDA: No hay configuración de EXP para el nivel '${targetLevel}'.`);
+      throw new Error(ERROR_LEVEL_NO_EXP_CONFIG(targetLevel));
     }
 
     const character = await this.prisma.character.findUnique({
@@ -561,7 +581,7 @@ export class LevelUpService {
     let optionalRequirements: OptionalRequirement[] = [];
 
     if (character.exp < requiredExp) {
-      missingRequirements.push(`- EXP insuficiente (${character.exp}/${requiredExp}).`);
+      missingRequirements.push(ERROR_EXP_INSUFFICIENT(character.exp, requiredExp));
     }
 
     const toStatus = (current: number, required: number): 'COMPLETADO' | 'PARCIAL' | 'SIN PROGRESO' =>
@@ -577,11 +597,11 @@ export class LevelUpService {
       case 'C1': {
         const refDateC1 = await this.getAchievedAt(characterId, 'D1', character.createdAt);
         if (!refDateC1) {
-          manualRequirements.push('No hay historial de gradación. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY);
         } else if (!skipTimeGate) {
           const daysSinceD = this.calendarDaysBetween(refDateC1, refDate);
           if (daysSinceD < 5) {
-            missingRequirements.push(`Faltan días como Rango D para C1 (requiere 5, actualmente ${daysSinceD}).`);
+            missingRequirements.push(REQ_DAYS_D_FOR_C1(daysSinceD));
           }
         }
 
@@ -600,7 +620,7 @@ export class LevelUpService {
         ].filter(Boolean).length;
 
         if (optionalMet < 2) {
-          missingRequirements.push('Falta al menos 2 requisitos adicionales para C1 (narración, combate, 2 misiones D o 2 logros).');
+          missingRequirements.push(REQ_OPTIONAL_C1);
         }
         break;
       }
@@ -610,12 +630,12 @@ export class LevelUpService {
         const refLevelC2C3 = normalizedTargetLevel === 'C2' ? 'C1' : 'C2';
         const refDateC2C3 = await this.getAchievedAt(characterId, refLevelC2C3, character.createdAt);
         if (!refDateC2C3) {
-          manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY_DAYS);
         } else if (!skipTimeGate) {
           const daysRequiredC2C3 = 2;
           const daysSince = this.calendarDaysBetween(refDateC2C3, refDate);
           if (daysSince < daysRequiredC2C3) {
-            missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredC2C3}, actualmente ${daysSince}).`);
+            missingRequirements.push(REQ_DAYS_PREV_GRADATION(normalizedTargetLevel, daysRequiredC2C3, daysSince));
           }
         }
 
@@ -638,7 +658,7 @@ export class LevelUpService {
         ].filter(Boolean).length;
 
         if (optionalMet < 2) {
-          missingRequirements.push('Falta al menos 2 requisitos adicionales para C2/C3 (narración, destacado, logro, combate, misión C o curar a 2 personajes).');
+          missingRequirements.push(REQ_OPTIONAL_C2C3);
         }
         break;
       }
@@ -646,16 +666,16 @@ export class LevelUpService {
       case 'B1': {
         const refDateB1 = await this.getAchievedAt(characterId, 'C1', character.createdAt);
         if (!refDateB1) {
-          manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY_DAYS);
         } else if (!skipTimeGate) {
           const daysSinceC = this.calendarDaysBetween(refDateB1, refDate);
           if (daysSinceC < 8) {
-            missingRequirements.push(`Faltan días como Rango C para B1 (requiere 8, actualmente ${daysSinceC}).`);
+            missingRequirements.push(REQ_DAYS_C_FOR_B1(daysSinceC));
           }
         }
 
         if (character.pr < 500) {
-          missingRequirements.push(`PR insuficiente para B1 (${character.pr}/500).`);
+          missingRequirements.push(REQ_PR_B1(character.pr));
         }
 
         const missionEquivalentB1 = metrics.missionC + (metrics.missionB * 2) + (metrics.missionA * 2) + (metrics.missionS * 2);
@@ -676,7 +696,7 @@ export class LevelUpService {
         ].filter(Boolean).length;
 
         if (optionalMet < 3) {
-          missingRequirements.push('Falta al menos 3 requisitos adicionales para B1 (narraciones, destacados, misiones equivalentes C, combates vs C+ o curar a 5 personajes).');
+          missingRequirements.push(REQ_OPTIONAL_B1);
         }
         break;
       }
@@ -686,12 +706,12 @@ export class LevelUpService {
         const refLevelB2B3 = normalizedTargetLevel === 'B2' ? 'B1' : 'B2';
         const refDateB2B3 = await this.getAchievedAt(characterId, refLevelB2B3, character.createdAt);
         if (!refDateB2B3) {
-          manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY_DAYS);
         } else if (!skipTimeGate) {
           const daysRequiredB2B3 = 3;
           const daysSince = this.calendarDaysBetween(refDateB2B3, refDate);
           if (daysSince < daysRequiredB2B3) {
-            missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredB2B3}, actualmente ${daysSince}).`);
+            missingRequirements.push(REQ_DAYS_PREV_GRADATION(normalizedTargetLevel, daysRequiredB2B3, daysSince));
           }
         }
 
@@ -715,7 +735,7 @@ export class LevelUpService {
         ].filter(Boolean).length;
 
         if (optionalMet < 2) {
-          missingRequirements.push('Falta al menos 2 requisitos adicionales para B2/B3 (narración, destacado, logro, 2 combates B+, misión B/A o curar a 2 personajes).');
+          missingRequirements.push(REQ_OPTIONAL_B2B3);
         }
         break;
       }
@@ -723,16 +743,16 @@ export class LevelUpService {
       case 'A1': {
         const refDateA1 = await this.getAchievedAt(characterId, 'B1', character.createdAt);
         if (!refDateA1) {
-          manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY_DAYS);
         } else if (!skipTimeGate) {
           const daysSinceB = this.calendarDaysBetween(refDateA1, refDate);
           if (daysSinceB < 14) {
-            missingRequirements.push(`Faltan días como Rango B para A1 (requiere 14, actualmente ${daysSinceB}).`);
+            missingRequirements.push(REQ_DAYS_B_FOR_A1(daysSinceB));
           }
         }
 
         if (character.pr < 1000) {
-          missingRequirements.push(`PR insuficiente para A1 (${character.pr}/1000).`);
+          missingRequirements.push(REQ_PR_A1(character.pr));
         }
 
         const missionEquivalentA1 = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
@@ -755,7 +775,7 @@ export class LevelUpService {
         ].filter(Boolean).length;
 
         if (optionalMet < 3) {
-          missingRequirements.push('Falta al menos 3 requisitos adicionales para A1 (narraciones, destacados, misiones B/A, victorias vs B+, logros o curar a 10 personajes).');
+          missingRequirements.push(REQ_OPTIONAL_A1);
         }
         break;
       }
@@ -765,15 +785,15 @@ export class LevelUpService {
         const refLevelA2A3 = normalizedTargetLevel === 'A2' ? 'A1' : 'A2';
         const refDateA2A3 = await this.getAchievedAt(characterId, refLevelA2A3, character.createdAt);
         if (!refDateA2A3) {
-          manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY_DAYS);
         } else if (!skipTimeGate) {
           const daysRequiredA2A3 = 6;
           const daysSince = this.calendarDaysBetween(refDateA2A3, refDate);
           if (daysSince < daysRequiredA2A3) {
-            missingRequirements.push(`Faltan días en la gradación previa para ${normalizedTargetLevel} (requiere ${daysRequiredA2A3}, actualmente ${daysSince}).`);
+            missingRequirements.push(REQ_DAYS_PREV_GRADATION(normalizedTargetLevel, daysRequiredA2A3, daysSince));
           }
         }
-        manualRequirements.push('Manual parcial: “obtener 300 PR durante la gradación anterior” no es trazable sin ledger temporal.');
+        manualRequirements.push(REQ_MANUAL_PR_300_GRADACION);
 
         const missionEquivalentA2A3 = this.countMissionEquivalentForB(metrics.missionB, metrics.missionA + metrics.missionS);
         optionalRequirements = [
@@ -795,7 +815,7 @@ export class LevelUpService {
         ].filter(Boolean).length;
 
         if (optionalMet < 2) {
-          missingRequirements.push('Falta al menos 2 requisitos adicionales para A2/A3 (narración, destacado, 2 logros, combate A+, misiones B/A o curar a 2 personajes).');
+          missingRequirements.push(REQ_OPTIONAL_A2A3);
         }
         break;
       }
@@ -803,28 +823,28 @@ export class LevelUpService {
       case 'S1': {
         const refDateS1 = await this.getAchievedAt(characterId, 'A1', character.createdAt);
         if (!refDateS1) {
-          manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY_DAYS);
         } else if (!skipTimeGate) {
           const daysSinceA = this.calendarDaysBetween(refDateS1, refDate);
           if (daysSinceA < 20) {
-            missingRequirements.push(`Faltan días como Rango A para S1 (requiere 20, actualmente ${daysSinceA}).`);
+            missingRequirements.push(REQ_DAYS_A_FOR_S1(daysSinceA));
           }
         }
 
         if (character.pr < 3500) {
-          missingRequirements.push(`PR insuficiente para S1 (${character.pr}/3500).`);
+          missingRequirements.push(REQ_PR_S1(character.pr));
         }
         if (metrics.combatWinsVsAOrHigher < 7) {
-          missingRequirements.push(`Faltan victorias vs A/S para S1 (${metrics.combatWinsVsAOrHigher}/7).`);
+          missingRequirements.push(REQ_COMBAT_WINS_A_S_S1(metrics.combatWinsVsAOrHigher));
         }
         if ((metrics.missionASuccess >= 5) === false && (metrics.missionSAnyResult >= 3) === false) {
-          missingRequirements.push('Para S1 se requiere 5 misiones A exitosas o participar en 3 misiones S.');
+          missingRequirements.push(REQ_S1_MISSIONS);
         }
         if (metrics.narrations < 10) {
-          missingRequirements.push(`Narraciones insuficientes para S1 (${metrics.narrations}/10).`);
+          missingRequirements.push(REQ_NARRATIONS_S1(metrics.narrations));
         }
         if (metrics.highlightedNarrations < 5) {
-          missingRequirements.push(`Destacados insuficientes para S1 (${metrics.highlightedNarrations}/5).`);
+          missingRequirements.push(REQ_HIGHLIGHTS_S1(metrics.highlightedNarrations));
         }
         break;
       }
@@ -832,11 +852,11 @@ export class LevelUpService {
       case 'S2': {
         const refDateS2 = await this.getAchievedAt(characterId, 'S1', character.createdAt);
         if (!refDateS2) {
-          manualRequirements.push('No hay historial de gradación para verificar días. Requiere revisión manual.');
+          manualRequirements.push(REQ_NO_GRADATION_HISTORY_DAYS);
         } else if (!skipTimeGate) {
           const daysSinceS = this.calendarDaysBetween(refDateS2, refDate);
           if (daysSinceS < 10) {
-            missingRequirements.push(`Faltan días como Rango S para S2 (requiere 10, actualmente ${daysSinceS}).`);
+            missingRequirements.push(REQ_DAYS_S_FOR_S2(daysSinceS));
           }
         }
 
@@ -857,13 +877,13 @@ export class LevelUpService {
         ].filter(Boolean).length;
 
         if (optionalMet < 2) {
-          missingRequirements.push('Falta al menos 2 requisitos adicionales para S2 (2 narraciones, 1 destacado, 1 misión S, 500 PR o curar a 5 personajes).');
+          missingRequirements.push(REQ_OPTIONAL_S2);
         }
         break;
       }
 
       default:
-        throw new Error(`⛔ El nivel '${targetLevel}' no está configurado en el motor.`);
+        throw new Error(ERROR_LEVEL_NOT_CONFIGURED(targetLevel));
     }
 
     if (missingRequirements.length > 0 || manualRequirements.length > 0) {
@@ -876,8 +896,8 @@ export class LevelUpService {
   async applyPromotion(characterId: string, targetRankOrLevel: string, approvedBy: string) {
     const validation = await this.checkRankRequirements(characterId, targetRankOrLevel);
     if (!validation.passed) {
-      const details = validation.reason ?? 'Requisitos insuficientes para ascenso.';
-      throw new Error(`⛔ Ascenso rechazado: ${details}`);
+      const details = validation.reason ?? ERROR_ASCENSO_INSUFFICIENT_REQUIREMENTS;
+      throw new Error(ERROR_ASCENSO_REJECTED(details));
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -900,9 +920,9 @@ export class LevelUpService {
       if (this.isInternalLevel(normalizedTarget)) {
         nextLevel = normalizedTarget;
       } else {
-        const displayName = this.RANK_DISPLAY_NAMES[normalizedTarget];
+        const displayName = RANK_DISPLAY_NAMES[normalizedTarget];
         if (!displayName) {
-          throw new Error(`⛔ Objetivo '${targetRankOrLevel}' no reconocido por el motor de ascenso.`);
+          throw new Error(ERROR_ASCENSO_TARGET_UNRECOGNIZED(targetRankOrLevel));
         }
         nextRank = displayName;
       }
@@ -919,7 +939,7 @@ export class LevelUpService {
         data: {
           characterId: character.id,
           category: AUDIT_LOG_CATEGORY.ASCENSO,
-          detail: `Ascenso aplicado por ${approvedBy}. Nivel: ${previousLevel} -> ${nextLevel}. Cargo: ${previousRank} -> ${nextRank}. Objetivo: ${targetRankOrLevel}`,
+          detail: AUDIT_ASCENSO_DETAIL(approvedBy, previousLevel, nextLevel, previousRank, nextRank, targetRankOrLevel),
           evidence: EVIDENCE.COMANDO_ASCENDER
         }
       });
@@ -950,11 +970,11 @@ export class LevelUpService {
       const now = new Date();
       const elapsedMs = now.getTime() - character.lastSalaryClaim.getTime();
       const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
-      if (elapsedDays < this.DAYS_BETWEEN_SALARY) {
+      if (elapsedDays < SALARY_COOLDOWN_DAYS) {
         throw new Error(ERROR_SALARY_ALREADY_CLAIMED);
       }
 
-      const baseSalary = this.BASE_SALARIES[character.rank] ?? 0;
+      const baseSalary = BASE_SALARIES[character.rank] ?? 0;
 
       let weeklyTotalMultiplier = 1;
       let weeklyTraitBonusRyou = 0;
@@ -989,8 +1009,8 @@ export class LevelUpService {
       });
 
       const statusDetail = multiplierDelta !== 0
-        ? `Cobro semanal: +${grossSalary} Ryou. Multiplicador lunes aplicado (${weeklyTotalMultiplier.toFixed(2)}x): ${multiplierDelta >= 0 ? '+' : ''}${multiplierDelta} Ryou.`
-        : `Cobro semanal exitoso: +${grossSalary} Ryou.`;
+        ? AUDIT_SALARY_WITH_MULTIPLIER(grossSalary, weeklyTotalMultiplier, multiplierDelta)
+        : AUDIT_SALARY_SIMPLE(grossSalary);
 
       await tx.auditLog.create({
         data: {

@@ -135,3 +135,31 @@ export const ERROR_TRAIT_INCOMPATIBLE_WITH = (name: string, other: string) =>
   `⛔ CONFLICTO: '${name}' es incompatible con '${other}'.`;
 export const ERROR_RC_INSUFFICIENT = (need: number, have: number) =>
   `⛔ No hay suficientes RC. Necesitas ${need}, tienes ${have}.`;
+
+// --- LevelUpService / PromotionService ---
+
+/** Rank/cargo target not configured in engine. */
+export const ERROR_RANK_NOT_CONFIGURED = (target: string) =>
+  `⛔ ACCIÓN PROHIBIDA: El rango/cargo objetivo '${target}' no está configurado en el motor.`;
+
+/** Level is not a valid gradation. */
+export const ERROR_LEVEL_INVALID_GRADATION = (target: string) =>
+  `⛔ ACCIÓN PROHIBIDA: El nivel '${target}' no es una gradación válida.`;
+
+/** No EXP config for level. */
+export const ERROR_LEVEL_NO_EXP_CONFIG = (target: string) =>
+  `⛔ ACCIÓN PROHIBIDA: No hay configuración de EXP para el nivel '${target}'.`;
+
+/** Level not configured in engine. */
+export const ERROR_LEVEL_NOT_CONFIGURED = (target: string) =>
+  `⛔ El nivel '${target}' no está configurado en el motor.`;
+
+/** Target not recognized by ascenso engine. */
+export const ERROR_ASCENSO_TARGET_UNRECOGNIZED = (target: string) =>
+  `⛔ Objetivo '${target}' no reconocido por el motor de ascenso.`;
+
+/** Ascenso: insufficient requirements (fallback). */
+export const ERROR_ASCENSO_INSUFFICIENT_REQUIREMENTS = 'Requisitos insuficientes para ascenso.';
+
+/** Ascenso: rejected with details. */
+export const ERROR_ASCENSO_REJECTED = (details: string) => `⛔ Ascenso rechazado: ${details}`;
