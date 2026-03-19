@@ -50,7 +50,9 @@ export const ACTIVITY_TIER: Record<string, 'AUTO' | 'MANUAL'> = {
   [ActivityType.LOGRO_SAGA]: 'MANUAL',
   [ActivityType.LOGRO_REPUTACION]: 'AUTO',
   [ActivityType.TIMESKIP]: 'MANUAL',
-  [ActivityType.BALANCE_GENERAL]: 'AUTO'
+  [ActivityType.BALANCE_GENERAL]: 'AUTO',
+  [ActivityType.MESIVERSARIO]: 'MANUAL',
+  [ActivityType.RECOMPENSA_ESPECIAL]: 'MANUAL'
 };
 
 // Mission rewards by rank. Failed missions give EXP only.

@@ -60,7 +60,7 @@ export class RewardCalculatorService {
     } else if (normalizedType === ActivityType.BALANCE_GENERAL) {
       baseRewards = this.calculateBalanceGeneralRewards(activity.narrationKey);
     } else {
-      // MANUAL tier types (Escena, Logro de Saga, Experimento, Timeskip)
+      // MANUAL tier types (Escena, Logro de Saga, Experimento, Timeskip, Mesiversario, Recompensa Especial)
       return { exp: 0, pr: 0, ryou: 0 };
     }
 

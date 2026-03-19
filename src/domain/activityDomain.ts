@@ -11,7 +11,9 @@ export const ActivityType = {
   LOGRO_REPUTACION: 'Logro de Reputación',
   DESARROLLO_PERSONAL: 'Desarrollo Personal',
   TIMESKIP: 'Timeskip',
-  BALANCE_GENERAL: 'Balance General'
+  BALANCE_GENERAL: 'Balance General',
+  MESIVERSARIO: 'Mesiversario',
+  RECOMPENSA_ESPECIAL: 'Recompensa Especial'
 } as const;
 
 export type ActivityTypeValue = (typeof ActivityType)[keyof typeof ActivityType];
@@ -54,8 +56,10 @@ const ACTIVITY_TYPE_NORMALIZED_MAP: Readonly<Record<string, ActivityTypeValue>> 
   'LOGRO DE REPUTACION': ActivityType.LOGRO_REPUTACION,
   'LOGROS DE REPUTACION': ActivityType.LOGRO_REPUTACION,
   'DESARROLLO PERSONAL': ActivityType.DESARROLLO_PERSONAL,
-  TIMESKIP: ActivityType.TIMESKIP,
-  'BALANCE GENERAL': ActivityType.BALANCE_GENERAL
+  'BALANCE GENERAL': ActivityType.BALANCE_GENERAL,
+  'RECOMPENSA ESPECIAL': ActivityType.RECOMPENSA_ESPECIAL,
+  MESIVERSARIO: ActivityType.MESIVERSARIO,
+  TIMESKIP: ActivityType.TIMESKIP
 };
 
 const ACTIVITY_STATUS_NORMALIZED_MAP: Readonly<Record<string, ActivityStatusValue>> = {
