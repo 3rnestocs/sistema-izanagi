@@ -1,4 +1,12 @@
 import { PrismaClient } from '@prisma/client';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { EVIDENCE } from '../config/evidenceStrings';
+import {
+  ERROR_CHARACTER_NOT_FOUND,
+  ERROR_FORCE_ASCENSO_SAME_OR_LOWER,
+  ERROR_INVALID_LEVEL,
+  ERROR_INVALID_RANK
+} from '../config/serviceErrors';
 import { StatValidatorService } from './StatValidatorService';
 import { LevelUpService, type RequirementCheck, type OptionalRequirement } from './LevelUpService';
 import {
@@ -149,7 +157,7 @@ export class PromotionService {
     let spGranted: number | undefined;
     await this.prisma.$transaction(async (tx) => {
       const character = await tx.character.findUnique({ where: { id: characterId } });
-      if (!character) throw new Error('Personaje no encontrado.');
+      if (!character) throw new Error(ERROR_CHARACTER_NOT_FOUND);
 
       if (targetType === 'level') {
         spGranted = StatValidatorService.getInitialSpForLevel(target);
@@ -170,7 +178,7 @@ export class PromotionService {
         });
       } else {
         const displayName = this.RANK_DISPLAY_NAMES[this.normalizeTarget(target)];
-        if (!displayName) throw new Error(`Rango no válido: ${target}`);
+        if (!displayName) throw new Error(ERROR_INVALID_RANK(target));
 
         await tx.character.update({
           where: { id: characterId },
@@ -181,9 +189,9 @@ export class PromotionService {
       await tx.auditLog.create({
         data: {
           characterId,
-          category: 'Ascenso',
+          category: AUDIT_LOG_CATEGORY.ASCENSO,
           detail: `${targetType === 'rank' ? 'Ascenso de rango' : 'Ascenso de nivel'}: ${target}`,
-          evidence: 'Comando /ascender',
+          evidence: EVIDENCE.COMANDO_ASCENDER,
           ...(spGranted !== undefined ? { deltaSp: spGranted } : {}),
           ...(promotedAt && { createdAt: promotedAt })
         }
@@ -207,7 +215,7 @@ export class PromotionService {
   ) {
     const normalizedTarget = this.normalizeTarget(targetLevel);
     if (!this.isInternalLevel(normalizedTarget)) {
-      throw new Error(`⛔ Nivel inválido: ${targetLevel}`);
+      throw new Error(ERROR_INVALID_LEVEL(targetLevel));
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -215,13 +223,13 @@ export class PromotionService {
         where: { id: characterId }
       });
 
-      if (!character) throw new Error('Personaje no encontrado.');
+      if (!character) throw new Error(ERROR_CHARACTER_NOT_FOUND);
 
       const currentIndex = PromotionService.LEVEL_ORDER.indexOf(character.level);
       const targetIndex = PromotionService.LEVEL_ORDER.indexOf(normalizedTarget);
 
       if (targetIndex <= currentIndex) {
-        throw new Error(`⛔ El personaje ya es ${character.level}. No puedes forzar un ascenso a un nivel igual o inferior.`);
+        throw new Error(ERROR_FORCE_ASCENSO_SAME_OR_LOWER(character.level));
       }
 
       // 1. Calcular SP acumulado y registrar historiales intermedios
@@ -258,12 +266,12 @@ export class PromotionService {
       });
 
       // 4. Auditar el movimiento administrativo
-      await tx.auditLog.create({
+        await tx.auditLog.create({
         data: {
           characterId: character.id,
-          category: 'Ajuste Staff de Recursos',
+          category: AUDIT_LOG_CATEGORY.AJUSTE_RECURSOS,
           detail: `Ascenso FORZADO por ${approvedBy}. Nivel: ${character.level} -> ${normalizedTarget}. SP Otorgados: ${totalSpGranted}. Ajuste base: +${deltaExp} EXP, +${deltaPr} PR.`,
-          evidence: 'Comando /forzar_ascenso',
+          evidence: EVIDENCE.COMANDO_FORZAR_ASCENSO,
           deltaSp: totalSpGranted,
           deltaExp: deltaExp,
           deltaPr: deltaPr,

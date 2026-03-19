@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
 import { RewardCalculatorService } from './RewardCalculatorService';
 import { ActivityStatus } from '../domain/activityDomain';
 
@@ -111,7 +112,7 @@ export class ActivityApprovalService {
       await tx.auditLog.create({
         data: {
           characterId: activityRecord.characterId,
-          category: 'Aprobación de Actividad',
+          category: AUDIT_LOG_CATEGORY.APROBACION_ACTIVIDAD,
           detail: `Registro ${activityRecord.id} (${activityRecord.type}) aprobado por reacción de ${staffUserTag}. Recompensas => ${rewardsText}`,
           evidence: activityRecord.evidenceUrl,
           ...auditData

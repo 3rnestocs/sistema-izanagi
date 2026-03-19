@@ -3,6 +3,13 @@ import {
   BASE_SALARIES,
   WEEKLY_EXP_BONUS
 } from '../config/salaryConfig';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { EVIDENCE } from '../config/evidenceStrings';
+import {
+  ERROR_CHARACTER_NOT_FOUND,
+  ERROR_SALARY_ALREADY_CLAIMED_WEEK,
+  ERROR_SALARY_BEFORE_CREATION
+} from '../config/serviceErrors';
 import { toDateOnlyUTC } from '../utils/dateParser';
 
 export class SalaryService {
@@ -21,7 +28,7 @@ export class SalaryService {
       });
 
       if (!character) {
-        throw new Error('Personaje no encontrado.');
+        throw new Error(ERROR_CHARACTER_NOT_FOUND);
       }
 
       const claimDateNorm = toDateOnlyUTC(claimDate);
@@ -29,7 +36,7 @@ export class SalaryService {
       const lastClaimNorm = toDateOnlyUTC(character.lastSalaryClaim);
 
       if (claimDateNorm.getTime() < createdAtNorm.getTime()) {
-        throw new Error('No puedes cobrar sueldos de fechas anteriores a la creación de tu personaje.');
+        throw new Error(ERROR_SALARY_BEFORE_CREATION);
       }
 
       if (claimDateNorm.getTime() === lastClaimNorm.getTime()) {
@@ -39,7 +46,7 @@ export class SalaryService {
           month: 'long',
           day: 'numeric'
         });
-        throw new Error(`Ya has cobrado el sueldo correspondiente a la semana del ${fmt}.`);
+        throw new Error(ERROR_SALARY_ALREADY_CLAIMED_WEEK(fmt));
       }
 
       const baseSalary = BASE_SALARIES[character.rank] ?? 0;
@@ -96,9 +103,9 @@ export class SalaryService {
       await tx.auditLog.create({
         data: {
           characterId: character.id,
-          category: 'Sueldo Semanal',
+          category: AUDIT_LOG_CATEGORY.SUELDO_SEMANAL,
           detail: statusDetail,
-          evidence: 'Sistema Automatizado',
+          evidence: EVIDENCE.SISTEMA_AUTOMATIZADO,
           deltaRyou: actualRyouEarnedOrLost,
           deltaExp: WEEKLY_EXP_BONUS
         }
@@ -130,7 +137,7 @@ export class SalaryService {
     });
 
     if (!character) {
-      throw new Error('Personaje no encontrado.');
+      throw new Error(ERROR_CHARACTER_NOT_FOUND);
     }
 
     const baseSalary = BASE_SALARIES[character.rank] ?? 0;

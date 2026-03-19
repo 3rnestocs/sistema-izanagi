@@ -10,9 +10,9 @@ import { assertStaffAccess } from '../../utils/staffGuards';
 import {
   ADJUSTABLE_RESOURCES,
   AdjustableResource,
-  ResourceAdjustmentService,
-  RESOURCE_LABEL_MAP
+  ResourceAdjustmentService
 } from '../../services/ResourceAdjustmentService';
+import { RESOURCE_LABEL_MAP } from '../../config/resourceLabels';
 import { PLACEHOLDER_NO_EVIDENCE } from '../../config/uiStrings';
 
 const resourceAdjustmentService = new ResourceAdjustmentService(prisma);

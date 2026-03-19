@@ -1,4 +1,18 @@
 import { PrismaClient } from '@prisma/client';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { EVIDENCE } from '../config/evidenceStrings';
+import {
+  ERROR_ACTION_PROHIBIDA_CHARACTER_NOT_FOUND,
+  ERROR_CHARACTER_ALREADY_HAS_TRAIT,
+  ERROR_CHARACTER_DOES_NOT_HAVE_TRAIT,
+  ERROR_KEKO_OR_DISCORD_ALREADY_REGISTERED,
+  ERROR_RC_INSUFFICIENT,
+  ERROR_RC_INVALID_AT_CREATION,
+  ERROR_TRAIT_INCOMPATIBLE,
+  ERROR_TRAIT_INCOMPATIBLE_WITH,
+  ERROR_TRAIT_NOT_FOUND,
+  ERROR_TRAITS_NOT_IN_SYSTEM
+} from '../config/serviceErrors';
 import { StatValidatorService } from './StatValidatorService';
 import {
   assertRestrictedCategoryAvailable,
@@ -55,7 +69,7 @@ export class CharacterService {
         }
       });
       if (existingChar) {
-        throw new Error(`⛔ ACCIÓN PROHIBIDA: El Keko '${data.name}' o el usuario de Discord ya posee una ficha registrada.`);
+        throw new Error(ERROR_KEKO_OR_DISCORD_ALREADY_REGISTERED(data.name));
       }
 
       // 2. LECTURA DE RASGOS (SSOT)
@@ -66,7 +80,7 @@ export class CharacterService {
       });
 
       if (traits.length !== data.traitNames.length) {
-        throw new Error(`⛔ CONFLICTO: Uno o más rasgos proporcionados no existen en el sistema IZANAGI.`);
+        throw new Error(ERROR_TRAITS_NOT_IN_SYSTEM);
       }
 
       this.assertRestrictedCategoryUniqueness(
@@ -90,7 +104,7 @@ export class CharacterService {
           if (traitIds.includes(conflictingTraitId)) {
             const conflictingTrait = traits.find((candidate: any) => candidate.id === conflictingTraitId);
             const conflictingName = conflictingTrait?.name ?? 'otro rasgo seleccionado';
-            throw new Error(`⛔ CONFLICTO: El rasgo ${trait.name} es incompatible con el rasgo ${conflictingName}. Elimina uno de los dos.`);
+            throw new Error(ERROR_TRAIT_INCOMPATIBLE(trait.name, conflictingName));
           }
         }
 
@@ -121,7 +135,7 @@ export class CharacterService {
       const finalRcAtCreation = CharacterService.BASE_INITIAL_RC + totalRcCost;
 
       if (finalRcAtCreation < 0) {
-        throw new Error(`⛔ CONFLICTO: RC inválido al crear la ficha: ${finalRcAtCreation}. Ajusta la selección de rasgos.`);
+        throw new Error(ERROR_RC_INVALID_AT_CREATION(finalRcAtCreation));
       }
 
      // 4. CREACIÓN DE LA FICHA Y RELACIONES
@@ -165,9 +179,9 @@ export class CharacterService {
       await tx.auditLog.create({
         data: {
           characterId: newCharacter.id,
-          category: "Creación de Ficha",
+          category: AUDIT_LOG_CATEGORY.CREACION_FICHA,
           detail: `Ficha creada. Rasgos asignados: ${data.traitNames.join(', ')}`,
-          evidence: "Comando /registro",
+          evidence: EVIDENCE.COMANDO_REGISTRO,
           deltaRyou: totalRyouBonus,
           deltaRc: totalRcCost
         }
@@ -197,7 +211,7 @@ export class CharacterService {
       });
 
       if (!character) {
-        throw new Error('⛔ ACCIÓN PROHIBIDA: Personaje no encontrado.');
+        throw new Error(ERROR_ACTION_PROHIBIDA_CHARACTER_NOT_FOUND);
       }
 
       const traitToAdd = await tx.trait.findUnique({
@@ -206,12 +220,12 @@ export class CharacterService {
       });
 
       if (!traitToAdd) {
-        throw new Error(`⛔ CONFLICTO: El rasgo '${traitName}' no existe en el sistema.`);
+        throw new Error(ERROR_TRAIT_NOT_FOUND(traitName));
       }
 
       // 2. Verificar si ya tiene el rasgo
       if (character.traits.some((ct) => ct.trait.id === traitToAdd.id)) {
-        throw new Error(`⛔ CONFLICTO: El personaje ya posee el rasgo '${traitName}'.`);
+        throw new Error(ERROR_CHARACTER_ALREADY_HAS_TRAIT(traitName));
       }
 
       // 3. Validar incompatibilidades
@@ -221,7 +235,7 @@ export class CharacterService {
         const conflictingId = conflict.traitAId === traitToAdd.id ? conflict.traitBId : conflict.traitAId;
         if (existingTraitIds.includes(conflictingId)) {
           const conflictingTrait = character.traits.find((ct) => ct.trait.id === conflictingId);
-          throw new Error(`⛔ CONFLICTO: '${traitName}' es incompatible con '${conflictingTrait?.trait.name}'.`);
+          throw new Error(ERROR_TRAIT_INCOMPATIBLE_WITH(traitName, conflictingTrait?.trait.name ?? ''));
         }
       }
 
@@ -234,7 +248,7 @@ export class CharacterService {
       // 5. Validar costo RC
       // Si el costo es menor a 0 (es un cobro), validamos que el usuario tenga suficiente RC
       if (traitToAdd.costRC < 0 && character.rc < Math.abs(traitToAdd.costRC)) {
-        throw new Error(`⛔ No hay suficientes RC. Necesitas ${Math.abs(traitToAdd.costRC)}, tienes ${character.rc}.`);
+        throw new Error(ERROR_RC_INSUFFICIENT(Math.abs(traitToAdd.costRC), character.rc));
       }
 
       // 6. Calcular bonificaciones
@@ -264,9 +278,9 @@ export class CharacterService {
       await tx.auditLog.create({
         data: {
           characterId,
-          category: 'Rasgo Asignado',
+          category: AUDIT_LOG_CATEGORY.RASGO_ASIGNADO,
           detail: `Rasgo '${traitName}' agregado. Costo RC: ${traitToAdd.costRC}`,
-          evidence: 'Comando /otorgar_rasgo',
+          evidence: EVIDENCE.COMANDO_OTORGAR_RASGO,
           deltaRc: rcDelta
         }
       });
@@ -288,7 +302,7 @@ export class CharacterService {
       });
 
       if (!character) {
-        throw new Error('⛔ ACCIÓN PROHIBIDA: Personaje no encontrado.');
+        throw new Error(ERROR_ACTION_PROHIBIDA_CHARACTER_NOT_FOUND);
       }
 
       const traitToRemove = await tx.trait.findUnique({
@@ -296,13 +310,13 @@ export class CharacterService {
       });
 
       if (!traitToRemove) {
-        throw new Error(`⛔ CONFLICTO: El rasgo '${traitName}' no existe en el sistema.`);
+        throw new Error(ERROR_TRAIT_NOT_FOUND(traitName));
       }
 
       // 2. Verificar si el personaje tiene el rasgo
       const hasTraitRecord = character.traits.find((ct) => ct.trait.id === traitToRemove.id);
       if (!hasTraitRecord) {
-        throw new Error(`⛔ CONFLICTO: El personaje no posee el rasgo '${traitName}'.`);
+        throw new Error(ERROR_CHARACTER_DOES_NOT_HAVE_TRAIT(traitName));
       }
 
       // 3. Revertir bonificaciones
@@ -332,9 +346,9 @@ export class CharacterService {
       await tx.auditLog.create({
         data: {
           characterId,
-          category: 'Rasgo Removido',
+          category: AUDIT_LOG_CATEGORY.RASGO_REMOVIDO,
           detail: `Rasgo '${traitName}' removido. Reembolso RC: ${rcDelta}`,
-          evidence: 'Comando /otorgar_rasgo',
+          evidence: EVIDENCE.COMANDO_OTORGAR_RASGO,
           deltaRc: rcDelta
         }
       });

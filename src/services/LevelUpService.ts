@@ -1,6 +1,13 @@
 import { PrismaClient } from '@prisma/client';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { EVIDENCE } from '../config/evidenceStrings';
 import { NEWBIE_BOOST_CONFIG } from '../config/newbieBoost';
 import { OPTIONAL_REQUIREMENTS } from '../config/requirements';
+import {
+  ERROR_ACTION_PROHIBIDA_CHARACTER_NOT_FOUND,
+  ERROR_CHARACTER_NOT_FOUND,
+  ERROR_SALARY_ALREADY_CLAIMED
+} from '../config/serviceErrors';
 import { StatValidatorService } from './StatValidatorService';
 import {
   ActivityStatus,
@@ -326,7 +333,7 @@ export class LevelUpService {
     });
 
     if (!character) {
-      throw new Error('Personaje no encontrado.');
+      throw new Error(ERROR_CHARACTER_NOT_FOUND);
     }
 
     const activities = await this.prisma.activityRecord.findMany({
@@ -532,7 +539,7 @@ export class LevelUpService {
     });
 
     if (!character) {
-      throw new Error('⛔ ACCIÓN PROHIBIDA: Personaje no encontrado.');
+      throw new Error(ERROR_ACTION_PROHIBIDA_CHARACTER_NOT_FOUND);
     }
 
     const activities = await this.prisma.activityRecord.findMany({
@@ -880,7 +887,7 @@ export class LevelUpService {
       });
 
       if (!character) {
-        throw new Error('Personaje no encontrado.');
+        throw new Error(ERROR_CHARACTER_NOT_FOUND);
       }
 
       const normalizedTarget = this.normalizeTarget(targetRankOrLevel);
@@ -911,9 +918,9 @@ export class LevelUpService {
       await tx.auditLog.create({
         data: {
           characterId: character.id,
-          category: 'Ascenso',
+          category: AUDIT_LOG_CATEGORY.ASCENSO,
           detail: `Ascenso aplicado por ${approvedBy}. Nivel: ${previousLevel} -> ${nextLevel}. Cargo: ${previousRank} -> ${nextRank}. Objetivo: ${targetRankOrLevel}`,
-          evidence: 'Comando /ascender'
+          evidence: EVIDENCE.COMANDO_ASCENDER
         }
       });
 
@@ -937,14 +944,14 @@ export class LevelUpService {
       });
 
       if (!character) {
-        throw new Error('Personaje no encontrado.');
+        throw new Error(ERROR_CHARACTER_NOT_FOUND);
       }
 
       const now = new Date();
       const elapsedMs = now.getTime() - character.lastSalaryClaim.getTime();
       const elapsedDays = elapsedMs / (1000 * 60 * 60 * 24);
       if (elapsedDays < this.DAYS_BETWEEN_SALARY) {
-        throw new Error('⛔ Ya cobraste el sueldo semanal. Intenta nuevamente más tarde.');
+        throw new Error(ERROR_SALARY_ALREADY_CLAIMED);
       }
 
       const baseSalary = this.BASE_SALARIES[character.rank] ?? 0;
@@ -988,9 +995,9 @@ export class LevelUpService {
       await tx.auditLog.create({
         data: {
           characterId,
-          category: 'Sueldo Semanal',
+          category: AUDIT_LOG_CATEGORY.SUELDO_SEMANAL,
           detail: statusDetail,
-          evidence: 'Sistema Automatizado',
+          evidence: EVIDENCE.SISTEMA_AUTOMATIZADO,
           deltaRyou: netDeltaRyou
         }
       });

@@ -1,4 +1,12 @@
 import { Prisma, PrismaClient } from '@prisma/client';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { RESOURCE_LABEL_MAP } from '../config/resourceLabels';
+import { PLACEHOLDER_NO_EVIDENCE } from '../config/uiStrings';
+import {
+  ERROR_AMOUNT_MUST_BE_POSITIVE,
+  ERROR_REASON_REQUIRED,
+  ERROR_TARGET_NO_CHARACTER
+} from '../config/serviceErrors';
 
 export const ADJUSTABLE_RESOURCES = [
   'ryou',
@@ -61,16 +69,7 @@ const RESOURCE_DELTA_FIELD_MAP = {
   bes: 'deltaBes'
 } as const;
 
-export const RESOURCE_LABEL_MAP = {
-  ryou: 'Ryou',
-  exp: 'EXP',
-  pr: 'PR',
-  sp: 'SP',
-  cupos: 'Cupos',
-  rc: 'RC',
-  bts: 'BTS',
-  bes: 'BES'
-} as const;
+export { RESOURCE_LABEL_MAP };
 
 type DeltaFieldName = (typeof RESOURCE_DELTA_FIELD_MAP)[AdjustableResource];
 
@@ -83,12 +82,12 @@ export class ResourceAdjustmentService {
 
   public async removeResource(data: RemoveResourceDTO): Promise<RemoveResourceResult> {
     if (data.requestedAmount <= 0) {
-      throw new Error('⛔ La cantidad debe ser mayor a cero.');
+      throw new Error(ERROR_AMOUNT_MUST_BE_POSITIVE);
     }
 
     const reason = data.reason.trim();
     if (!reason) {
-      throw new Error('⛔ Debes proporcionar un motivo para el ajuste.');
+      throw new Error(ERROR_REASON_REQUIRED);
     }
 
     return this.prisma.$transaction(
@@ -110,7 +109,7 @@ export class ResourceAdjustmentService {
         });
 
         if (!character) {
-          throw new Error('⛔ El usuario objetivo no tiene un personaje registrado.');
+          throw new Error(ERROR_TARGET_NO_CHARACTER);
         }
 
         const previousValue = character[data.resource];
@@ -135,7 +134,7 @@ export class ResourceAdjustmentService {
         await tx.auditLog.create({
           data: {
             characterId: character.id,
-            category: 'Ajuste Staff de Recursos',
+            category: AUDIT_LOG_CATEGORY.AJUSTE_RECURSOS,
             detail: [
               `Staff: ${data.actorDiscordTag}`,
               `Recurso: ${resourceLabel}`,
@@ -145,7 +144,7 @@ export class ResourceAdjustmentService {
               `Saldo final: ${finalValue}`,
               `Motivo: ${reason}`
             ].join(' | '),
-            evidence: data.evidence?.trim() || 'Sin evidencia adjunta',
+            evidence: data.evidence?.trim() || PLACEHOLDER_NO_EVIDENCE,
             ...deltaData
           }
         });
@@ -168,12 +167,12 @@ export class ResourceAdjustmentService {
 
   public async addResource(data: AddResourceDTO): Promise<AddResourceResult> {
     if (data.amount <= 0) {
-      throw new Error('⛔ La cantidad debe ser mayor a cero.');
+      throw new Error(ERROR_AMOUNT_MUST_BE_POSITIVE);
     }
 
     const reason = data.reason.trim();
     if (!reason) {
-      throw new Error('⛔ Debes proporcionar un motivo para el ajuste.');
+      throw new Error(ERROR_REASON_REQUIRED);
     }
 
     return this.prisma.$transaction(
@@ -195,7 +194,7 @@ export class ResourceAdjustmentService {
         });
 
         if (!character) {
-          throw new Error('⛔ El usuario objetivo no tiene un personaje registrado.');
+          throw new Error(ERROR_TARGET_NO_CHARACTER);
         }
 
         const previousValue = character[data.resource];
@@ -219,7 +218,7 @@ export class ResourceAdjustmentService {
         await tx.auditLog.create({
           data: {
             characterId: character.id,
-            category: 'Ajuste Staff de Recursos',
+            category: AUDIT_LOG_CATEGORY.AJUSTE_RECURSOS,
             detail: [
               `Staff: ${data.actorDiscordTag}`,
               `Recurso: ${resourceLabel}`,
@@ -228,7 +227,7 @@ export class ResourceAdjustmentService {
               `Saldo final: ${finalValue}`,
               `Motivo: ${reason}`
             ].join(' | '),
-            evidence: data.evidence?.trim() || 'Sin evidencia adjunta',
+            evidence: data.evidence?.trim() || PLACEHOLDER_NO_EVIDENCE,
             ...deltaData
           }
         });

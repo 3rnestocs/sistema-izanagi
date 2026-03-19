@@ -10,7 +10,7 @@ import {
 import { prisma } from '../../lib/prisma';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
-import { RESOURCE_LABEL_MAP } from '../../services/ResourceAdjustmentService';
+import { RESOURCE_LABEL_MAP } from '../../config/resourceLabels';
 import { LOGRO_GENERAL_CATALOG } from '../../config/activityRewards';
 import { AUDIT_LOG_CATEGORY } from '../../config/auditLogCategories';
 import {

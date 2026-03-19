@@ -1,4 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { EVIDENCE } from '../config/evidenceStrings';
+import {
+  ERROR_NPC_ALREADY_EXISTS,
+  ERROR_NPC_ALREADY_RETIRED,
+  ERROR_NPC_NAME_REQUIRED,
+  ERROR_NPC_NOT_FOUND,
+  ERROR_NPC_RETIRE_REASON_REQUIRED,
+  ERROR_NPC_RETIRE_REFERENCE_REQUIRED
+} from '../config/serviceErrors';
 import { StatValidatorService } from './StatValidatorService';
 
 interface CreateNpcInput {
@@ -34,7 +44,7 @@ export class NpcService {
   async createNpc(input: CreateNpcInput) {
     const normalizedName = input.name.trim();
     if (normalizedName.length === 0) {
-      throw new Error('⛔ Debes proporcionar un nombre de NPC válido.');
+      throw new Error(ERROR_NPC_NAME_REQUIRED);
     }
 
     const normalizedLevel = (input.level ?? 'D1').trim().toUpperCase();
@@ -46,7 +56,7 @@ export class NpcService {
       });
 
       if (existingCharacter) {
-        throw new Error(`⛔ Ya existe un personaje con el nombre '${normalizedName}'.`);
+        throw new Error(ERROR_NPC_ALREADY_EXISTS(normalizedName));
       }
 
       const npc = await tx.character.create({
@@ -86,9 +96,9 @@ export class NpcService {
       await tx.auditLog.create({
         data: {
           characterId: npc.id,
-          category: 'NPC Lifecycle',
+          category: AUDIT_LOG_CATEGORY.NPC_LIFECYCLE,
           detail: `NPC creado por ${input.actorDiscordTag}.${detailSuffix}`,
-          evidence: 'Comando /npc crear'
+          evidence: EVIDENCE.COMANDO_NPC_CREAR
         }
       });
 
@@ -146,12 +156,12 @@ export class NpcService {
   async retireNpc(input: RetireNpcInput) {
     const reference = input.npcReference.trim();
     if (reference.length === 0) {
-      throw new Error('⛔ Debes indicar el NPC a retirar por ID o nombre.');
+      throw new Error(ERROR_NPC_RETIRE_REFERENCE_REQUIRED);
     }
 
     const reason = input.reason.trim();
     if (reason.length === 0) {
-      throw new Error('⛔ Debes indicar el motivo del retiro.');
+      throw new Error(ERROR_NPC_RETIRE_REASON_REQUIRED);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -169,11 +179,11 @@ export class NpcService {
       });
 
       if (!npc) {
-        throw new Error(`⛔ No se encontró un NPC con referencia '${reference}'.`);
+        throw new Error(ERROR_NPC_NOT_FOUND(reference));
       }
 
       if (npc.isRetired) {
-        throw new Error(`⛔ El NPC '${npc.name}' ya se encuentra retirado.`);
+        throw new Error(ERROR_NPC_ALREADY_RETIRED(npc.name));
       }
 
       const retiredAt = new Date();
@@ -188,9 +198,9 @@ export class NpcService {
       await tx.auditLog.create({
         data: {
           characterId: npc.id,
-          category: 'NPC Lifecycle',
+          category: AUDIT_LOG_CATEGORY.NPC_LIFECYCLE,
           detail: `NPC retirado por ${input.actorDiscordTag}. Motivo: ${reason}`,
-          evidence: 'Comando /npc retirar'
+          evidence: EVIDENCE.COMANDO_NPC_RETIRAR
         }
       });
 

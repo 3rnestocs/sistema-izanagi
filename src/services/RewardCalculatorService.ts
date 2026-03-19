@@ -15,6 +15,19 @@ import {
 import { getHistoricalNarrationRewards } from '../config/historicalNarrations';
 import { NEWBIE_BOOST_CONFIG } from '../config/newbieBoost';
 import {
+  BONUS_NEWBIE,
+  ERROR_CHARACTER_LEVEL_INVALID,
+  ERROR_COMBAT_NO_ENEMY_RANK,
+  ERROR_CURACION_NO_SEVERITY,
+  ERROR_ENEMY_RANK_INVALID,
+  ERROR_LEVEL_INVALID_DESARROLLO,
+  ERROR_LOGRO_GENERAL_NOT_FOUND,
+  ERROR_LOGRO_REPUTACION_NOT_FOUND,
+  ERROR_MISSION_NO_RANK,
+  ERROR_MISSION_RANK_INVALID,
+  ERROR_SEVERITY_INVALID
+} from '../config/serviceErrors';
+import {
   ActivityType,
   canonicalizeActivityType,
   isAutoApprovableType,
@@ -141,14 +154,14 @@ export class RewardCalculatorService {
       const newbieBonusAmount = boostedBaseExp - baseRewards.exp;
       details.exp.bonus += newbieBonusAmount;
       details.exp.base = baseRewards.exp;
-      details.exp.source = details.exp.source ? `Bono Novato, ${details.exp.source}` : 'Bono Novato';
+      details.exp.source = details.exp.source ? `${BONUS_NEWBIE}, ${details.exp.source}` : BONUS_NEWBIE;
     }
 
     if (isNewbiePrActive) {
       const newbieBonusAmount = boostedBasePr - baseRewards.pr;
       details.pr.bonus += newbieBonusAmount;
       details.pr.base = baseRewards.pr;
-      details.pr.source = details.pr.source ? `Bono Novato, ${details.pr.source}` : 'Bono Novato';
+      details.pr.source = details.pr.source ? `${BONUS_NEWBIE}, ${details.pr.source}` : BONUS_NEWBIE;
     }
 
     return details;
@@ -189,13 +202,13 @@ export class RewardCalculatorService {
 
   private calculateMissionRewards(rank: string | null, result: string | null | undefined): RewardBreakdown {
     if (!rank) {
-      throw new Error('⛔ La misión no tiene rango definido.');
+      throw new Error(ERROR_MISSION_NO_RANK);
     }
 
     const normalizedRank = rank.toUpperCase();
     const rankReward = MISSION_REWARDS[normalizedRank];
     if (!rankReward) {
-      throw new Error(`⛔ El rango de misión '${rank}' no es válido para recompensas.`);
+      throw new Error(ERROR_MISSION_RANK_INVALID(rank));
     }
 
     const isSuccess = isSuccessResult(result);
@@ -221,19 +234,19 @@ export class RewardCalculatorService {
     }
 
     if (!enemyRank) {
-      throw new Error('⛔ El combate no tiene rango del oponente definido.');
+      throw new Error(ERROR_COMBAT_NO_ENEMY_RANK);
     }
 
     const myRankLetter = characterLevel.charAt(0).toUpperCase();
     const myRankValue = this.RANK_VALUES[myRankLetter];
     if (!myRankValue) {
-      throw new Error(`⛔ El rango actual del personaje ('${characterLevel}') no es válido.`);
+      throw new Error(ERROR_CHARACTER_LEVEL_INVALID(characterLevel));
     }
 
     const enemyRankLetter = enemyRank.toUpperCase();
     const enemyRankValue = this.RANK_VALUES[enemyRankLetter];
     if (!enemyRankValue) {
-      throw new Error(`⛔ El rango del oponente ('${enemyRank}') no es válido.`);
+      throw new Error(ERROR_ENEMY_RANK_INVALID(enemyRank));
     }
 
     let exp = 1;
@@ -255,12 +268,12 @@ export class RewardCalculatorService {
     const exp = 2;
 
     if (!severidad) {
-      throw new Error('⛔ La curación no tiene severidad de herida definida.');
+      throw new Error(ERROR_CURACION_NO_SEVERITY);
     }
 
     const pr = CURACION_PR_BY_SEVERITY[severidad];
     if (pr === undefined) {
-      throw new Error(`⛔ La severidad '${severidad}' no es válida.`);
+      throw new Error(ERROR_SEVERITY_INVALID(severidad));
     }
 
     return { exp, pr, ryou: 0 };
@@ -275,7 +288,7 @@ export class RewardCalculatorService {
     const exp = DESARROLLO_PERSONAL_EXP[levelLetter];
 
     if (exp === undefined) {
-      throw new Error(`⛔ El nivel '${characterLevel}' no es válido para Desarrollo Personal.`);
+      throw new Error(ERROR_LEVEL_INVALID_DESARROLLO(characterLevel));
     }
 
     return { exp, pr: 0, ryou: 0 };
@@ -356,7 +369,7 @@ export class RewardCalculatorService {
   private calculateLogroGeneralRewards(goalKey: string | null | undefined): RewardBreakdown {
     const logro = getLogroGeneralEntry(goalKey);
     if (!logro) {
-      throw new Error('⛔ El logro general seleccionado no existe en el catálogo.');
+      throw new Error(ERROR_LOGRO_GENERAL_NOT_FOUND);
     }
 
     // Manual exceptions keep staff-driven flow and should not auto-credit projected rewards.
@@ -370,7 +383,7 @@ export class RewardCalculatorService {
   private calculateLogroReputacionRewards(goalKey: string | null | undefined): RewardBreakdown {
     const logro = getLogroReputacionEntry(goalKey);
     if (!logro) {
-      throw new Error('⛔ El logro de reputación seleccionado no existe en el catálogo.');
+      throw new Error(ERROR_LOGRO_REPUTACION_NOT_FOUND);
     }
 
     return logro.rewards;

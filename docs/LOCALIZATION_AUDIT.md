@@ -1,8 +1,8 @@
-# Localization Audit — `src/commands/`, `src/config/`, `src/domain/`, `src/database/`
+# Localization Audit — `src/commands/`, `src/config/`, `src/domain/`, `src/database/`, `src/services/`
 
 Report of hardcoded strings that can be centralized in `src/config/` for reuse across the app.
 
-**Implementation status:** Sections 1–4 (commands) have been implemented. Sections 7–9 (config, domain, database) are audit findings for future work.
+**Implementation status:** Sections 1–4 (commands) and Section 10 (services) have been implemented. Sections 7–9 (config, domain, database) are audit findings for future work.
 
 ---
 
@@ -367,7 +367,151 @@ const VALID_LEVELS = new Set(['D2', 'D3', 'C1', 'C2', 'C3', 'B1', 'B2', 'B3', 'A
 
 ---
 
-## 10. Summary — config / domain / database
+## 10. `src/services/` — Audit findings
+
+Services contain the highest density of user-facing error messages and audit-log strings. These should be centralized in `src/config/` for consistency and reuse.
+
+### 10.1 AuditLog categories (extend `auditLogCategories.ts`)
+
+| Category string | Current location | Suggested key |
+|-----------------|------------------|---------------|
+| `'Ajuste Staff de Recursos'` | ResourceAdjustmentService, PromotionService | `AJUSTE_RECURSOS` |
+| `'Compra (Mercado)'` | TransactionService | `COMPRA_MERCADO` |
+| `'Venta (Mercado)'` | TransactionService | `VENTA_MERCADO` |
+| `'Intercambio'` | TransactionService | `INTERCAMBIO` |
+| `'Aprobación de Actividad'` | ActivityApprovalService | `APROBACION_ACTIVIDAD` |
+| `'NPC Lifecycle'` | NpcService | `NPC_LIFECYCLE` |
+| `'Sueldo Semanal'` | LevelUpService, SalaryService | Already covered by `SUELDO` |
+| `'Gestor Habilidades'` | PlazaService | Already covered by `GESTOR` |
+| `'Rasgo Asignado'` / `'Rasgo Removido'` | CharacterService | `RASGO_ASIGNADO`, `RASGO_REMOVIDO` |
+| `'Creación de Ficha'` | CharacterService | Already in `CREACION_FICHA` |
+
+### 10.2 Evidence strings (audit log `evidence` field)
+
+| String | Files | Suggested key |
+|--------|-------|---------------|
+| `'Sin evidencia adjunta'` | ResourceAdjustmentService | `PLACEHOLDER_NO_EVIDENCE` (already in uiStrings) |
+| `'Sistema Automatizado'` | LevelUpService, SalaryService | `EVIDENCE_SISTEMA_AUTOMATIZADO` |
+| `'Sistema de Transacciones'` | TransactionService | `EVIDENCE_SISTEMA_TRANSACCIONES` |
+| `'Comando /ascender'` | LevelUpService, PromotionService | `EVIDENCE_COMANDO_ASCENDER` |
+| `'Comando /forzar_ascenso'` | PromotionService | `EVIDENCE_COMANDO_FORZAR_ASCENSO` |
+| `'Comando /registro'` | CharacterService | `EVIDENCE_COMANDO_REGISTRO` |
+| `'Comando /otorgar_rasgo'` | CharacterService | `EVIDENCE_COMANDO_OTORGAR_RASGO` |
+| `'Comando /retirar_habilidad'` | PlazaService | `EVIDENCE_COMANDO_RETIRAR_HABILIDAD` |
+| `'Comando /npc crear'` | NpcService | `EVIDENCE_COMANDO_NPC_CREAR` |
+| `'Comando /npc retirar'` | NpcService | `EVIDENCE_COMANDO_NPC_RETIRAR` |
+
+### 10.3 Error messages — reusable across services
+
+| String | Suggested key | Files |
+|--------|---------------|-------|
+| `'Personaje no encontrado.'` | `ERROR_CHARACTER_NOT_FOUND` | LevelUpService, PromotionService, SalaryService, TransactionService, PlazaService, CharacterService |
+| `'⛔ ACCIÓN PROHIBIDA: Personaje no encontrado.'` | `ERROR_ACTION_PROHIBIDA_CHARACTER_NOT_FOUND` | LevelUpService, CharacterService |
+| `'⛔ La cantidad debe ser mayor a cero.'` | `ERROR_AMOUNT_MUST_BE_POSITIVE` | ResourceAdjustmentService |
+| `'⛔ Debes proporcionar un motivo para el ajuste.'` | `ERROR_REASON_REQUIRED` | ResourceAdjustmentService |
+| `'⛔ El usuario objetivo no tiene un personaje registrado.'` | `ERROR_TARGET_NO_CHARACTER` | ResourceAdjustmentService |
+| `'⛔ Debes proporcionar un nombre de NPC válido.'` | `ERROR_NPC_NAME_REQUIRED` | NpcService |
+| `'⛔ Debes indicar el NPC a retirar por ID o nombre.'` | `ERROR_NPC_RETIRE_REFERENCE_REQUIRED` | NpcService |
+| `'⛔ Debes indicar el motivo del retiro.'` | `ERROR_NPC_RETIRE_REASON_REQUIRED` | NpcService |
+| `'No puedes cobrar sueldos de fechas anteriores a la creación de tu personaje.'` | `ERROR_SALARY_BEFORE_CREATION` | SalaryService |
+| `'⛔ Ya cobraste el sueldo semanal. Intenta nuevamente más tarde.'` | `ERROR_SALARY_ALREADY_CLAIMED` | LevelUpService |
+| `'Rango no válido: ${target}'` | `ERROR_INVALID_RANK` (template) | PromotionService |
+| `'⛔ Nivel inválido: ${targetLevel}'` | `ERROR_INVALID_LEVEL` (template) | PromotionService |
+| `'⛔ El personaje ya es ${level}. No puedes forzar un ascenso a un nivel igual o inferior.'` | `ERROR_FORCE_ASCENSO_SAME_OR_LOWER` (template) | PromotionService |
+| `'Ninguno de los ítems existe en el Mercado.'` / `'Ninguno de los ítems existe en el catálogo.'` | `ERROR_ITEMS_NOT_IN_CATALOG` | TransactionService |
+| `'El ítem \'${name}\' no existe en el catálogo.'` | `ERROR_ITEM_NOT_FOUND` (template) | TransactionService |
+| `'⛔ FONDOS: Necesitas ${cost} Ryou, tienes ${have}.'` (and EXP/PR variants) | `ERROR_FUNDS_INSUFFICIENT` (template) | TransactionService |
+| `'⛔ RESTRICCIÓN DE RASGO: Debes mantener al menos ${min} Ryou intactos en tu ficha.'` | `ERROR_TRAIT_MIN_BALANCE` (template) | TransactionService |
+| `'⛔ RESTRICCIÓN DE RASGO: Tienes prohibido ceder dinero voluntariamente a otros personajes.'` | `ERROR_TRAIT_BLOCKS_TRANSFER` | TransactionService |
+| `'⛔ No tienes suficientes Ryou para transferir.'` | `ERROR_INSUFFICIENT_RYOU_TRANSFER` | TransactionService |
+| `'Remitente no encontrado.'` | `ERROR_SENDER_NOT_FOUND` | TransactionService |
+| `'⛔ El mensaje de aprobación no pertenece a un servidor.'` | `ERROR_APPROVAL_MESSAGE_NO_GUILD` | BuildApprovalService |
+| `'⛔ No se pudo extraer "Nombre del Keko" del mensaje aprobado.'` | `ERROR_APPROVAL_MESSAGE_NO_KEKO` | BuildApprovalService |
+
+### 10.4 RewardCalculatorService — strings
+
+| String | Suggested key | Notes |
+|--------|---------------|-------|
+| `'Bono Novato'` | `BONUS_NEWBIE` | Used in reward detail source |
+| `'⛔ La misión no tiene rango definido.'` | `ERROR_MISSION_NO_RANK` | |
+| `'⛔ El rango de misión \'${rank}\' no es válido para recompensas.'` | `ERROR_MISSION_RANK_INVALID` (template) | |
+| `'⛔ El combate no tiene rango del oponente definido.'` | `ERROR_COMBAT_NO_ENEMY_RANK` | |
+| `'⛔ El rango actual del personaje (\'${level}\') no es válido.'` | `ERROR_CHARACTER_LEVEL_INVALID` (template) | |
+| `'⛔ El rango del oponente (\'${rank}\') no es válido.'` | `ERROR_ENEMY_RANK_INVALID` (template) | |
+| `'⛔ La curación no tiene severidad de herida definida.'` | `ERROR_CURACION_NO_SEVERITY` | |
+| `'⛔ La severidad \'${severidad}\' no es válida.'` | `ERROR_SEVERITY_INVALID` (template) | |
+| `'⛔ El nivel \'${level}\' no es válido para Desarrollo Personal.'` | `ERROR_LEVEL_INVALID_DESARROLLO` (template) | |
+| `'⛔ El logro general seleccionado no existe en el catálogo.'` | `ERROR_LOGRO_GENERAL_NOT_FOUND` | |
+| `'⛔ El logro de reputación seleccionado no existe en el catálogo.'` | `ERROR_LOGRO_REPUTACION_NOT_FOUND` | |
+
+### 10.5 ResourceAdjustmentService — move RESOURCE_LABEL_MAP to config
+
+`RESOURCE_LABEL_MAP` is defined in `ResourceAdjustmentService.ts` (lines 64–72) but is used by historial and ficha. **Move to `src/config/resourceLabels.ts`** (or `config/activityRewards.ts` if related) and import from there.
+
+### 10.6 LevelUpService / PromotionService — requirement messages
+
+`LevelUpService` contains ~60+ hardcoded requirement messages (e.g. `Falta al menos 1 misión Rango B`, `EXP insuficiente`, `Cumple validaciones automáticas, pero faltan requisitos manuales.`). These are **domain-specific** and highly repetitive. **Recommendation:** Create `src/config/requirementMessages.ts` with template functions:
+
+```ts
+export const ERROR_EXP_INSUFFICIENT = (current: number, required: number) =>
+  `- EXP insuficiente (${current}/${required}).`;
+export const ERROR_PR_INSUFFICIENT = (current: number, required: number) =>
+  `- PR insuficiente (${current}/${required}).`;
+export const REASON_MANUAL_REQUIREMENTS = 'Cumple validaciones automáticas, pero faltan requisitos manuales.';
+// ... etc.
+```
+
+### 10.7 CharacterService / PlazaService — conflict and validation errors
+
+| String pattern | Suggested key |
+|---------------|---------------|
+| `'⛔ ACCIÓN PROHIBIDA: El Keko \'${name}\' o el usuario de Discord ya posee una ficha registrada.'` | `ERROR_KEKO_OR_DISCORD_ALREADY_REGISTERED` |
+| `'⛔ CONFLICTO: Uno o más rasgos proporcionados no existen en el sistema IZANAGI.'` | `ERROR_TRAITS_NOT_IN_SYSTEM` |
+| `'⛔ CONFLICTO: El rasgo ${trait} es incompatible con el rasgo ${other}. Elimina uno de los dos.'` | `ERROR_TRAIT_INCOMPATIBLE` |
+| `'⛔ CONFLICTO: RC inválido al crear la ficha: ${rc}. Ajusta la selección de rasgos.'` | `ERROR_RC_INVALID_AT_CREATION` |
+| `'⛔ CONFLICTO: El rasgo \'${name}\' no existe en el sistema.'` | `ERROR_TRAIT_NOT_FOUND` |
+| `'⛔ CONFLICTO: El personaje ya posee el rasgo \'${name}\'.'` | `ERROR_CHARACTER_ALREADY_HAS_TRAIT` |
+| `'⛔ CONFLICTO: \'${name}\' es incompatible con \'${other}\'.'` | `ERROR_TRAIT_INCOMPATIBLE_WITH` |
+| `'⛔ No hay suficientes RC. Necesitas ${need}, tienes ${have}.'` | `ERROR_RC_INSUFFICIENT` |
+| Plaza `'⛔ La guía/plaza \'${name}\' no existe en el sistema.'` | `ERROR_PLAZA_NOT_FOUND` |
+| `'⛔ El personaje ya posee la habilidad \'${name}\'.'` | `ERROR_CHARACTER_ALREADY_HAS_PLAZA` |
+| `'⛔ No quedan plazas para \'${name}\'. Cupo máximo: ${max}.'` | `ERROR_PLAZA_CUPOS_EXCEEDED` |
+| `'⛔ No puedes pagar con BTS y BES al mismo tiempo.'` | `ERROR_BTS_BES_MUTEX` |
+| `'⛔ REGLA DE DESARROLLO: \'${cat}\' no puede tomarse como habilidad inicial.'` | `ERROR_PLAZA_INITIAL_CATEGORY` |
+| `'⛔ Este personaje ya consumió su único Deseo Especial.'` | `ERROR_DESEO_ESPECIAL_ALREADY_USED` | etc. |
+
+### 10.8 StatValidatorService / SkillRankValidator / ActivityCapService
+
+These contain many validation and limit errors. Extract to `config/validationErrors.ts` or extend `uiStrings.ts` with an `ERROR_VALIDATION_*` section.
+
+### 10.9 Suggested new config files
+
+| File | Purpose |
+|------|---------|
+| `config/auditLogCategories.ts` | Extend with `AJUSTE_RECURSOS`, `COMPRA_MERCADO`, `VENTA_MERCADO`, `INTERCAMBIO`, `APROBACION_ACTIVIDAD`, `NPC_LIFECYCLE`, `RASGO_ASIGNADO`, `RASGO_REMOVIDO` |
+| `config/evidenceStrings.ts` | Audit evidence strings (`EVIDENCE_SISTEMA_AUTOMATIZADO`, `EVIDENCE_COMANDO_*`, etc.) |
+| `config/serviceErrors.ts` | Shared error messages (character not found, funds, etc.) |
+| `config/requirementMessages.ts` | LevelUpService requirement templates |
+| `config/resourceLabels.ts` | Move `RESOURCE_LABEL_MAP` from ResourceAdjustmentService |
+
+### 10.10 Services by priority
+
+| Service | Priority | Notes |
+|---------|----------|-------|
+| ResourceAdjustmentService | High | `PLACEHOLDER_NO_EVIDENCE`, audit category, errors; move RESOURCE_LABEL_MAP |
+| RewardCalculatorService | High | `BONUS_NEWBIE`, errors |
+| TransactionService | High | Many errors, audit categories, evidence |
+| CharacterService | High | Many errors, audit categories |
+| LevelUpService / PromotionService | Medium | Requirement messages, audit categories |
+| SalaryService | Medium | Errors, evidence |
+| PlazaService | Medium | Many errors |
+| ActivityApprovalService | Low | Audit category only |
+| NpcService | Low | Errors, audit categories |
+| StatValidatorService, SkillRankValidator, ActivityCapService | Low | Validation errors |
+
+---
+
+## 11. Summary — config / domain / database / services
 
 | Area | Action | Priority |
 |------|--------|----------|
@@ -377,3 +521,5 @@ const VALID_LEVELS = new Set(['D2', 'D3', 'C1', 'C2', 'C3', 'B1', 'B2', 'B3', 'A
 | **database** | Add `AUDIT_LOG_CATEGORY` constant; use in historial, backfill | Medium |
 | **database** | Import VALID_LEVELS from StatValidatorService in backfillGradationHistory | Low |
 | **database** | Optional scriptStrings.ts for console messages | Low |
+| **services** | Extend `auditLogCategories.ts`; add `evidenceStrings.ts`, `serviceErrors.ts` | High |
+| **services** | Move `RESOURCE_LABEL_MAP` to config; add `requirementMessages.ts` | Medium |

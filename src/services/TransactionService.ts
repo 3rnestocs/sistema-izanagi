@@ -1,4 +1,20 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { AUDIT_LOG_CATEGORY } from '../config/auditLogCategories';
+import { EVIDENCE } from '../config/evidenceStrings';
+import {
+  ERROR_CHARACTER_NOT_FOUND,
+  ERROR_FUNDS_INSUFFICIENT,
+  ERROR_INSUFFICIENT_QUANTITY_SELL,
+  ERROR_INSUFFICIENT_QUANTITY_TRANSFER,
+  ERROR_ITEM_NOT_FOUND,
+  ERROR_ITEM_NOT_IN_CATALOG,
+  ERROR_ITEM_NOT_SELLABLE,
+  ERROR_ITEMS_NOT_IN_CATALOG,
+  ERROR_SENDER_NOT_FOUND,
+  ERROR_TRAIT_BLOCKS_TRANSFER,
+  ERROR_TRAIT_MIN_BALANCE,
+  ERROR_INSUFFICIENT_RYOU_TRANSFER
+} from '../config/serviceErrors';
 
 export interface BuyDTO {
   characterId: string;
@@ -41,7 +57,7 @@ export class TransactionService {
         where: { id: data.characterId },
         include: { traits: { include: { trait: true } } }
       });
-      if (!character) throw new Error("Personaje no encontrado.");
+      if (!character) throw new Error(ERROR_CHARACTER_NOT_FOUND);
 
       // 1. Extraer multiplicadores y reglas de Rasgos (Tacaño, Derrochador, etc.)
       let multiplierGasto = 1.0;
@@ -59,7 +75,7 @@ export class TransactionService {
         where: { name: { in: data.itemNames } }
       });
 
-      if (itemsToBuy.length === 0) throw new Error("Ninguno de los ítems existe en el Mercado.");
+      if (itemsToBuy.length === 0) throw new Error(ERROR_ITEMS_NOT_IN_CATALOG);
 
       // 3. Agrupar costos por moneda (RYOU, EXP, PR)
       const costs = { RYOU: 0, EXP: 0, PR: 0 };
@@ -67,7 +83,7 @@ export class TransactionService {
 
       for (const name of data.itemNames) {
         const item = itemsToBuy.find(i => i.name.toUpperCase() === name.toUpperCase());
-        if (!item) throw new Error(`El ítem '${name}' no existe en el catálogo.`);
+        if (!item) throw new Error(ERROR_ITEM_NOT_FOUND(name));
         
         const finalPrice = item.currency === 'RYOU'
           ? Math.ceil(item.price * multiplierGasto)
@@ -78,12 +94,12 @@ export class TransactionService {
       }
 
       // 4. Validar Fondos y Regla del Tacaño
-      if (character.ryou < costs.RYOU) throw new Error(`⛔ FONDOS: Necesitas ${costs.RYOU} Ryou, tienes ${character.ryou}.`);
-      if (character.exp < costs.EXP) throw new Error(`⛔ FONDOS: Necesitas ${costs.EXP} EXP, tienes ${character.exp}.`);
-      if (character.pr < costs.PR) throw new Error(`⛔ FONDOS: Necesitas ${costs.PR} PR, tienes ${character.pr}.`);
+      if (character.ryou < costs.RYOU) throw new Error(ERROR_FUNDS_INSUFFICIENT('Ryou', costs.RYOU, character.ryou));
+      if (character.exp < costs.EXP) throw new Error(ERROR_FUNDS_INSUFFICIENT('EXP', costs.EXP, character.exp));
+      if (character.pr < costs.PR) throw new Error(ERROR_FUNDS_INSUFFICIENT('PR', costs.PR, character.pr));
 
       if (costs.RYOU > 0 && (character.ryou - costs.RYOU) < minBalanceRule) {
-        throw new Error(`⛔ RESTRICCIÓN DE RASGO: Debes mantener al menos ${minBalanceRule} Ryou intactos en tu ficha.`);
+        throw new Error(ERROR_TRAIT_MIN_BALANCE(minBalanceRule));
       }
 
       // 5. Cobrar Recursos
@@ -109,9 +125,9 @@ export class TransactionService {
       await tx.auditLog.create({
         data: {
           characterId: character.id,
-          category: "Compra (Mercado)",
+          category: AUDIT_LOG_CATEGORY.COMPRA_MERCADO,
           detail: `Compró: ${data.itemNames.join(", ")}`,
-          evidence: "Sistema de Transacciones",
+          evidence: EVIDENCE.SISTEMA_TRANSACCIONES,
           deltaRyou: -costs.RYOU,
           deltaExp: -costs.EXP,
           deltaPr: -costs.PR,
@@ -132,14 +148,14 @@ export class TransactionService {
         where: { id: data.characterId },
         include: { inventory: { include: { item: true } } }
       });
-      if (!character) throw new Error('Personaje no encontrado.');
+      if (!character) throw new Error(ERROR_CHARACTER_NOT_FOUND);
 
       // 1. Buscar items en el catálogo global
       const catalog = await tx.item.findMany({
         where: { name: { in: data.itemNames } }
       });
 
-      if (catalog.length === 0) throw new Error('Ninguno de los ítems existe en el catálogo.');
+      if (catalog.length === 0) throw new Error(ERROR_ITEMS_NOT_IN_CATALOG);
 
       // 2. Agrupar items a vender y calcular ingresos
       const itemsToSell: Record<string, { quantity: number; basePrice: number; item: any }> = {};
@@ -148,11 +164,11 @@ export class TransactionService {
 
       for (const name of data.itemNames) {
         const catalogItem = catalog.find(i => i.name.toUpperCase() === name.toUpperCase());
-        if (!catalogItem) throw new Error(`El ítem '${name}' no existe en el catálogo.`);
+        if (!catalogItem) throw new Error(ERROR_ITEM_NOT_FOUND(name));
 
         // Solo procesamos items con precio en RYOU (venta solo en moneda)
         if (catalogItem.currency !== 'RYOU') {
-          throw new Error(`⛔ El ítem '${name}' no se puede vender (no es una moneda compatible).`);
+          throw new Error(ERROR_ITEM_NOT_SELLABLE(name));
         }
 
         if (!itemsToSell[catalogItem.id]) {
@@ -165,7 +181,7 @@ export class TransactionService {
       for (const [itemId, sellData] of Object.entries(itemsToSell)) {
         const invItem = character.inventory.find(inv => inv.itemId === itemId);
         if (!invItem || invItem.quantity < sellData.quantity) {
-          throw new Error(`⛔ No tienes suficiente cantidad de '${sellData.item.name}' para vender.`);
+          throw new Error(ERROR_INSUFFICIENT_QUANTITY_SELL(sellData.item.name));
         }
 
         const sellPrice = Math.floor(sellData.basePrice * this.SELL_PERCENTAGE);
@@ -206,9 +222,9 @@ export class TransactionService {
       await tx.auditLog.create({
         data: {
           characterId: character.id,
-          category: 'Venta (Mercado)',
+          category: AUDIT_LOG_CATEGORY.VENTA_MERCADO,
           detail: `Vendió: ${itemNames}. Ganancia: ${totalRyouGained} Ryou.`,
-          evidence: 'Sistema de Transacciones',
+          evidence: EVIDENCE.SISTEMA_TRANSACCIONES,
           deltaRyou: totalRyouGained,
           ...(data.createdAt && { createdAt: data.createdAt })
         }
@@ -223,17 +239,17 @@ export class TransactionService {
         where: { id: data.senderId },
         include: { traits: { include: { trait: true } } }
       });
-      if (!sender) throw new Error("Remitente no encontrado.");
+      if (!sender) throw new Error(ERROR_SENDER_NOT_FOUND);
 
       // 1. Validar bloqueo de transferencia (Tacaño)
       const transferAmount = data.ryouAmount || 0;
       if (transferAmount > 0) {
         const blocksTransfer = sender.traits.some(ct => ct.trait.blocksTransfer);
         if (blocksTransfer) {
-          throw new Error("⛔ RESTRICCIÓN DE RASGO: Tienes prohibido ceder dinero voluntariamente a otros personajes.");
+          throw new Error(ERROR_TRAIT_BLOCKS_TRANSFER);
         }
         if (sender.ryou < transferAmount) {
-          throw new Error("⛔ No tienes suficientes Ryou para transferir.");
+          throw new Error(ERROR_INSUFFICIENT_RYOU_TRANSFER);
         }
       }
 
@@ -244,7 +260,7 @@ export class TransactionService {
         
         for (const name of data.itemNames) {
           const item = catalog.find(i => i.name.toUpperCase() === name.toUpperCase());
-          if (!item) throw new Error(`Ítem '${name}' no existe en el catálogo.`);
+          if (!item) throw new Error(ERROR_ITEM_NOT_IN_CATALOG(name));
           itemsToMove[item.id] = (itemsToMove[item.id] || 0) + 1;
         }
 
@@ -255,7 +271,7 @@ export class TransactionService {
           });
           
           if (!invItem || invItem.quantity < qty) {
-            throw new Error(`⛔ No tienes suficiente cantidad del ítem para transferir.`);
+            throw new Error(ERROR_INSUFFICIENT_QUANTITY_TRANSFER);
           }
 
           if (invItem.quantity === qty) {
@@ -292,9 +308,9 @@ export class TransactionService {
       await tx.auditLog.create({
         data: {
           characterId: sender.id,
-          category: "Intercambio",
+          category: AUDIT_LOG_CATEGORY.INTERCAMBIO,
           detail: `Transfirió a [${data.receiverId}]: ${itemsLog}${moneyLog}`,
-          evidence: "Sistema de Transacciones",
+          evidence: EVIDENCE.SISTEMA_TRANSACCIONES,
           deltaRyou: -transferAmount,
           ...auditBase
         }
@@ -303,9 +319,9 @@ export class TransactionService {
       await tx.auditLog.create({
         data: {
           characterId: data.receiverId,
-          category: "Intercambio",
+          category: AUDIT_LOG_CATEGORY.INTERCAMBIO,
           detail: `Recibió de [${sender.id}]: ${itemsLog}${moneyLog}`,
-          evidence: "Sistema de Transacciones",
+          evidence: EVIDENCE.SISTEMA_TRANSACCIONES,
           deltaRyou: transferAmount,
           ...auditBase
         }
