@@ -25,6 +25,8 @@ import {
     getLogroReputacionEntry,
     type DetailedRewardBreakdown
 } from '../../config/activityRewards';
+import { SEVERIDAD_CHOICES } from '../../config/choices';
+import { DATE_OPTION_VARIANTS } from '../../config/uiStrings';
 
 const rewardCalculatorService = new RewardCalculatorService();
 const activityCapService = new ActivityCapService(prisma);
@@ -70,14 +72,6 @@ const RESULTADO_COMBATE_CHOICES = [
 const RESULTADO_CRONICA_EVENTO_CHOICES = [
     { name: '⭐ Destacado', value: 'Destacado' },
     { name: '📝 Participación', value: 'Participación' }
-];
-
-const SEVERIDAD_CHOICES = [
-    { name: 'Herido Leve', value: 'Herido Leve' },
-    { name: 'Herido Grave', value: 'Herido Grave' },
-    { name: 'Herido Crítico', value: 'Herido Critico' },
-    { name: 'Coma', value: 'Coma' },
-    { name: 'Herida Letal', value: 'Herida Letal' }
 ];
 
 function normalizeForMatch(value: string): string {
@@ -137,7 +131,6 @@ function formatDetailedRewardLines(detailed: DetailedRewardBreakdown): string[] 
 }
 
 const evidenciaDesc = 'Link al foro, pantallazo o mensaje de Discord que prueba la actividad';
-const fechaDesc = 'Fecha de la actividad (en formato DD/MM/YYYY o escribe "hoy").';
 
 export const data = new SlashCommandBuilder()
     .setName(COMMAND_NAMES.registrar_suceso)
@@ -147,7 +140,7 @@ export const data = new SlashCommandBuilder()
             .setName('mision')
             .setDescription('Registrar una misión')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -172,7 +165,7 @@ export const data = new SlashCommandBuilder()
             .setName('combate')
             .setDescription('Registrar un combate')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -197,7 +190,7 @@ export const data = new SlashCommandBuilder()
             .setName('cronica')
             .setDescription('Registrar una crónica')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -222,7 +215,7 @@ export const data = new SlashCommandBuilder()
             .setName('evento')
             .setDescription('Registrar un evento')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -247,7 +240,7 @@ export const data = new SlashCommandBuilder()
             .setName('escena')
             .setDescription('Registrar una escena')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -271,7 +264,7 @@ export const data = new SlashCommandBuilder()
             .setName('logro_general')
             .setDescription('Registrar un logro general')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -298,7 +291,7 @@ export const data = new SlashCommandBuilder()
             .setName('logro_saga')
             .setDescription('Registrar un logro de saga')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -318,7 +311,7 @@ export const data = new SlashCommandBuilder()
             .setName('logro_reputacion')
             .setDescription('Registrar un logro de reputación')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -336,7 +329,7 @@ export const data = new SlashCommandBuilder()
             .setName('balance_general')
             .setDescription('Registrar un balance general')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -372,7 +365,7 @@ export const data = new SlashCommandBuilder()
             .setName('experimento')
             .setDescription('Registrar un experimento')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -400,7 +393,7 @@ export const data = new SlashCommandBuilder()
             .setName('curacion')
             .setDescription('Registrar una curación')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -418,7 +411,7 @@ export const data = new SlashCommandBuilder()
             .setName('desarrollo_personal')
             .setDescription('Registrar desarrollo personal')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)
@@ -428,7 +421,7 @@ export const data = new SlashCommandBuilder()
         sc
             .setName('mesiversario')
             .setDescription('Registrar recompensas por mesiversario')
-            .addStringOption((o) => o.setName('fecha').setDescription(fechaDesc).setRequired(true))
+            .addStringOption((o) => o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true))
             .addStringOption((o) => o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true))
             .addIntegerOption((o) => o.setName('exp').setDescription('EXP (opcional)').setRequired(false).setMinValue(0))
             .addIntegerOption((o) => o.setName('pr').setDescription('PR (opcional)').setRequired(false).setMinValue(0))
@@ -441,7 +434,7 @@ export const data = new SlashCommandBuilder()
         sc
             .setName('recompensa_especial')
             .setDescription('Registrar una recompensa especial otorgada por el Staff')
-            .addStringOption((o) => o.setName('fecha').setDescription(fechaDesc).setRequired(true))
+            .addStringOption((o) => o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true))
             .addStringOption((o) => o.setName('detalle').setDescription('Motivo o detalle de la recompensa').setRequired(true))
             .addStringOption((o) => o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true))
             .addIntegerOption((o) => o.setName('exp').setDescription('EXP (opcional)').setRequired(false).setMinValue(0))
@@ -456,7 +449,7 @@ export const data = new SlashCommandBuilder()
             .setName('timeskip')
             .setDescription('Registrar un timeskip')
             .addStringOption((o) =>
-                o.setName('fecha').setDescription(fechaDesc).setRequired(true)
+                o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.actividad).setRequired(true)
             )
             .addStringOption((o) =>
                 o.setName('evidencia').setDescription(evidenciaDesc).setRequired(true)

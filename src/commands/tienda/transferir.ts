@@ -9,6 +9,7 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { businessRuleError, executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { DATE_OPTION_VARIANTS } from '../../config/uiStrings';
 import { getFechaFromOption } from '../../utils/dateParser';
 
 const transactionService = new TransactionService(prisma);
@@ -28,7 +29,7 @@ export const data = new SlashCommandBuilder()
     .setDescription('Transfiere Ryou y/o objetos a otro personaje.')
     .addStringOption(opt =>
         opt.setName('fecha')
-           .setDescription('Fecha de la transferencia (en formato DD/MM/YYYY o escribe "hoy").')
+           .setDescription(DATE_OPTION_VARIANTS.transferencia)
            .setRequired(true)
     )
     .addUserOption(opt => 

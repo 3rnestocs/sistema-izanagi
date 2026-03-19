@@ -12,6 +12,14 @@ import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
 import { RESOURCE_LABEL_MAP } from '../../services/ResourceAdjustmentService';
 import { LOGRO_GENERAL_CATALOG } from '../../config/activityRewards';
+import {
+  ERROR_STAFF_ONLY_HISTORIAL,
+  ERROR_NO_CHARACTER,
+  HISTORIAL_EMPTY,
+  HISTORIAL_CONTINUATION,
+  BUTTON_DELETE_MESSAGE,
+  ERROR_HISTORIAL_FETCH
+} from '../../config/uiStrings';
 
 const EMBED_DESC_MAX_LEN = 4000;
 
@@ -125,7 +133,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         targetUser.id !== interaction.user.id &&
         !interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)
       ) {
-        throw new Error('⛔ Solo staff puede ver el historial de otros personajes.');
+        throw new Error(ERROR_STAFF_ONLY_HISTORIAL);
       }
 
       const character = await prisma.character.findUnique({
@@ -133,7 +141,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       });
 
       if (!character) {
-        throw new Error(`⛔ ${targetUser.username} no tiene un personaje registrado.`);
+        throw new Error(ERROR_NO_CHARACTER(targetUser.username));
       }
 
       // Solo traemos el AuditLog (ya contiene todas las actividades, ascensos y compras)
@@ -149,7 +157,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const auditLines =
         auditLogs.length > 0
           ? auditLogs.map(formatAuditLine)
-          : ['Sin eventos registrados en el historial.'];
+          : [HISTORIAL_EMPTY];
           
       const auditChunks = chunkByLines(auditLines);
 
@@ -157,7 +165,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       auditChunks.forEach((chunk, i) => {
         const embedTitle = i === 0 
           ? `📜 Historial de ${character.name}` 
-          : '...continuación del historial...';
+          : HISTORIAL_CONTINUATION;
 
         embeds.push(
           new EmbedBuilder()
@@ -172,7 +180,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       const deleteRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
           .setCustomId(`historial_delete:${interaction.user.id}`)
-          .setLabel('Eliminar mensaje')
+          .setLabel(BUTTON_DELETE_MESSAGE)
           .setStyle(ButtonStyle.Secondary)
           .setEmoji('🗑️')
       );
@@ -185,7 +193,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     },
     {
       defer: { ephemeral: false },
-      fallbackMessage: 'Error al obtener historial.',
+      fallbackMessage: ERROR_HISTORIAL_FETCH,
       errorEphemeral: true
     }
   );

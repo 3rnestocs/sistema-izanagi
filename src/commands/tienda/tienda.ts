@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { assertForumPostContext } from '../../utils/channelGuards';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
+import { STORE_CURRENCY_CHOICES } from '../../config/choices';
 
 type StoreCurrency = 'RYOU' | 'EXP' | 'PR';
 
@@ -31,11 +32,7 @@ export const data = new SlashCommandBuilder()
       .setName('moneda')
       .setDescription('Filtrar por moneda')
       .setRequired(false)
-      .addChoices(
-        { name: 'Ryou', value: 'RYOU' },
-        { name: 'EXP', value: 'EXP' },
-        { name: 'PR', value: 'PR' }
-      )
+      .addChoices(...STORE_CURRENCY_CHOICES)
   )
   .addStringOption((option) =>
     option

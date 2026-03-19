@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 import { assertStaffAccess } from '../../utils/staffGuards';
 import { handleCommandError } from '../../utils/errorHandler';
+import { ERROR_OWNER_ONLY } from '../../config/uiStrings';
 
 const GESTION_FORUM_ID = process.env.GESTION_FORUM_ID ?? '';
 const REGISTRO_SUCESOS_FORUM_ID = process.env.REGISTRO_SUCESOS_FORUM_ID ?? '';
@@ -22,7 +23,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     const allowedId = process.env.BIENVENIDA_ALLOWED_USER_ID?.trim();
     if (!allowedId || interaction.user.id !== allowedId) {
       await interaction.reply({
-        content: '⛔ Solo el propietario configurado puede usar este comando.',
+        content: ERROR_OWNER_ONLY,
         ephemeral: true
       });
       return;

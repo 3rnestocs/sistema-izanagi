@@ -10,6 +10,17 @@ import { executeWithErrorHandling, validationError } from '../../utils/errorHand
 import { assertStaffAccess } from '../../utils/staffGuards';
 import { COMMAND_NAMES } from '../../config/commandNames';
 import {
+  DATE_OPTION_VARIANTS,
+  ERROR_DATE_FORMAT_PROVIDE,
+  FIELD_WEEK_OF,
+  FIELD_BASE_SALARY,
+  FIELD_ORIGIN_BONUS,
+  FIELD_BALANCE_MULTIPLIER,
+  FIELD_NET_RYOU,
+  FIELD_EXP_GRANTED,
+  FIELD_FINAL_BALANCE
+} from '../../config/uiStrings';
+import {
   getFechaFromOption,
   isMondayInTimezone,
   toDateOnlyUTC
@@ -39,7 +50,7 @@ export const data = new SlashCommandBuilder()
   .addStringOption((option) =>
     option
       .setName('fecha')
-      .setDescription('Fecha del lunes (formato DD/MM/YYYY o "hoy")')
+      .setDescription(DATE_OPTION_VARIANTS.lunes)
       .setRequired(true)
   );
 
@@ -58,7 +69,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         throw validationError(fechaResult.error);
       }
       if (!fechaResult || !('date' in fechaResult)) {
-        throw validationError('Debes proporcionar una fecha en formato DD/MM/YYYY o "hoy".');
+        throw validationError(ERROR_DATE_FORMAT_PROVIDE);
       }
 
       const parsedDate = fechaResult.date;
@@ -77,24 +88,24 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         )
         .addFields(
           {
-            name: 'Correspondiente a la semana del',
+            name: FIELD_WEEK_OF,
             value: formatClaimDate(result.claimDate),
             inline: false
           },
-          { name: 'Sueldo Base', value: `${result.baseSalary} Ryou`, inline: true },
-          { name: 'Bonos de Origen', value: `${result.bonusRyou} Ryou`, inline: true },
+          { name: FIELD_BASE_SALARY, value: `${result.baseSalary} Ryou`, inline: true },
+          { name: FIELD_ORIGIN_BONUS, value: `${result.bonusRyou} Ryou`, inline: true },
           {
-            name: 'Multiplicador de Balance',
+            name: FIELD_BALANCE_MULTIPLIER,
             value: `${result.multiplierGanancia.toFixed(2)}x`,
             inline: true
           },
           {
-            name: 'Ryou Neto',
+            name: FIELD_NET_RYOU,
             value: `${result.netDeltaRyou >= 0 ? '+' : ''}${result.netDeltaRyou} Ryou`,
             inline: true
           },
-          { name: 'EXP Otorgado', value: `+${result.weeklyExpBonus} EXP`, inline: true },
-          { name: 'Balance Final', value: `**${result.finalRyou} Ryou**`, inline: true }
+          { name: FIELD_EXP_GRANTED, value: `+${result.weeklyExpBonus} EXP`, inline: true },
+          { name: FIELD_FINAL_BALANCE, value: `**${result.finalRyou} Ryou**`, inline: true }
         )
         .setFooter({
           text: `Staff: ${interaction.user.tag} | ⚠️ Si la cantidad es incorrecta por multiplicadores (ej. Ambicioso), usa /ajustar_recursos retirar para corregir.`

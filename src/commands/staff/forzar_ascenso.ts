@@ -9,6 +9,14 @@ import { PromotionService } from '../../services/PromotionService';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { getFechaFromOption } from '../../utils/dateParser';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import {
+  DATE_OPTION_VARIANTS,
+  ERROR_INVALID_DATE,
+  ERROR_STAFF_ONLY,
+  ERROR_NO_CHARACTER_FICHA,
+  FIELD_SP_GRANTED,
+  FIELD_BASE_COMPENSATION
+} from '../../config/uiStrings';
 
 const promotionService = new PromotionService(prisma);
 
@@ -25,7 +33,7 @@ export const data = new SlashCommandBuilder()
     o.setName('nivel').setDescription('Nivel de destino').setRequired(true).addChoices(...LEVEL_CHOICES)
   )
   .addStringOption((o) =>
-    o.setName('fecha').setDescription('Fecha del ascenso (DD/MM/YYYY o "hoy")').setRequired(true)
+    o.setName('fecha').setDescription(DATE_OPTION_VARIANTS.ascensoShort).setRequired(true)
   );
 
 export async function execute(interaction: ChatInputCommandInteraction) {
@@ -34,7 +42,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
     COMMAND_NAMES.forzar_ascenso,
     async (interaction) => {
       if (!interaction.memberPermissions?.has(PermissionFlagsBits.Administrator)) {
-        throw new Error('⛔ Este comando es exclusivo de Staff.');
+        throw new Error(ERROR_STAFF_ONLY);
       }
 
       const targetUser = interaction.options.getUser('usuario', true);
@@ -42,7 +50,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 
       const fechaResult = getFechaFromOption(interaction.options.getString('fecha'));
       if (fechaResult && 'error' in fechaResult) throw validationError(fechaResult.error);
-      if (!fechaResult || !('date' in fechaResult)) throw validationError('⛔ Fecha inválida.');
+      if (!fechaResult || !('date' in fechaResult)) throw validationError(ERROR_INVALID_DATE);
       const promotedAt = fechaResult.date;
 
       const character = await prisma.character.findUnique({
@@ -50,7 +58,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
       });
 
       if (!character) {
-        throw new Error(`⛔ El usuario ${targetUser.username} no tiene ficha registrada.`);
+        throw new Error(ERROR_NO_CHARACTER_FICHA(targetUser.username));
       }
 
       const result = await promotionService.forceLevelPromotion(
@@ -66,13 +74,13 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         .setDescription(`Se ha forzado el ascenso de **${character.name}** saltando requisitos automáticos.`)
         .addFields(
           { name: 'Nivel', value: `${result.previousLevel} ➔ **${result.newLevel}**`, inline: true },
-          { name: 'SP Acumulados', value: `+${result.spGranted}`, inline: true },
+          { name: FIELD_SP_GRANTED, value: `+${result.spGranted}`, inline: true },
           { name: 'Fecha Oficial', value: promotedAt.toLocaleDateString('es-ES'), inline: true }
         );
 
       if (result.expGranted > 0 || result.prGranted > 0) {
         embed.addFields({
-          name: 'Compensación de Base (Para alcanzar el mínimo del nivel)',
+          name: FIELD_BASE_COMPENSATION,
           value: `✨ EXP: +${result.expGranted} | 🏆 PR: +${result.prGranted}`,
           inline: false
         });

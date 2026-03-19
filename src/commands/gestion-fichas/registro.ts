@@ -21,6 +21,7 @@ import {
 import { assertForumPostContext } from '../../utils/channelGuards';
 import { formatChannelReference } from '../../utils/channelRefs';
 import { getFechaFromOption } from '../../utils/dateParser';
+import { DATE_OPTION_VARIANTS } from '../../config/uiStrings';
 import { BuildApprovalService } from '../../services/BuildApprovalService';
 import { AppCommandError, CommandErrorStyle, CommandErrorType, handleCommandError } from '../../utils/errorHandler';
 
@@ -179,7 +180,7 @@ export const data = new SlashCommandBuilder()
     .addStringOption((option) =>
         option
             .setName('fecha')
-            .setDescription('Fecha de creación de la ficha (en formato DD/MM/YYYY o escribe "hoy").')
+            .setDescription(DATE_OPTION_VARIANTS.creacion)
             .setRequired(true)
     )
     .addStringOption((option) =>

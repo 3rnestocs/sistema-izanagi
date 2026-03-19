@@ -10,21 +10,12 @@ import { assertStaffAccess } from '../../utils/staffGuards';
 import {
   ADJUSTABLE_RESOURCES,
   AdjustableResource,
-  ResourceAdjustmentService
+  ResourceAdjustmentService,
+  RESOURCE_LABEL_MAP
 } from '../../services/ResourceAdjustmentService';
+import { PLACEHOLDER_NO_EVIDENCE } from '../../config/uiStrings';
 
 const resourceAdjustmentService = new ResourceAdjustmentService(prisma);
-
-const RESOURCE_CHOICE_LABELS: Record<AdjustableResource, string> = {
-  ryou: 'Ryou',
-  exp: 'EXP',
-  pr: 'PR',
-  sp: 'SP',
-  cupos: 'Cupos',
-  rc: 'RC',
-  bts: 'BTS',
-  bes: 'BES'
-};
 
 export const data = new SlashCommandBuilder()
   .setName('ajustar_recursos')
@@ -48,7 +39,7 @@ export const data = new SlashCommandBuilder()
 
         for (const resource of ADJUSTABLE_RESOURCES) {
           option.addChoices({
-            name: RESOURCE_CHOICE_LABELS[resource],
+            name: RESOURCE_LABEL_MAP[resource],
             value: resource
           });
         }
@@ -95,7 +86,7 @@ export const data = new SlashCommandBuilder()
 
         for (const resource of ADJUSTABLE_RESOURCES) {
           option.addChoices({
-            name: RESOURCE_CHOICE_LABELS[resource],
+            name: RESOURCE_LABEL_MAP[resource],
             value: resource
           });
         }
@@ -201,7 +192,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
             },
             {
               name: 'Evidencia',
-              value: evidence ?? 'Sin evidencia adjunta',
+              value: evidence ?? PLACEHOLDER_NO_EVIDENCE,
               inline: false
             }
           )
@@ -258,7 +249,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
             },
             {
               name: 'Evidencia',
-              value: evidence ?? 'Sin evidencia adjunta',
+              value: evidence ?? PLACEHOLDER_NO_EVIDENCE,
               inline: false
             }
           )

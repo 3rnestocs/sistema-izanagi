@@ -9,6 +9,14 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import {
+  FIELD_WEEK_OF,
+  FIELD_BASE_SALARY,
+  FIELD_ORIGIN_BONUS,
+  FIELD_BALANCE_MULTIPLIER,
+  FIELD_FINAL_BALANCE,
+  FIELD_WEEKLY_EXP_BONUS
+} from '../../config/uiStrings';
 import { getMostRecentMonday } from '../../utils/dateParser';
 
 const salaryService = new SalaryService(prisma);
@@ -65,16 +73,16 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         .setTitle('💰 Cobro de Sueldo Semanal')
         .setDescription(`**${result.characterName}** ha cobrado su sueldo semanal.`)
         .addFields(
-          { name: 'Correspondiente a la semana del', value: formatClaimDate(result.claimDate), inline: false },
-          { name: 'Sueldo Base', value: `${result.baseSalary} Ryou`, inline: true },
-          { name: 'Bonos de Origen', value: `${result.bonusRyou} Ryou`, inline: true },
+          { name: FIELD_WEEK_OF, value: formatClaimDate(result.claimDate), inline: false },
+          { name: FIELD_BASE_SALARY, value: `${result.baseSalary} Ryou`, inline: true },
+          { name: FIELD_ORIGIN_BONUS, value: `${result.bonusRyou} Ryou`, inline: true },
           {
-            name: 'Multiplicador de Balance',
+            name: FIELD_BALANCE_MULTIPLIER,
             value: `${result.multiplierGanancia.toFixed(2)}x`,
             inline: true
           },
-          { name: 'Balance Final', value: `**${result.finalRyou} Ryou**`, inline: true },
-          { name: 'Bono EXP Semanal', value: `+${result.weeklyExpBonus} EXP`, inline: true }
+          { name: FIELD_FINAL_BALANCE, value: `**${result.finalRyou} Ryou**`, inline: true },
+          { name: FIELD_WEEKLY_EXP_BONUS, value: `+${result.weeklyExpBonus} EXP`, inline: true }
         )
         .setTimestamp();
 

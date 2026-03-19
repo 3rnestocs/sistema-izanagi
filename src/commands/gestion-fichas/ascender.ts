@@ -10,20 +10,10 @@ import { type OptionalRequirement } from '../../services/LevelUpService';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { getFechaFromOption } from '../../utils/dateParser';
 import { assertForumPostContext } from '../../utils/channelGuards';
+import { CARGO_CHOICES } from '../../config/choices';
+import { DATE_OPTION_VARIANTS, ERROR_DATE_FORMAT_HINT } from '../../config/uiStrings';
 
 const promotionService = new PromotionService(prisma);
-
-const CARGO_CHOICES: Array<{ name: string; value: string }> = [
-  { name: 'Chuunin', value: 'Chuunin' },
-  { name: 'Tokubetsu Jounin', value: 'Tokubetsu Jounin' },
-  { name: 'Jounin', value: 'Jounin' },
-  { name: 'ANBU', value: 'ANBU' },
-  { name: 'Buntaichoo', value: 'Buntaichoo' },
-  { name: 'Jounin Hanchou', value: 'Jounin Hanchou' },
-  { name: 'Go-Ikenban', value: 'Go-Ikenban' },
-  { name: 'Líder de Clan', value: 'Lider de Clan' },
-  { name: 'Kage', value: 'Kage' }
-];
 
 function formatOptionalStatus(opt: OptionalRequirement): string {
   if (opt.status === 'COMPLETADO') return '✅ COMPLETADO';
@@ -70,7 +60,7 @@ export const data = new SlashCommandBuilder()
   .addStringOption((option) =>
     option
       .setName('fecha')
-      .setDescription('Fecha del ascenso (en formato DD/MM/YYYY o escribe "hoy").')
+      .setDescription(DATE_OPTION_VARIANTS.ascenso)
       .setRequired(true)
   )
   .addStringOption((option) =>
@@ -138,7 +128,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         throw new Error(`⛔ ${fechaResult.error}`);
       }
       if (!fechaResult || !('date' in fechaResult)) {
-        throw new Error('⛔ Debes indicar una fecha válida (DD/MM/YYYY o "hoy").');
+        throw new Error(`⛔ ${ERROR_DATE_FORMAT_HINT}`);
       }
       const promotedAt = fechaResult.date;
 

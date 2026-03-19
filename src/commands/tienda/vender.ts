@@ -9,6 +9,7 @@ import { assertForumPostContext } from '../../utils/channelGuards';
 import { cleanupExpiredCooldowns, consumeCommandCooldown } from '../../utils/commandThrottle';
 import { executeWithErrorHandling, validationError } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { DATE_OPTION_VARIANTS } from '../../config/uiStrings';
 import { getFechaFromOption } from '../../utils/dateParser';
 
 const transactionService = new TransactionService(prisma);
@@ -29,7 +30,7 @@ export const data = new SlashCommandBuilder()
   .addStringOption((option) =>
     option
       .setName('fecha')
-      .setDescription('Fecha de la venta (en formato DD/MM/YYYY o escribe "hoy").')
+      .setDescription(DATE_OPTION_VARIANTS.venta)
       .setRequired(true)
   )
   .addStringOption((option) =>
