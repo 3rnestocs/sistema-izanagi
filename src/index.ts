@@ -22,6 +22,22 @@ import { CharacterService } from './services/CharacterService';
 import { PlazaService } from './services/PlazaService';
 import { ReactionApprovalRouter } from './services/ReactionApprovalRouter';
 import { getRegistrarSucesoForumIds, getAllBotForumIds } from './utils/channelGuards';
+import {
+  ERROR_COMMAND_EXECUTION,
+  ERROR_DELETE_MESSAGE_FAILED,
+  ERROR_FICHA_DELETE_AUTH,
+  ERROR_FICHA_DELETE_FAILED,
+  ERROR_FICHA_IMAGE_OWNER_ONLY,
+  ERROR_HISTORIAL_DELETE_AUTH,
+  ERROR_INTERNAL,
+  ERROR_URL_MUST_BE_IMAGE,
+  ERROR_URL_MUST_START_HTTPS,
+  MODAL_FICHA_IMAGE_LABEL,
+  MODAL_FICHA_IMAGE_PLACEHOLDER,
+  MODAL_FICHA_IMAGE_TITLE,
+  SUCCESS_FICHA_IMAGE_UPDATED
+} from './config/uiStrings';
+import { LOG } from './config/logStrings';
 
 // Commands will be loaded dynamically
 let commands: Collection<string, Command>;
@@ -71,10 +87,10 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         }, user.tag ?? user.username ?? user.id);
 
         if (approved) {
-            console.log(`✅ Aprobación procesada desde reacción en mensaje ${reaction.message.id}`);
+            console.log(LOG.APPROVAL_PROCESSED(reaction.message.id));
         }
     } catch (error) {
-        console.error('❌ Error procesando aprobación por reacción:', error);
+        console.error(LOG.ERROR_REACTION_APPROVAL, error);
     }
 });
 
@@ -108,7 +124,7 @@ client.on(Events.MessageReactionRemove, async (reaction, user) => {
         const hasAdminApprover = adminCheckResults.some(Boolean);
         await buildApprovalService.setApprovalActiveStateByMessageId(reaction.message.id, hasAdminApprover);
     } catch (error) {
-        console.error('❌ Error procesando remoción de aprobación por reacción:', error);
+        console.error(LOG.ERROR_REACTION_REMOVE, error);
     }
 });
 
@@ -132,12 +148,12 @@ client.on(Events.MessageCreate, async (message) => {
     try {
         await message.delete();
     } catch (error) {
-        console.error('❌ Error eliminando mensaje de no-dueño en thread:', error);
+        console.error(LOG.ERROR_DELETE_NON_OWNER, error);
     }
 });
 
 client.once(Events.ClientReady, async (c) => {
-    console.log(`✅ Sistema IZANAGI en línea. Bot: ${c.user.tag}`);
+    console.log(LOG.BOT_READY(c.user.tag));
     
     // Register reaction approval handlers (specific embed title matches)
     reactionApprovalRouter.register(wishApprovalHandler);
@@ -170,7 +186,7 @@ client.once(Events.ClientReady, async (c) => {
     
     // Load commands on startup
     commands = await loadCommands();
-    console.log(`📦 Loaded ${commands.size} commands`);
+    console.log(LOG.COMMANDS_LOADED(commands.size));
 });
 
 // 🧠 MANEJADOR DE COMANDOS (Dynamic)
@@ -183,7 +199,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
             if (!isCommandAuthor && !isAdmin) {
                 await interaction.reply({
-                    content: '⛔ Solo el autor del historial o staff puede eliminar este mensaje.',
+                    content: ERROR_HISTORIAL_DELETE_AUTH,
                     ephemeral: true
                 });
                 return;
@@ -194,7 +210,7 @@ client.on(Events.InteractionCreate, async interaction => {
             } catch (error) {
                 if (!interaction.replied && !interaction.deferred) {
                     await interaction.reply({
-                        content: '❌ No se pudo eliminar el mensaje.',
+                        content: ERROR_DELETE_MESSAGE_FAILED,
                         ephemeral: true
                     });
                 }
@@ -210,7 +226,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
             if (!isCommandAuthor && !isAdmin && !isThreadOwner) {
                 await interaction.reply({
-                    content: '⛔ Solo el autor de la ficha, el dueño del post o staff puede eliminar este mensaje.',
+                    content: ERROR_FICHA_DELETE_AUTH,
                     ephemeral: true
                 });
                 return;
@@ -221,7 +237,7 @@ client.on(Events.InteractionCreate, async interaction => {
             } catch (error) {
                 if (!interaction.replied && !interaction.deferred) {
                     await interaction.reply({
-                        content: '❌ No se pudo eliminar el mensaje de ficha.',
+                        content: ERROR_FICHA_DELETE_FAILED,
                         ephemeral: true
                     });
                 }
@@ -237,20 +253,20 @@ client.on(Events.InteractionCreate, async interaction => {
             });
             if (!character || character.discordId !== interaction.user.id) {
                 await interaction.reply({
-                    content: '⛔ Solo puedes cambiar la imagen de tu propio personaje.',
+                    content: ERROR_FICHA_IMAGE_OWNER_ONLY,
                     ephemeral: true
                 });
                 return;
             }
             const modal = new ModalBuilder()
                 .setCustomId(`ficha_set_image:${characterId}`)
-                .setTitle('Cambiar imagen del personaje')
+                .setTitle(MODAL_FICHA_IMAGE_TITLE)
                 .addComponents(
                     new ActionRowBuilder<TextInputBuilder>().addComponents(
                         new TextInputBuilder()
                             .setCustomId('image_url')
-                            .setLabel('URL de la imagen')
-                            .setPlaceholder('https://ejemplo.com/imagen.png')
+                            .setLabel(MODAL_FICHA_IMAGE_LABEL)
+                            .setPlaceholder(MODAL_FICHA_IMAGE_PLACEHOLDER)
                             .setStyle(TextInputStyle.Short)
                             .setRequired(true)
                     )
@@ -264,7 +280,7 @@ client.on(Events.InteractionCreate, async interaction => {
         if (interaction.customId.startsWith('ficha_set_image:')) {
             const characterId = interaction.customId.split(':')[1];
             if (!characterId) {
-                await interaction.reply({ content: '⛔ Error interno.', ephemeral: true });
+                await interaction.reply({ content: ERROR_INTERNAL, ephemeral: true });
                 return;
             }
             const urlInput = interaction.fields.getTextInputValue('image_url').trim();
@@ -273,7 +289,7 @@ client.on(Events.InteractionCreate, async interaction => {
             });
             if (!character || character.discordId !== interaction.user.id) {
                 await interaction.reply({
-                    content: '⛔ Solo puedes cambiar la imagen de tu propio personaje.',
+                    content: ERROR_FICHA_IMAGE_OWNER_ONLY,
                     ephemeral: true
                 });
                 return;
@@ -284,14 +300,14 @@ client.on(Events.InteractionCreate, async interaction => {
             const isKnownHost = knownHosts.some((h) => urlInput.includes(h));
             if (!urlInput.startsWith('https://') && !urlInput.startsWith('http://')) {
                 await interaction.reply({
-                    content: '⛔ La URL debe comenzar con https:// o http://',
+                    content: ERROR_URL_MUST_START_HTTPS,
                     ephemeral: true
                 });
                 return;
             }
             if (!isExtension && !isKnownHost) {
                 await interaction.reply({
-                    content: '⛔ La URL debe ser de una imagen (jpg, png, gif, webp) o de un host conocido (imgur, Discord CDN).',
+                    content: ERROR_URL_MUST_BE_IMAGE,
                     ephemeral: true
                 });
                 return;
@@ -301,7 +317,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 data: { imageUrl: urlInput }
             });
             await interaction.reply({
-                content: '✅ Imagen del personaje actualizada. Usa `/ficha` para ver el cambio.',
+                content: SUCCESS_FICHA_IMAGE_UPDATED,
                 ephemeral: true
             });
             return;
@@ -318,7 +334,7 @@ client.on(Events.InteractionCreate, async interaction => {
         try {
             await command.autocomplete(interaction);
         } catch (error) {
-            console.error(`❌ Error handling autocomplete for ${interaction.commandName}:`, error);
+            console.error(LOG.ERROR_AUTOCOMPLETE(interaction.commandName), error);
             if (!interaction.responded) {
                 await interaction.respond([]);
             }
@@ -331,50 +347,50 @@ client.on(Events.InteractionCreate, async interaction => {
 
     const command = commands.get(interaction.commandName);
     if (!command) {
-        console.warn(`⚠️  No command found for: ${interaction.commandName}`);
+        console.warn(LOG.WARN_NO_COMMAND(interaction.commandName));
         return;
     }
 
     try {
         await command.execute(interaction);
     } catch (error) {
-        console.error(`❌ Error executing command ${interaction.commandName}:`, error);
+        console.error(LOG.ERROR_EXECUTE_COMMAND(interaction.commandName), error);
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '❌ Error al ejecutar el comando', ephemeral: true });
+            await interaction.reply({ content: ERROR_COMMAND_EXECUTION, ephemeral: true });
         } else if (interaction.deferred) {
-            await interaction.editReply({ content: '❌ Error al ejecutar el comando' });
+            await interaction.editReply({ content: ERROR_COMMAND_EXECUTION });
         }
     }
 });
 
 // 🛑 GRACEFUL SHUTDOWN
 const gracefulShutdown = async (signal: string) => {
-    console.log(`\n🛑 ${signal} received. Shutting down gracefully...`);
-    
+    console.log(LOG.SHUTDOWN_START(signal));
+
     try {
         // Set timeout: force shutdown after 10 seconds
         const shutdownTimeout = setTimeout(() => {
-            console.error('❌ Graceful shutdown timeout. Force exiting...');
+            console.error(LOG.SHUTDOWN_TIMEOUT);
             process.exit(1);
         }, 10000);
 
         // Disconnect Discord bot
-        console.log('📡 Disconnecting from Discord...');
+        console.log(LOG.DISCONNECTING_DISCORD);
         await client.destroy();
-        console.log('✅ Discord bot disconnected');
+        console.log(LOG.DISCORD_DISCONNECTED);
 
         // Disconnect database
-        console.log('💾 Disconnecting from database...');
+        console.log(LOG.DISCONNECTING_DB);
         await disconnectPrisma();
-        console.log('✅ Database disconnected');
+        console.log(LOG.DB_DISCONNECTED);
 
         // Clear timeout if we got here successfully
         clearTimeout(shutdownTimeout);
-        
-        console.log('✅ Graceful shutdown completed');
+
+        console.log(LOG.SHUTDOWN_COMPLETE);
         process.exit(0);
     } catch (error) {
-        console.error('❌ Error during graceful shutdown:', error);
+        console.error(LOG.ERROR_SHUTDOWN, error);
         process.exit(1);
     }
 };

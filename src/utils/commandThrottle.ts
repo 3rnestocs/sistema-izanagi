@@ -1,3 +1,5 @@
+import { ERROR_COOLDOWN } from '../config/uiStrings';
+
 const cooldownStore = new Map<string, number>();
 
 const DEFAULT_COOLDOWNS_SECONDS = {
@@ -40,7 +42,7 @@ export function consumeCommandCooldown(params: CooldownParams): void {
 
   if (expiresAt && expiresAt > currentTime) {
     const retrySeconds = Math.ceil((expiresAt - currentTime) / 1000);
-    throw new Error(`⏳ Comando en enfriamiento. Intenta nuevamente en ${retrySeconds}s.`);
+    throw new Error(ERROR_COOLDOWN(retrySeconds));
   }
 
   const windowSeconds = getWindowSeconds(params.commandName, params.customWindowSeconds);

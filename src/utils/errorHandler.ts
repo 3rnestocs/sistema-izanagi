@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { ChatInputCommandInteraction } from 'discord.js';
+import { ERROR_HANDLER } from '../config/errorHandlerStrings';
 
 export enum CommandErrorType {
   Validation = 'validation',
@@ -78,7 +79,7 @@ export interface ErrorStyleOptions {
   inputNameTip?: string;
 }
 
-const DEFAULT_RECOVERY_TIP = '↩️ Tip: Presiona Ctrl+Z en la caja de chat para recuperar tu mensaje. También puedes seleccionar el comando resaltado encima de la respuesta del bot y copiar el texto desde ahí.';
+const DEFAULT_RECOVERY_TIP = ERROR_HANDLER.DEFAULT_RECOVERY_TIP;
 
 function sanitizeUserMessage(message: string): string {
   return message.replace(/^[⛔❌🚫\s]+/, '').trim();
@@ -117,21 +118,21 @@ function mapPrismaError(error: Prisma.PrismaClientKnownRequestError): AppCommand
     case 'P2002':
       return new AppCommandError({
         type: CommandErrorType.Conflict,
-        userMessage: 'Ya existe un registro con esos datos únicos.',
+        userMessage: ERROR_HANDLER.PRISMA_P2002,
         internalCode: 'DB_P2002_DUPLICATE',
         cause: error
       });
     case 'P2025':
       return new AppCommandError({
         type: CommandErrorType.NotFound,
-        userMessage: 'No se encontró el registro solicitado.',
+        userMessage: ERROR_HANDLER.PRISMA_P2025,
         internalCode: 'DB_P2025_NOT_FOUND',
         cause: error
       });
     default:
       return new AppCommandError({
         type: CommandErrorType.Database,
-        userMessage: 'Ocurrió un error al procesar la base de datos. Intenta nuevamente.',
+        userMessage: ERROR_HANDLER.PRISMA_GENERIC,
         internalCode: `DB_${error.code}`,
         cause: error
       });
@@ -180,8 +181,8 @@ export function formatCommandError(error: AppCommandError): string {
 }
 
 function formatMarkdownPanelError(error: AppCommandError, options?: ErrorStyleOptions): string {
-  const titleLine = options?.titleLine ?? '## :x: Operacion cancelada';
-  const mainPrefix = options?.mainPrefix ?? ':no_entry:';
+  const titleLine = options?.titleLine ?? ERROR_HANDLER.PANEL_TITLE;
+  const mainPrefix = options?.mainPrefix ?? ERROR_HANDLER.MAIN_PREFIX;
   const includeRecoveryTip = options?.includeRecoveryTip ?? true;
   const recoveryTip = options?.recoveryTip ?? DEFAULT_RECOVERY_TIP;
   const includeInputNameTipFromContext = options?.includeInputNameTipFromContext ?? false;
@@ -251,7 +252,7 @@ export async function handleCommandError(
   interaction: ChatInputCommandInteraction,
   options: HandleCommandErrorOptions
 ): Promise<void> {
-  const appError = coerceUnknownToAppError(error, options.fallbackMessage ?? 'Error del sistema. Intenta nuevamente.');
+  const appError = coerceUnknownToAppError(error, options.fallbackMessage ?? ERROR_HANDLER.SYSTEM_FALLBACK);
   const finalMessage = options.customFormatter
     ? options.customFormatter(appError)
     : formatErrorByStyle(appError, options.errorStyle ?? CommandErrorStyle.Default, options.styleOptions);
@@ -278,7 +279,7 @@ export async function handleCommandError(
       options.deferWasEphemeral
     );
   } catch (replyError) {
-    console.error('Failed to send error response:', replyError);
+    console.error(ERROR_HANDLER.FAILED_SEND_ERROR, replyError);
   }
 }
 
@@ -321,7 +322,7 @@ export function conflictError(message: string): AppCommandError {
 }
 
 export function cooldownError(message: string, seconds?: number): AppCommandError {
-  const detail = seconds ? [`Intenta de nuevo en ${seconds}s.`] : undefined;
+  const detail = seconds ? [ERROR_HANDLER.COOLDOWN_DETAIL(seconds)] : undefined;
   return new AppCommandError({
     type: CommandErrorType.Cooldown,
     userMessage: message,

@@ -1,4 +1,12 @@
 import { ChannelType, ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
+import {
+  ERROR_FORUM_CHANNEL_REQUIRED,
+  ERROR_FORUM_NOT_ENABLED,
+  ERROR_FORUM_OWN_POST_REQUIRED,
+  ERROR_FORUM_ROLE_REQUIRED,
+  ERROR_FORUM_THREAD_REQUIRED,
+  ERROR_GUILD_ONLY
+} from '../config/uiStrings';
 
 interface ForumGuardOptions {
   allowStaffBypass?: boolean;
@@ -105,17 +113,17 @@ export function assertForumPostContext(
   }
 
   if (!interaction.inGuild()) {
-    throw new Error('⛔ Este comando solo puede usarse dentro de un servidor.');
+    throw new Error(ERROR_GUILD_ONLY);
   }
 
   const channel = interaction.channel;
   if (!channel || !channel.isThread()) {
-    throw new Error('⛔ Usa este comando dentro de un post de foro (thread), no en un canal de texto normal.');
+    throw new Error(ERROR_FORUM_THREAD_REQUIRED);
   }
 
   const parent = channel.parent;
   if (!parent || parent.type !== ChannelType.GuildForum) {
-    throw new Error('⛔ Este comando solo está permitido en threads que pertenezcan a canales tipo foro.');
+    throw new Error(ERROR_FORUM_CHANNEL_REQUIRED);
   }
 
   const allowedRoleIds = getAllowedRoleIds();
@@ -123,25 +131,19 @@ export function assertForumPostContext(
     const memberRoleIds = getMemberRoleIds(interaction);
     const hasAllowedRole = memberRoleIds.some((roleId) => allowedRoleIds.includes(roleId));
     if (!hasAllowedRole) {
-      throw new Error('⛔ No tienes el rol permitido para usar este comando en el flujo de pruebas.');
+      throw new Error(ERROR_FORUM_ROLE_REQUIRED);
     }
   }
 
   const commandForumMap = getCommandForumMap();
   const allowedForumIds = commandForumMap.get(interaction.commandName) ?? getAllowedForumChannelIds();
   if (allowedForumIds.length > 0 && !allowedForumIds.includes(parent.id)) {
-    throw new Error(
-      invalidForumMessage
-      ?? '⛔ Este foro no está habilitado para comandos de ficha. Usa el foro configurado por Staff para creación/gestión de personaje.'
-    );
+    throw new Error(invalidForumMessage ?? ERROR_FORUM_NOT_ENABLED);
   }
 
   if (enforceThreadOwnership) {
     if (channel.ownerId && channel.ownerId !== interaction.user.id) {
-      throw new Error(
-        invalidThreadOwnershipMessage
-        ?? '⛔ Debes usar tu propio post del foro para ejecutar comandos de ficha.'
-      );
+      throw new Error(invalidThreadOwnershipMessage ?? ERROR_FORUM_OWN_POST_REQUIRED);
     }
   }
 }

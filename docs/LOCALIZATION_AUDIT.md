@@ -1,8 +1,8 @@
-# Localization Audit — `src/commands/`, `src/config/`, `src/domain/`, `src/database/`, `src/services/`
+# Localization Audit — `src/commands/`, `src/config/`, `src/domain/`, `src/database/`, `src/services/`, `src/index.ts`, `src/utils/`
 
 Report of hardcoded strings that can be centralized in `src/config/` for reuse across the app.
 
-**Implementation status:** Sections 1–4 (commands) and Section 10 (services) have been implemented. Sections 7–9 (config, domain, database) are audit findings for future work.
+**Implementation status:** Sections 1–4 (commands), Section 10 (services), and Section 12 (index, utils) have been implemented. Sections 7–9 (config, domain, database) are audit findings for future work.
 
 ---
 
@@ -523,3 +523,83 @@ These contain many validation and limit errors. Extract to `config/validationErr
 | **database** | Optional scriptStrings.ts for console messages | Low |
 | **services** | Extend `auditLogCategories.ts`; add `evidenceStrings.ts`, `serviceErrors.ts` | High |
 | **services** | Move `RESOURCE_LABEL_MAP` to config; add `requirementMessages.ts` | Medium |
+
+---
+
+## 12. `src/index.ts` and `src/utils/` — Audit findings (implemented)
+
+### 12.1 index.ts — user-facing strings
+
+| String | Suggested key | Context |
+|--------|---------------|---------|
+| `'⛔ Solo el autor del historial o staff puede eliminar este mensaje.'` | `ERROR_HISTORIAL_DELETE_AUTH` | historial_delete button |
+| `'❌ No se pudo eliminar el mensaje.'` | `ERROR_DELETE_MESSAGE_FAILED` | historial delete fail |
+| `'⛔ Solo el autor de la ficha, el dueño del post o staff puede eliminar este mensaje.'` | `ERROR_FICHA_DELETE_AUTH` | ficha_delete button |
+| `'❌ No se pudo eliminar el mensaje de ficha.'` | `ERROR_FICHA_DELETE_FAILED` | ficha delete fail |
+| `'⛔ Solo puedes cambiar la imagen de tu propio personaje.'` | `ERROR_FICHA_IMAGE_OWNER_ONLY` | ficha_change_image |
+| `'Cambiar imagen del personaje'` | `MODAL_FICHA_IMAGE_TITLE` | Modal title |
+| `'URL de la imagen'` | `MODAL_FICHA_IMAGE_LABEL` | Modal input label |
+| `'https://ejemplo.com/imagen.png'` | `MODAL_FICHA_IMAGE_PLACEHOLDER` | Modal placeholder |
+| `'⛔ Error interno.'` | `ERROR_INTERNAL` | Modal submit error |
+| `'⛔ La URL debe comenzar con https:// o http://'` | `ERROR_URL_MUST_START_HTTPS` | URL validation |
+| `'⛔ La URL debe ser de una imagen (jpg, png, gif, webp) o de un host conocido (imgur, Discord CDN).'` | `ERROR_URL_MUST_BE_IMAGE` | URL validation |
+| `'✅ Imagen del personaje actualizada. Usa \`/ficha\` para ver el cambio.'` | `SUCCESS_FICHA_IMAGE_UPDATED` | Success reply |
+| `'❌ Error al ejecutar el comando'` | `ERROR_COMMAND_EXECUTION` | Command catch-all |
+
+### 12.2 index.ts — console logs (optional, dev-only)
+
+| String | Suggested key |
+|--------|---------------|
+| `'✅ Aprobación procesada desde reacción en mensaje ${id}'` | `LOG_APPROVAL_PROCESSED` |
+| `'❌ Error procesando aprobación por reacción:'` | `LOG_ERROR_REACTION_APPROVAL` |
+| `'✅ Sistema IZANAGI en línea. Bot: ${tag}'` | `LOG_BOT_READY` |
+| `'📦 Loaded ${n} commands'` | `LOG_COMMANDS_LOADED` |
+| `'🛑 ${signal} received. Shutting down gracefully...'` | `LOG_SHUTDOWN_START` |
+| etc. | → `config/logStrings.ts` |
+
+### 12.3 utils/staffGuards.ts
+
+| String | Suggested key |
+|--------|---------------|
+| `'⛔ Este comando solo puede usarse dentro de un servidor.'` | `ERROR_GUILD_ONLY` |
+| `'⛔ No tienes permisos de staff para usar este comando.'` | `ERROR_STAFF_PERMISSION` |
+| `'⛔ Configuración inválida: falta cliente de base de datos para validación de NPC.'` | `ERROR_NPC_VALIDATION_NO_PRISMA` |
+| `'⛔ Tu ficha no tiene habilitado el permiso canCreateNPC para gestionar NPCs.'` | `ERROR_NPC_CAN_CREATE_REQUIRED` |
+
+### 12.4 utils/channelGuards.ts
+
+| String | Suggested key |
+|--------|---------------|
+| `'⛔ Usa este comando dentro de un post de foro (thread), no en un canal de texto normal.'` | `ERROR_FORUM_THREAD_REQUIRED` |
+| `'⛔ Este comando solo está permitido en threads que pertenezcan a canales tipo foro.'` | `ERROR_FORUM_CHANNEL_REQUIRED` |
+| `'⛔ No tienes el rol permitido para usar este comando en el flujo de pruebas.'` | `ERROR_FORUM_ROLE_REQUIRED` |
+| `'⛔ Este foro no está habilitado para comandos de ficha...'` | `ERROR_FORUM_NOT_ENABLED` |
+| `'⛔ Debes usar tu propio post del foro para ejecutar comandos de ficha.'` | `ERROR_FORUM_OWN_POST_REQUIRED` |
+
+### 12.5 utils/dateParser.ts
+
+| String | Suggested key |
+|--------|---------------|
+| `'Formato de fecha inválido. Usa DD/MM/YYYY (ej: 15/01/2025) o "hoy".'` | `ERROR_DATE_FORMAT_INVALID` |
+| `'Mes inválido. Debe estar entre 01 y 12.'` | `ERROR_DATE_MONTH_INVALID` |
+| `'Fecha inválida (ej: 31/02 no existe).'` | `ERROR_DATE_INVALID` |
+| `'La fecha no puede ser futura.'` | `ERROR_DATE_FUTURE` |
+| `'La fecha no puede ser hace más de ${n} días (${y} años).'` | `ERROR_DATE_TOO_OLD` (template) |
+
+### 12.6 utils/commandThrottle.ts
+
+| String | Suggested key |
+|--------|---------------|
+| `'⏳ Comando en enfriamiento. Intenta nuevamente en ${s}s.'` | `ERROR_COOLDOWN` (template) |
+
+### 12.7 utils/errorHandler.ts
+
+| String | Suggested key |
+|--------|---------------|
+| `'↩️ Tip: Presiona Ctrl+Z...'` | `DEFAULT_RECOVERY_TIP` |
+| `'## :x: Operacion cancelada'` | `ERROR_PANEL_TITLE` |
+| `'Ya existe un registro con esos datos únicos.'` | `ERROR_PRISMA_P2002` |
+| `'No se encontró el registro solicitado.'` | `ERROR_PRISMA_P2025` |
+| `'Ocurrió un error al procesar la base de datos. Intenta nuevamente.'` | `ERROR_PRISMA_GENERIC` |
+| `'Error del sistema. Intenta nuevamente.'` | `ERROR_SYSTEM_FALLBACK` |
+| `'Intenta de nuevo en ${s}s.'` | `COOLDOWN_DETAIL` (template) |

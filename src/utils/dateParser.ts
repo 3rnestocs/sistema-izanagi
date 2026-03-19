@@ -4,6 +4,13 @@
  */
 
 import dayjs from 'dayjs';
+import {
+  ERROR_DATE_FORMAT_INVALID,
+  ERROR_DATE_FUTURE,
+  ERROR_DATE_INVALID,
+  ERROR_DATE_MONTH_INVALID,
+  ERROR_DATE_TOO_OLD
+} from '../config/uiStrings';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 
@@ -49,7 +56,7 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   if (!match) {
     return {
       success: false,
-      message: `Formato de fecha inválido. Usa DD/MM/YYYY (ej: 15/01/2025) o "hoy".`
+      message: ERROR_DATE_FORMAT_INVALID
     };
   }
 
@@ -60,7 +67,7 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   if (month < 0 || month > 11) {
     return {
       success: false,
-      message: `Mes inválido. Debe estar entre 01 y 12.`
+      message: ERROR_DATE_MONTH_INVALID
     };
   }
 
@@ -68,7 +75,7 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month || date.getUTCDate() !== day) {
     return {
       success: false,
-      message: `Fecha inválida (ej: 31/02 no existe).`
+      message: ERROR_DATE_INVALID
     };
   }
 
@@ -77,7 +84,7 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   if (date > now) {
     return {
       success: false,
-      message: `La fecha no puede ser futura.`
+      message: ERROR_DATE_FUTURE
     };
   }
 
@@ -87,7 +94,7 @@ export function parseAndValidateFecha(value: string | null | undefined): ParseFe
   if (date < minDate) {
     return {
       success: false,
-      message: `La fecha no puede ser hace más de ${MAX_DAYS_BACK} días (${Math.floor(MAX_DAYS_BACK / 365)} años).`
+      message: ERROR_DATE_TOO_OLD(MAX_DAYS_BACK, Math.floor(MAX_DAYS_BACK / 365))
     };
   }
 

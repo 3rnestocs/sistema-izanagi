@@ -1,5 +1,11 @@
 import { ChatInputCommandInteraction, PermissionFlagsBits } from 'discord.js';
 import { PrismaClient } from '@prisma/client';
+import {
+  ERROR_GUILD_ONLY,
+  ERROR_NPC_CAN_CREATE_REQUIRED,
+  ERROR_NPC_VALIDATION_NO_PRISMA,
+  ERROR_STAFF_PERMISSION
+} from '../config/uiStrings';
 
 interface StaffGuardOptions {
   requireNpcCreationFlag?: boolean;
@@ -51,14 +57,14 @@ export async function assertStaffAccess(
   options: StaffGuardOptions = {}
 ): Promise<void> {
   if (!interaction.inGuild()) {
-    throw new Error('⛔ Este comando solo puede usarse dentro de un servidor.');
+    throw new Error(ERROR_GUILD_ONLY);
   }
 
   const isAdmin = interaction.memberPermissions?.has(PermissionFlagsBits.Administrator) ?? false;
   const hasStaffRole = hasConfiguredStaffRole(interaction);
 
   if (!isAdmin && !hasStaffRole) {
-    throw new Error('⛔ No tienes permisos de staff para usar este comando.');
+    throw new Error(ERROR_STAFF_PERMISSION);
   }
 
   if (!options.requireNpcCreationFlag || !shouldRequireNpcFlag()) {
@@ -70,7 +76,7 @@ export async function assertStaffAccess(
   }
 
   if (!options.prisma) {
-    throw new Error('⛔ Configuración inválida: falta cliente de base de datos para validación de NPC.');
+    throw new Error(ERROR_NPC_VALIDATION_NO_PRISMA);
   }
 
   const actorCharacter = await options.prisma.character.findUnique({
@@ -79,6 +85,6 @@ export async function assertStaffAccess(
   });
 
   if (!actorCharacter?.canCreateNPC) {
-    throw new Error('⛔ Tu ficha no tiene habilitado el permiso canCreateNPC para gestionar NPCs.');
+    throw new Error(ERROR_NPC_CAN_CREATE_REQUIRED);
   }
 }
