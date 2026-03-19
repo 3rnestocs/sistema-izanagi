@@ -10,17 +10,17 @@ import {
 import { prisma } from '../../lib/prisma';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
-import { ActivityStatus } from '../../domain/activityDomain';
 
-const EMBED_FIELD_MAX_LEN = 1020;
+// Aumentamos el límite porque ahora usaremos la 'description' del embed (límite 4096)
+const EMBED_DESC_MAX_LEN = 4000; 
 
-function chunkByLines(lines: string[], maxSize = EMBED_FIELD_MAX_LEN): string[][] {
+function chunkByLines(lines: string[], maxSize = EMBED_DESC_MAX_LEN): string[][] {
   const chunks: string[][] = [];
   let current: string[] = [];
   let currentSize = 0;
 
   for (const line of lines) {
-    const lineSize = line.length + 1;
+    const lineSize = line.length + 1; // +1 por el salto de línea
     if (currentSize + lineSize > maxSize && current.length > 0) {
       chunks.push(current);
       current = [line];
@@ -36,21 +36,6 @@ function chunkByLines(lines: string[], maxSize = EMBED_FIELD_MAX_LEN): string[][
   }
 
   return chunks;
-}
-
-function formatActivityLine(activity: {
-  type: string;
-  rank: string | null;
-  result: string | null;
-  narrationKey: string | null;
-  evidenceUrl: string;
-  createdAt: Date;
-}): string {
-  const date = activity.createdAt.toLocaleDateString('es-ES');
-  const rankPart = activity.rank ? ` ${activity.rank}` : '';
-  const resultPart = activity.result ? ` ${activity.result}` : '';
-  const narrationPart = activity.narrationKey ? ` — ${activity.narrationKey}` : '';
-  return `${date} | ${activity.type}${rankPart}${resultPart}${narrationPart} [Ver](${activity.evidenceUrl})`;
 }
 
 function formatAuditLine(log: { category: string; detail: string; createdAt: Date }): string {
@@ -90,66 +75,36 @@ export async function execute(interaction: ChatInputCommandInteraction) {
         throw new Error(`⛔ ${targetUser.username} no tiene un personaje registrado.`);
       }
 
-      const [activities, auditLogs] = await Promise.all([
-        prisma.activityRecord.findMany({
-          where: {
-            characterId: character.id,
-            status: { in: [ActivityStatus.APROBADO, ActivityStatus.AUTO_APROBADO] }
-          },
-          orderBy: { createdAt: 'desc' },
-          take: 15
-        }),
-        prisma.auditLog.findMany({
-          where: { characterId: character.id },
-          orderBy: { createdAt: 'desc' },
-          take: 10
-        })
-      ]);
+      // Solo traemos el AuditLog (ya contiene todas las actividades, ascensos y compras)
+      // Aumentamos considerablemente el límite de 10 a 100.
+      const auditLogs = await prisma.auditLog.findMany({
+        where: { characterId: character.id },
+        orderBy: { createdAt: 'desc' },
+        take: 100 
+      });
 
       const embeds: EmbedBuilder[] = [];
-
-      const headerEmbed = new EmbedBuilder()
-        .setColor(0x0099ff)
-        .setTitle(`📜 Historial de ${character.name}`)
-        .setDescription(`👤 Personaje desde ${character.createdAt.toLocaleDateString('es-ES')}`)
-        .setTimestamp();
-      embeds.push(headerEmbed);
-
-      const activityLines =
-        activities.length > 0
-          ? activities.map(formatActivityLine)
-          : ['Ninguna actividad aprobada.'];
-      const activityChunks = chunkByLines(activityLines);
-
-      activityChunks.forEach((chunk, i) => {
-        const name =
-          activityChunks.length > 1
-            ? `📋 Actividades recientes (últimas 15) — Página ${i + 1}/${activityChunks.length}`
-            : '📋 Actividades recientes (últimas 15)';
-        embeds.push(
-          new EmbedBuilder()
-            .setColor(0x43b581)
-            .addFields({ name, value: chunk.join('\n'), inline: false })
-            .setTimestamp()
-        );
-      });
 
       const auditLines =
         auditLogs.length > 0
           ? auditLogs.map(formatAuditLine)
-          : ['Sin eventos registrados.'];
+          : ['Sin eventos registrados en el historial.'];
+          
       const auditChunks = chunkByLines(auditLines);
 
+      // Creamos los embeds basándonos en los chunks
       auditChunks.forEach((chunk, i) => {
-        const name =
-          auditChunks.length > 1
-            ? `⚔️ Ascensos y eventos recientes (últimos 10) — Página ${i + 1}/${auditChunks.length}`
-            : '⚔️ Ascensos y eventos recientes (últimos 10)';
+        const embedTitle = i === 0 
+          ? `📜 Historial de ${character.name}` 
+          : '...continuación del historial...';
+
         embeds.push(
           new EmbedBuilder()
-            .setColor(0xfaa61a)
-            .addFields({ name, value: chunk.join('\n'), inline: false })
-            .setTimestamp()
+            .setColor(0xfaa61a) // Amarillo institucional
+            .setTitle(embedTitle)
+            .setDescription(chunk.join('\n'))
+            // Solo ponemos el timestamp en el último bloque para no repetirlo
+            .setTimestamp(i === auditChunks.length - 1 ? new Date() : null) 
         );
       });
 
@@ -161,6 +116,7 @@ export async function execute(interaction: ChatInputCommandInteraction) {
           .setEmoji('🗑️')
       );
 
+      // Discord permite un máximo de 10 embeds por mensaje.
       return interaction.editReply({
         embeds: embeds.slice(0, 10),
         components: [deleteRow]
