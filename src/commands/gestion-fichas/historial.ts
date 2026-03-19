@@ -10,9 +10,15 @@ import {
 import { prisma } from '../../lib/prisma';
 import { executeWithErrorHandling } from '../../utils/errorHandler';
 import { COMMAND_NAMES } from '../../config/commandNames';
+import { RESOURCE_LABEL_MAP } from '../../services/ResourceAdjustmentService';
+import { LOGRO_GENERAL_CATALOG } from '../../config/activityRewards';
 
-// Aumentamos el límite porque ahora usaremos la 'description' del embed (límite 4096)
-const EMBED_DESC_MAX_LEN = 4000; 
+const EMBED_DESC_MAX_LEN = 4000;
+
+const RESOURCE_PATTERN = new RegExp(
+  `(${Object.keys(RESOURCE_LABEL_MAP).join('|')})[:=]\\s*(-?\\d+)`,
+  'gi'
+);
 
 function chunkByLines(lines: string[], maxSize = EMBED_DESC_MAX_LEN): string[][] {
   const chunks: string[][] = [];
@@ -39,8 +45,63 @@ function chunkByLines(lines: string[], maxSize = EMBED_DESC_MAX_LEN): string[][]
 }
 
 function formatAuditLine(log: { category: string; detail: string; createdAt: Date }): string {
-  const date = log.createdAt.toLocaleDateString('es-ES');
-  return `${date} | ${log.category}: ${log.detail}`;
+  const date = log.createdAt.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: '2-digit',
+    year: '2-digit'
+  });
+  const dateTag = `\`${date}\``;
+
+  let icon = '🔹';
+  let title = log.category;
+  let body = log.detail;
+
+  if (log.category.includes('Actividad')) {
+    icon = '📜';
+    const typeMatch = body.match(/\((.*?)\)/) || body.match(/Actividad (.*?) (auto-)?aprobada/);
+    const type = typeMatch ? typeMatch[1] : 'Actividad';
+
+    const rewardsMatch = body.match(/Recompensas[^\w]+(.*)/);
+    const rewardsText = rewardsMatch?.[1] ?? 'Ninguna';
+    const rewards = rewardsText.replace(RESOURCE_PATTERN, (_, resource, amount) => {
+      const num = Number(amount);
+      const sign = num > 0 ? '+' : '';
+      const resourceKey = resource.toLowerCase() as keyof typeof RESOURCE_LABEL_MAP;
+      const label = RESOURCE_LABEL_MAP[resourceKey] ?? resource;
+      return `${sign}${num} ${label}`;
+    });
+
+    title = type ?? 'Actividad';
+    body = rewards;
+  } else if (log.category === 'Ascenso') {
+    icon = '🌟';
+    title = 'Ascenso';
+    body = body.replace('Ascenso de nivel: ', 'Nivel ').replace('Ascenso de rango: ', 'Cargo ');
+    const ascensoParts = body.split('. Objetivo:');
+    body = (ascensoParts[0] ?? body) as string;
+  } else if (log.category.includes('Rasgo')) {
+    icon = '🧬';
+    title = log.category;
+    body = body.replace(' agregado.', '').replace(' removido.', '').replace('Costo RC', 'RC');
+  } else if (
+    log.category.includes('Stats') ||
+    log.category.includes('Recursos') ||
+    log.category.includes('Sueldo')
+  ) {
+    icon = '⚙️';
+    title = log.category.includes('Sueldo') ? 'Sueldo' : 'Ajuste de Recursos';
+    body = body.replace('Inversión: ', '');
+  } else if (log.category.includes('Habilidad') || log.category.includes('Gestor')) {
+    icon = '🔥';
+    title = 'Habilidad';
+    body = body.replace('[INICIAL] Adquisición de: ', '');
+  } else if (log.category === 'Creación de Ficha') {
+    icon = '🐣';
+    title = 'Ficha Creada';
+    body = `${LOGRO_GENERAL_CATALOG[0]?.key ?? 'Bienvenido al Shinobi Sekai'}.`;
+  }
+
+  return `${dateTag} ${icon} **${title}** | ${body}`;
 }
 
 export const data = new SlashCommandBuilder()

@@ -61,7 +61,7 @@ const RESOURCE_DELTA_FIELD_MAP = {
   bes: 'deltaBes'
 } as const;
 
-const RESOURCE_LABEL_MAP = {
+export const RESOURCE_LABEL_MAP = {
   ryou: 'Ryou',
   exp: 'EXP',
   pr: 'PR',
