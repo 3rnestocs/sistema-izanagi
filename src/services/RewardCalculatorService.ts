@@ -13,6 +13,7 @@ import {
   roundHalfUp
 } from '../config/activityRewards';
 import { getHistoricalNarrationRewards } from '../config/historicalNarrations';
+import { NEWBIE_BOOST_CONFIG } from '../config/newbieBoost';
 import {
   ActivityType,
   canonicalizeActivityType,
@@ -64,8 +65,20 @@ export class RewardCalculatorService {
       return { exp: 0, pr: 0, ryou: 0 };
     }
 
-    // Apply trait multipliers if character has traits
-    return this.applyTraitMultipliers(baseRewards, character.traits ?? []);
+    let boostedBaseExp = baseRewards.exp;
+    let boostedBasePr = baseRewards.pr;
+
+    if (NEWBIE_BOOST_CONFIG.enabled && NEWBIE_BOOST_CONFIG.isEligibleForReward(character.level)) {
+      if (character.exp < NEWBIE_BOOST_CONFIG.maxExp && baseRewards.exp > 0) {
+        boostedBaseExp = Math.floor(baseRewards.exp * NEWBIE_BOOST_CONFIG.multiplier);
+      }
+      if (character.pr < NEWBIE_BOOST_CONFIG.maxPr && baseRewards.pr > 0) {
+        boostedBasePr = Math.floor(baseRewards.pr * NEWBIE_BOOST_CONFIG.multiplier);
+      }
+    }
+
+    const boostedBase = { ...baseRewards, exp: boostedBaseExp, pr: boostedBasePr };
+    return this.applyTraitMultipliers(boostedBase, character.traits ?? []);
   }
 
   /**
@@ -105,7 +118,39 @@ export class RewardCalculatorService {
       };
     }
 
-    const details = this.applyTraitMultipliersWithDetails(baseRewards, character.traits ?? []);
+    let boostedBaseExp = baseRewards.exp;
+    let boostedBasePr = baseRewards.pr;
+    let isNewbieExpActive = false;
+    let isNewbiePrActive = false;
+
+    if (NEWBIE_BOOST_CONFIG.enabled && NEWBIE_BOOST_CONFIG.isEligibleForReward(character.level)) {
+      if (character.exp < NEWBIE_BOOST_CONFIG.maxExp && baseRewards.exp > 0) {
+        boostedBaseExp = Math.floor(baseRewards.exp * NEWBIE_BOOST_CONFIG.multiplier);
+        isNewbieExpActive = true;
+      }
+      if (character.pr < NEWBIE_BOOST_CONFIG.maxPr && baseRewards.pr > 0) {
+        boostedBasePr = Math.floor(baseRewards.pr * NEWBIE_BOOST_CONFIG.multiplier);
+        isNewbiePrActive = true;
+      }
+    }
+
+    const mockRewardsForTraits = { ...baseRewards, exp: boostedBaseExp, pr: boostedBasePr };
+    const details = this.applyTraitMultipliersWithDetails(mockRewardsForTraits, character.traits ?? []);
+
+    if (isNewbieExpActive) {
+      const newbieBonusAmount = boostedBaseExp - baseRewards.exp;
+      details.exp.bonus += newbieBonusAmount;
+      details.exp.base = baseRewards.exp;
+      details.exp.source = details.exp.source ? `Bono Novato, ${details.exp.source}` : 'Bono Novato';
+    }
+
+    if (isNewbiePrActive) {
+      const newbieBonusAmount = boostedBasePr - baseRewards.pr;
+      details.pr.bonus += newbieBonusAmount;
+      details.pr.base = baseRewards.pr;
+      details.pr.source = details.pr.source ? `Bono Novato, ${details.pr.source}` : 'Bono Novato';
+    }
+
     return details;
   }
 

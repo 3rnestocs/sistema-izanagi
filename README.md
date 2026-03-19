@@ -75,6 +75,15 @@ ENABLE_MISSION_RANK_LIMITS="true"
 
 # Require character flag canCreateNPC to use NPC commands (default false)
 NPC_REQUIRE_CAN_CREATE="false"
+
+# --- BONO DE NOVATOS ---
+ENABLE_NEWBIE_BOOST="true"
+NEWBIE_BOOST_MULTIPLIER="2.5"
+NEWBIE_BOOST_MAX_EXP="250"
+NEWBIE_BOOST_MAX_PR="500"
+NEWBIE_BOOST_REWARD_MAX_RANK="C"
+NEWBIE_BOOST_TIME_MAX_LEVEL="B1"
+# (REWARD_MAX_RANK: hasta qué rango aplica x2.5; TIME_MAX_LEVEL: hasta qué nivel se omite tiempo de espera)
 ```
 
 ### 3. Prepare database
