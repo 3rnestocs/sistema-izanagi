@@ -47,51 +47,118 @@ export class RewardCalculatorService {
     S: 5
   };
 
+  /**
+   * Base EXP/PR/Ryou from activity rules only (no newbie, no traits).
+   * MANUAL tier or unknown type → null (matches previous {0,0,0} / empty detailed behavior).
+   */
+  private resolveActivityBaseRewards(
+    character: Character & { traits?: any[] },
+    activity: ActivityRecord & { narrationKey?: string | null }
+  ): RewardBreakdown | null {
+    const normalizedType = canonicalizeActivityType(activity.type);
+    if (!normalizedType) return null;
+
+    if (normalizedType === ActivityType.MISION) {
+      return this.calculateMissionRewards(activity.rank, activity.result);
+    }
+    if (normalizedType === ActivityType.COMBATE) {
+      return this.calculateCombatRewards(character.level, activity.rank, activity.result);
+    }
+    if (normalizedType === ActivityType.CURACION) {
+      return this.calculateCuracionRewards(activity.rank);
+    }
+    if (normalizedType === ActivityType.DESARROLLO_PERSONAL) {
+      return this.calculateDesarrolloPersonalRewards(character.level);
+    }
+    if (normalizedType === ActivityType.CRONICA) {
+      return this.calculateCronicaRewards(activity.result, activity.narrationKey);
+    }
+    if (normalizedType === ActivityType.EVENTO) {
+      return this.calculateEventoRewards(activity.result, activity.narrationKey);
+    }
+    if (normalizedType === ActivityType.LOGRO_GENERAL) {
+      return this.calculateLogroGeneralRewards(activity.narrationKey);
+    }
+    if (normalizedType === ActivityType.LOGRO_REPUTACION) {
+      return this.calculateLogroReputacionRewards(activity.narrationKey);
+    }
+    if (normalizedType === ActivityType.BALANCE_GENERAL) {
+      return this.calculateBalanceGeneralRewards(activity.narrationKey);
+    }
+    return null;
+  }
+
+  /**
+   * Novato: multiplica EXP/PR base antes de rasgos; flags indican si entró la rama (misma semántica que antes).
+   */
+  private applyNewbieBoostLayer(
+    character: Character,
+    base: RewardBreakdown
+  ): {
+    mockForTraits: RewardBreakdown;
+    newbieExpActive: boolean;
+    newbiePrActive: boolean;
+  } {
+    let boostedExp = base.exp;
+    let boostedPr = base.pr;
+    let newbieExpActive = false;
+    let newbiePrActive = false;
+
+    if (NEWBIE_BOOST_CONFIG.enabled && NEWBIE_BOOST_CONFIG.isEligibleForReward(character.level)) {
+      if (character.exp < NEWBIE_BOOST_CONFIG.maxExp && base.exp > 0) {
+        boostedExp = Math.floor(base.exp * NEWBIE_BOOST_CONFIG.multiplier);
+        newbieExpActive = true;
+      }
+      if (character.pr < NEWBIE_BOOST_CONFIG.maxPr && base.pr > 0) {
+        boostedPr = Math.floor(base.pr * NEWBIE_BOOST_CONFIG.multiplier);
+        newbiePrActive = true;
+      }
+    }
+
+    return {
+      mockForTraits: { ...base, exp: boostedExp, pr: boostedPr },
+      newbieExpActive,
+      newbiePrActive
+    };
+  }
+
+  /** Bono novato → multiplicadores de rasgo → ajuste de desglose para embed/auditoría. */
+  private buildDetailedFromBaseRewards(
+    character: Character & { traits?: any[] },
+    baseRewards: RewardBreakdown,
+    traits: any[]
+  ): DetailedRewardBreakdown {
+    const { mockForTraits, newbieExpActive, newbiePrActive } = this.applyNewbieBoostLayer(character, baseRewards);
+    const details = this.applyTraitMultipliersWithDetails(mockForTraits, traits);
+
+    if (newbieExpActive) {
+      const newbieBonusAmount = mockForTraits.exp - baseRewards.exp;
+      details.exp.bonus += newbieBonusAmount;
+      details.exp.base = baseRewards.exp;
+      details.exp.source = details.exp.source ? `${BONUS_NEWBIE}, ${details.exp.source}` : BONUS_NEWBIE;
+    }
+
+    if (newbiePrActive) {
+      const newbieBonusAmount = mockForTraits.pr - baseRewards.pr;
+      details.pr.bonus += newbieBonusAmount;
+      details.pr.base = baseRewards.pr;
+      details.pr.source = details.pr.source ? `${BONUS_NEWBIE}, ${details.pr.source}` : BONUS_NEWBIE;
+    }
+
+    return details;
+  }
+
   public calculateRewards(
     character: Character & { traits?: any[] },
     activity: ActivityRecord & { narrationKey?: string | null }
   ): RewardBreakdown {
-    const normalizedType = canonicalizeActivityType(activity.type);
-
-    let baseRewards: RewardBreakdown;
-
-    if (normalizedType === ActivityType.MISION) {
-      baseRewards = this.calculateMissionRewards(activity.rank, activity.result);
-    } else if (normalizedType === ActivityType.COMBATE) {
-      baseRewards = this.calculateCombatRewards(character.level, activity.rank, activity.result);
-    } else if (normalizedType === ActivityType.CURACION) {
-      baseRewards = this.calculateCuracionRewards(activity.rank); // rank stores severidad for Curacion
-    } else if (normalizedType === ActivityType.DESARROLLO_PERSONAL) {
-      baseRewards = this.calculateDesarrolloPersonalRewards(character.level);
-    } else if (normalizedType === ActivityType.CRONICA) {
-      baseRewards = this.calculateCronicaRewards(activity.result, activity.narrationKey);
-    } else if (normalizedType === ActivityType.EVENTO) {
-      baseRewards = this.calculateEventoRewards(activity.result, activity.narrationKey);
-    } else if (normalizedType === ActivityType.LOGRO_GENERAL) {
-      baseRewards = this.calculateLogroGeneralRewards(activity.narrationKey);
-    } else if (normalizedType === ActivityType.LOGRO_REPUTACION) {
-      baseRewards = this.calculateLogroReputacionRewards(activity.narrationKey);
-    } else if (normalizedType === ActivityType.BALANCE_GENERAL) {
-      baseRewards = this.calculateBalanceGeneralRewards(activity.narrationKey);
-    } else {
-      // MANUAL tier types (Escena, Logro de Saga, Experimento, Timeskip, Mesiversario, Recompensa Especial)
+    const baseRewards = this.resolveActivityBaseRewards(character, activity);
+    if (!baseRewards) {
       return { exp: 0, pr: 0, ryou: 0 };
     }
 
-    let boostedBaseExp = baseRewards.exp;
-    let boostedBasePr = baseRewards.pr;
-
-    if (NEWBIE_BOOST_CONFIG.enabled && NEWBIE_BOOST_CONFIG.isEligibleForReward(character.level)) {
-      if (character.exp < NEWBIE_BOOST_CONFIG.maxExp && baseRewards.exp > 0) {
-        boostedBaseExp = Math.floor(baseRewards.exp * NEWBIE_BOOST_CONFIG.multiplier);
-      }
-      if (character.pr < NEWBIE_BOOST_CONFIG.maxPr && baseRewards.pr > 0) {
-        boostedBasePr = Math.floor(baseRewards.pr * NEWBIE_BOOST_CONFIG.multiplier);
-      }
-    }
-
-    const boostedBase = { ...baseRewards, exp: boostedBaseExp, pr: boostedBasePr };
-    return this.applyTraitMultipliers(boostedBase, character.traits ?? []);
+    const { mockForTraits } = this.applyNewbieBoostLayer(character, baseRewards);
+    return this.applyTraitMultipliers(mockForTraits, character.traits ?? []);
   }
 
   /**
@@ -101,70 +168,15 @@ export class RewardCalculatorService {
     character: Character & { traits?: any[] },
     activity: ActivityRecord & { narrationKey?: string | null }
   ): DetailedRewardBreakdown {
-    const normalizedType = canonicalizeActivityType(activity.type);
-
-    let baseRewards: RewardBreakdown;
-
-    if (normalizedType === ActivityType.MISION) {
-      baseRewards = this.calculateMissionRewards(activity.rank, activity.result);
-    } else if (normalizedType === ActivityType.COMBATE) {
-      baseRewards = this.calculateCombatRewards(character.level, activity.rank, activity.result);
-    } else if (normalizedType === ActivityType.CURACION) {
-      baseRewards = this.calculateCuracionRewards(activity.rank);
-    } else if (normalizedType === ActivityType.DESARROLLO_PERSONAL) {
-      baseRewards = this.calculateDesarrolloPersonalRewards(character.level);
-    } else if (normalizedType === ActivityType.CRONICA) {
-      baseRewards = this.calculateCronicaRewards(activity.result, activity.narrationKey);
-    } else if (normalizedType === ActivityType.EVENTO) {
-      baseRewards = this.calculateEventoRewards(activity.result, activity.narrationKey);
-    } else if (normalizedType === ActivityType.LOGRO_GENERAL) {
-      baseRewards = this.calculateLogroGeneralRewards(activity.narrationKey);
-    } else if (normalizedType === ActivityType.LOGRO_REPUTACION) {
-      baseRewards = this.calculateLogroReputacionRewards(activity.narrationKey);
-    } else if (normalizedType === ActivityType.BALANCE_GENERAL) {
-      baseRewards = this.calculateBalanceGeneralRewards(activity.narrationKey);
-    } else {
+    const baseRewards = this.resolveActivityBaseRewards(character, activity);
+    if (!baseRewards) {
       return {
         exp: { base: 0, bonus: 0, total: 0 },
         pr: { base: 0, bonus: 0, total: 0 },
         ryou: { base: 0, bonus: 0, total: 0 }
       };
     }
-
-    let boostedBaseExp = baseRewards.exp;
-    let boostedBasePr = baseRewards.pr;
-    let isNewbieExpActive = false;
-    let isNewbiePrActive = false;
-
-    if (NEWBIE_BOOST_CONFIG.enabled && NEWBIE_BOOST_CONFIG.isEligibleForReward(character.level)) {
-      if (character.exp < NEWBIE_BOOST_CONFIG.maxExp && baseRewards.exp > 0) {
-        boostedBaseExp = Math.floor(baseRewards.exp * NEWBIE_BOOST_CONFIG.multiplier);
-        isNewbieExpActive = true;
-      }
-      if (character.pr < NEWBIE_BOOST_CONFIG.maxPr && baseRewards.pr > 0) {
-        boostedBasePr = Math.floor(baseRewards.pr * NEWBIE_BOOST_CONFIG.multiplier);
-        isNewbiePrActive = true;
-      }
-    }
-
-    const mockRewardsForTraits = { ...baseRewards, exp: boostedBaseExp, pr: boostedBasePr };
-    const details = this.applyTraitMultipliersWithDetails(mockRewardsForTraits, character.traits ?? []);
-
-    if (isNewbieExpActive) {
-      const newbieBonusAmount = boostedBaseExp - baseRewards.exp;
-      details.exp.bonus += newbieBonusAmount;
-      details.exp.base = baseRewards.exp;
-      details.exp.source = details.exp.source ? `${BONUS_NEWBIE}, ${details.exp.source}` : BONUS_NEWBIE;
-    }
-
-    if (isNewbiePrActive) {
-      const newbieBonusAmount = boostedBasePr - baseRewards.pr;
-      details.pr.bonus += newbieBonusAmount;
-      details.pr.base = baseRewards.pr;
-      details.pr.source = details.pr.source ? `${BONUS_NEWBIE}, ${details.pr.source}` : BONUS_NEWBIE;
-    }
-
-    return details;
+    return this.buildDetailedFromBaseRewards(character, baseRewards, character.traits ?? []);
   }
 
   /**
@@ -190,7 +202,8 @@ export class RewardCalculatorService {
     if ((claimed.rc ?? 0) > 0) base.rc = claimed.rc!;
     if ((claimed.cupos ?? 0) > 0) base.cupos = claimed.cupos!;
     if ((claimed.bts ?? 0) > 0) base.bts = claimed.bts!;
-    return this.applyTraitMultipliersWithDetails(base, character.traits ?? []);
+
+    return this.buildDetailedFromBaseRewards(character, base, character.traits ?? []);
   }
 
   /**
